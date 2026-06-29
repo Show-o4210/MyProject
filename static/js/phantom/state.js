@@ -53,11 +53,11 @@ export function createEmptyCard() {
 }
 
 export const tabs = [
-  { id: 'basic', icon: '📋', name: '基础属性', desc: '导入 JSON、GUID、阵营、费用、攻血与核心标记。', shortName: '属性' },
-  { id: 'traits', icon: '🧬', name: '种族标签', desc: '底层种族与逻辑 / 展示标签。', shortName: '标签' },
-  { id: 'abilities', icon: '✨', name: '特殊能力', desc: '组件能力与触发类技能。', shortName: '能力' },
-  { id: 'logic', icon: '⚡', name: '技能逻辑', desc: '结构树编辑技能，自动同步到 JSON。', shortName: '技能' },
-  { id: 'json', icon: '📄', name: 'JSON 输出', desc: '预览、复制与下载单卡 JSON。', shortName: 'JSON' }
+  { id: 'basic', icon: '📋', name: '基础属性', shortName: '属性' },
+  { id: 'traits', icon: '🧬', name: '种族标签', shortName: '标签' },
+  { id: 'abilities', icon: '✨', name: '特殊能力', shortName: '能力' },
+  { id: 'logic', icon: '⚡', name: '技能逻辑', shortName: '技能' },
+  { id: 'json', icon: '📄', name: 'JSON 输出', shortName: 'JSON' }
 ];
 
 export const logicWorkspaceTabs = [

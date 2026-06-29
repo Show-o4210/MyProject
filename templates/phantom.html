@@ -1,26 +1,74 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>幻影卡牌工坊 · 单卡编辑</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/phantom.css') }}">
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block title %}幻影卡牌工坊 - PVZH Mod 工具箱{% endblock %}
+
+{% block body_class %}phantom-page overflow-hidden{% endblock %}
+
+{% block footer_visible %}hidden{% endblock %}
+
+{% block header_brand_extra %}
+<span class="hidden sm:inline text-slate-300 font-normal">/</span>
+<span class="hidden sm:inline text-xs font-bold text-slate-600 truncate max-w-[7rem] md:max-w-none">幻影卡牌工坊</span>
+{% endblock %}
+
+{% block main_class %}max-w-none w-full h-[calc(100dvh-3.5rem)] overflow-hidden{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/phantom.css') }}">
+<style>
+  body.phantom-page.page-bg { background: linear-gradient(180deg, #f3f6fb 0%, #eef2f8 120px); }
+  body.phantom-page > main { display: flex; flex-direction: column; }
+  #phantom-app {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #header-tool-slot .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+  #header-tool-slot .btn {
+    padding: 5px 9px;
+    min-height: 32px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+  #header-tool-slot .status-chip {
+    font-size: 11px;
+    padding: 4px 8px;
+    max-width: 7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  @media (max-width: 640px) {
+    #header-tool-slot .topbar-actions .btn span:not(.material-symbols-rounded) {
+      display: none;
+    }
+    #header-tool-slot .status-chip { display: none; }
+  }
+  #phantom-app .app-shell {
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
   <div id="phantom-app" v-cloak>
-    <header class="topbar">
-      <div class="topbar-brand">
-        <div class="eyebrow">PVZ-H · JSON Creator</div>
-        <h1>🃏 幻影卡牌工坊</h1>
-      </div>
-      <button class="btn btn-small topbar-menu-btn" @click="openMobileMenu" aria-label="菜单">☰</button>
+    <teleport to="#header-tool-slot">
+      <button type="button" class="btn btn-small topbar-menu-btn" @click="openMobileMenu" aria-label="菜单">☰</button>
       <div class="topbar-actions">
-        <span class="status-chip" :class="configStatus">[[ configStatus === 'loaded' ? '✅ 资源就绪' : configStatus === 'loading' ? '⏳ 加载中' : '⚠️ 兜底配置' ]]</span>
-        <button class="btn" @click="resetCard">🗑️ 重置</button>
-        <button class="btn" @click="copyPreview">📋 复制 JSON</button>
-        <button class="btn" @click="setActiveTab('json')">📄 输出</button>
+        <span class="status-chip" :class="configStatus">[[ configStatus === 'loaded' ? '✅ 就绪' : configStatus === 'loading' ? '⏳ 加载' : '⚠️ 兜底' ]]</span>
+        <button type="button" class="btn btn-small" @click="resetCard" title="重置">🗑️ <span>重置</span></button>
+        <button type="button" class="btn btn-small" @click="copyPreview" title="复制 JSON">📋 <span>复制</span></button>
+        <button type="button" class="btn btn-small" @click="setActiveTab('json')" title="JSON 输出">📄 <span>输出</span></button>
       </div>
-    </header>
+    </teleport>
 
     <main class="app-shell">
       <aside class="sidebar">
@@ -35,7 +83,6 @@
         <div class="workspace-head">
           <div>
             <h2>[[ currentTab.icon ]] [[ currentTab.name ]]</h2>
-            <p>[[ currentTab.desc ]]</p>
           </div>
           <div class="head-badges">
             <span class="badge">🃏 [[ cardDisplayTitle ]]</span>
@@ -406,8 +453,8 @@
 
     <div class="phantom-toast" :class="{show: toastMessage}">[[ toastMessage ]]</div>
   </div>
+{% endblock %}
 
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <script type="module" src="{{ url_for('static', filename='js/phantom/main.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+<script type="module" src="{{ url_for('static', filename='js/phantom/main.js') }}"></script>
+{% endblock %}

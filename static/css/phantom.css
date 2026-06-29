@@ -132,7 +132,30 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .nav-icon { width: 22px; text-align: center; }
 .nav-label { font-weight: 600; font-size: 14px; }
 
-.workspace { min-width: 0; }
+.workspace {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+body.phantom-page {
+  overflow: hidden;
+  height: 100dvh;
+}
+body.phantom-page > main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+body.phantom-page #phantom-app .app-shell {
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
+}
 .workspace-head {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -145,8 +168,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   gap: 12px;
   box-shadow: var(--shadow);
 }
-.workspace-head h2 { margin: 0 0 4px; font-size: clamp(18px, 4vw, 21px); }
-.workspace-head p { margin: 0; color: var(--muted); font-size: 14px; }
+.workspace-head h2 { margin: 0; font-size: clamp(18px, 4vw, 21px); }
 .head-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .badge {
   background: var(--surface-2);

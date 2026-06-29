@@ -22,7 +22,7 @@
                         </h1>
 
                         <p class="text-sm md:text-base text-slate-500 leading-relaxed max-w-3xl">
-                            面向 AssetBundle / Unity 资源文件的结构检查、轻量解包、补丁回填与高级 RAW 工作流。默认只处理常用可编辑对象，降低免费服务器内存压力；高级玩家仍可手动开启完整通道。
+                            面向 AssetBundle / Unity 资源文件的结构检查、轻量解包与补丁回填。默认只处理常用可编辑对象（JSON / CSV / PNG），通过硬限制保证在线版响应速度。
                         </p>
                     </div>
 
@@ -65,7 +65,7 @@
                             结构检查
                         </h2>
                         <p class="text-sm text-slate-500 mt-2">
-                            默认快速检查只统计对象类型和 Path ID，不深读字段；需要名称与可编辑性细节时再切换深度检查。
+                            快速统计对象类型与 Path ID，不读取 typetree，保证低内存占用。
                         </p>
                     </div>
                 </div>
@@ -83,23 +83,6 @@
                         <p v-if="fileHints.inspect" class="text-xs text-slate-500 mt-2" v-text="fileHints.inspect"></p>
                     </div>
 
-                    <div class="bg-slate-50 rounded-2xl border border-slate-100 p-4">
-                        <label class="block text-sm font-bold text-slate-700 mb-3">检查深度</label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label class="rounded-2xl border p-4 cursor-pointer transition" :class="inspectDepth === 'fast' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-slate-200 text-slate-600'">
-                                <input type="radio" v-model="inspectDepth" value="fast" class="mr-2 accent-blue-600">
-                                <span class="font-extrabold text-sm">快速检查</span>
-                                <span class="block text-xs mt-1 opacity-75">低内存，只看类型统计与 Path ID。</span>
-                            </label>
-
-                            <label class="rounded-2xl border p-4 cursor-pointer transition" :class="inspectDepth === 'deep' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-slate-200 text-slate-600'">
-                                <input type="radio" v-model="inspectDepth" value="deep" class="mr-2 accent-blue-600">
-                                <span class="font-extrabold text-sm">深度检查</span>
-                                <span class="block text-xs mt-1 opacity-75">读取名称与 typetree，更准确但更吃内存。</span>
-                            </label>
-                        </div>
-                    </div>
-
                     <button
                         type="submit"
                         :disabled="loading.inspect"
@@ -115,11 +98,6 @@
                         <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                             <div class="text-xs font-bold text-slate-400">对象总数</div>
                             <div class="text-2xl font-extrabold text-slate-950 mt-1" v-text="inspectReport.total_objects"></div>
-                        </div>
-
-                        <div class="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-                            <div class="text-xs font-bold text-blue-500">检查模式</div>
-                            <div class="text-lg font-extrabold text-blue-800 mt-1" v-text="inspectReport.depth === 'deep' ? '深度' : '快速'"></div>
                         </div>
 
                         <div
@@ -177,7 +155,6 @@
                 <form ref="unpackForm" action="/unpack" method="post" enctype="multipart/form-data" @submit.prevent="handleAsyncDownload($event, '资源提取中')" class="space-y-5">
                     <input type="hidden" name="preset" :value="unpackPreset">
                     <input type="hidden" name="include_images" :value="includeImages ? '1' : '0'">
-                    <input type="hidden" name="fallback_raw" :value="fallbackRaw ? '1' : '0'">
                     <input type="hidden" name="include_index" value="1">
 
                     <div>
@@ -215,10 +192,9 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-2">导出格式</label>
-                            <select name="format" v-model="targetFormat" :disabled="unpackPreset !== 'advanced' && unpackPreset !== 'raw'" class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-60">
+                            <select name="format" v-model="targetFormat" :disabled="unpackPreset !== 'advanced'" class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none disabled:opacity-60">
                                 <option value="json">标准 JSON</option>
                                 <option value="csv">CSV</option>
-                                <option value="raw">原始数据 RAW</option>
                             </select>
                             <p class="text-xs text-slate-400 mt-2">推荐/补丁模式会自动使用 JSON。</p>
                         </div>
@@ -236,7 +212,7 @@
                         <button type="button" @click="showAdvancedUnpack = !showAdvancedUnpack" class="w-full flex items-center justify-between text-left">
                             <span>
                                 <span class="block text-sm font-extrabold text-slate-800">高级设置</span>
-                                <span class="block text-xs text-slate-500 mt-1">高阶玩家可以手动选择对象类型、图片导出与 RAW 兜底。</span>
+                                <span class="block text-xs text-slate-500 mt-1">高阶玩家可以手动选择对象类型与图片导出。</span>
                             </span>
                             <span class="material-symbols-rounded text-slate-500" v-text="showAdvancedUnpack ? 'expand_less' : 'expand_more'"></span>
                         </button>
@@ -247,28 +223,18 @@
                                 <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                                     <label v-for="typeName in exportTypeOptions" :key="typeName" class="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 cursor-pointer">
                                         <input type="checkbox" name="types" :value="typeName" v-model="selectedTypes" class="accent-blue-600">
-                                        <span v-text="typeName === '__all__' ? '全部对象' : typeName"></span>
+                                        <span v-text="typeName"></span>
                                     </label>
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <label class="flex items-start gap-3 bg-white rounded-2xl border border-slate-200 p-4 cursor-pointer">
-                                    <input type="checkbox" v-model="includeImages" class="mt-1 accent-blue-600">
-                                    <span>
-                                        <span class="block text-sm font-extrabold text-slate-800">导出图片 PNG</span>
-                                        <span class="block text-xs text-slate-500 mt-1">仅在需要替换贴图时开启。大量贴图会显著增加内存和输出体积。</span>
-                                    </span>
-                                </label>
-
-                                <label class="flex items-start gap-3 bg-white rounded-2xl border border-slate-200 p-4 cursor-pointer">
-                                    <input type="checkbox" v-model="fallbackRaw" class="mt-1 accent-blue-600">
-                                    <span>
-                                        <span class="block text-sm font-extrabold text-slate-800">失败对象降级 RAW</span>
-                                        <span class="block text-xs text-slate-500 mt-1">高危兜底。对象无法导出 JSON 时会尝试导出二进制。</span>
-                                    </span>
-                                </label>
-                            </div>
+                            <label class="flex items-start gap-3 bg-white rounded-2xl border border-slate-200 p-4 cursor-pointer">
+                                <input type="checkbox" v-model="includeImages" class="mt-1 accent-blue-600">
+                                <span>
+                                    <span class="block text-sm font-extrabold text-slate-800">导出图片 PNG</span>
+                                    <span class="block text-xs text-slate-500 mt-1">仅在需要替换贴图时开启。大量贴图会显著增加内存和输出体积。</span>
+                                </span>
+                            </label>
                         </div>
                     </div>
 
@@ -291,14 +257,12 @@
                         预检与回填
                     </h2>
                     <p class="text-sm text-slate-500 mt-2">
-                        推荐补丁包回填：只上传修改过的 JSON / PNG / CSV / DAT 与 _index.json，避免完整 ZIP 占用服务器内存。
+                        推荐补丁包回填：只上传修改过的 JSON / PNG / CSV 与 _index.json，避免完整 ZIP 占用服务器内存。
                     </p>
                 </div>
 
                 <form ref="repackForm" action="/repack" method="post" enctype="multipart/form-data" class="space-y-5">
                     <input type="hidden" name="repack_mode" :value="repackMode">
-                    <input type="hidden" name="validate_level" :value="validateLevel">
-
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-3">回填方式</label>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -356,18 +320,6 @@
                             </label>
                         </div>
 
-                        <label class="block text-sm font-bold text-slate-700 mb-3">预检强度</label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label class="inline-flex items-center text-sm font-bold text-slate-700 cursor-pointer bg-white border border-slate-200 rounded-xl px-3 py-2">
-                                <input type="radio" v-model="validateLevel" value="fast" class="mr-2 accent-blue-600">
-                                快速预检
-                            </label>
-
-                            <label class="inline-flex items-center text-sm font-bold text-slate-700 cursor-pointer bg-white border border-slate-200 rounded-xl px-3 py-2">
-                                <input type="radio" v-model="validateLevel" value="full" class="mr-2 accent-blue-600">
-                                完整预检
-                            </label>
-                        </div>
                     </div>
 
                     <div class="bg-green-50 border border-green-100 rounded-2xl p-4 text-sm text-green-800 leading-relaxed">
@@ -423,7 +375,7 @@
                     <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                         <div class="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                             <h3 class="font-extrabold text-slate-900 text-sm">预检明细</h3>
-                            <span class="text-xs text-slate-400" v-text="validationReport.validate_level === 'full' ? '完整预检' : '快速预检'"></span>
+                            <span class="text-xs text-slate-400">快速预检</span>
                         </div>
 
                         <div class="max-h-96 overflow-auto">
@@ -472,30 +424,6 @@
                 </div>
             </section>
 
-            <!-- RAW 模式说明 -->
-            <section v-show="activeMode === 'raw'" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-6">
-                <h2 class="text-xl font-extrabold text-slate-950 flex items-center">
-                    <span class="material-symbols-rounded text-red-500 mr-2">dangerous</span>
-                    RAW 高危模式
-                </h2>
-
-                <p class="text-sm text-slate-500 mt-3 leading-relaxed">
-                    RAW 模式会直接导出或写入对象原始数据，适合高级用户进行二进制级修改。它不会理解字段结构，也不会保护对象类型。
-                </p>
-
-                <div class="mt-5 bg-red-50 border border-red-100 rounded-2xl p-4 text-sm text-red-800 leading-relaxed">
-                    如果只是修改文本、数值、卡牌字段或贴图，请优先使用推荐 JSON / 图片模式。RAW 会显著增大输出体积，也更容易让免费服务器内存吃紧。
-                </div>
-
-                <button
-                    @click="enterRawExport"
-                    class="mt-5 inline-flex items-center justify-center gap-2 bg-slate-950 hover:bg-black text-white font-extrabold px-5 py-3 rounded-2xl transition active:scale-95"
-                >
-                    <span class="material-symbols-rounded">unarchive</span>
-                    我知道风险，进入 RAW 高级导出
-                </button>
-            </section>
-
             <section v-if="globalError" class="bg-red-50 border border-red-100 rounded-3xl p-5">
                 <h3 class="font-extrabold text-red-800 mb-2 flex items-center">
                     <span class="material-symbols-rounded mr-2">error</span>
@@ -512,24 +440,37 @@
 {% block scripts %}
 {% raw %}
 <script>
-    const { createApp, ref, computed, watch } = Vue;
+    const { createApp, ref, computed } = Vue;
+
+    async function ensureGateMessage(response) {
+        if (window.__pvzhGate?.parseGateError) {
+            return await window.__pvzhGate.parseGateError(response);
+        }
+        return null;
+    }
+
+    function withGateToken(formData) {
+        if (window.__pvzhGate?.appendTokenToFormData) {
+            window.__pvzhGate.appendTokenToFormData(formData);
+        }
+        return formData;
+    }
 
     createApp({
         setup() {
             const activeMode = ref('inspect');
 
             const modes = [
-                { id: 'inspect', title: '结构检查', subtitle: '快速 / 深度', icon: 'search' },
+                { id: 'inspect', title: '结构检查', subtitle: '快速统计', icon: 'search' },
                 { id: 'unpack', title: '解包导出', subtitle: '推荐 / 高级', icon: 'unarchive' },
-                { id: 'repack', title: '预检回填', subtitle: '补丁优先', icon: 'library_add' },
-                { id: 'raw', title: 'RAW 高危', subtitle: '二进制兜底', icon: 'dangerous' }
+                { id: 'repack', title: '预检回填', subtitle: '补丁优先', icon: 'library_add' }
             ];
 
             const unpackPresets = [
                 { id: 'recommended', title: '推荐模式', icon: 'verified', desc: '只导出 MonoBehaviour / TextAsset，适合改字段、文本、卡牌参数。' },
                 { id: 'patch', title: '补丁制作模式', icon: 'difference', desc: '导出干净 JSON 与 _index.json，方便只保留修改文件后回填。' },
                 { id: 'images', title: '图片模式', icon: 'image', desc: '只导出 Texture2D / Sprite PNG，适合替换贴图。' },
-                { id: 'advanced', title: '高级自定义', icon: 'tune', desc: '手动选择对象类型、格式、图片与 RAW 兜底。' }
+                { id: 'advanced', title: '高级自定义', icon: 'tune', desc: '手动选择对象类型、格式与图片导出。' }
             ];
 
             const exportTypeOptions = [
@@ -540,15 +481,13 @@
                 'GameObject',
                 'Material',
                 'AnimationClip',
-                'AudioClip',
-                '__all__'
+                'AudioClip'
             ];
 
             const inspectFile = ref(null);
             const unpackForm = ref(null);
             const repackForm = ref(null);
 
-            const inspectDepth = ref('fast');
             const inspectReport = ref(null);
             const validationReport = ref(null);
             const globalError = ref('');
@@ -557,11 +496,9 @@
             const targetFormat = ref('json');
             const selectedTypes = ref(['MonoBehaviour', 'TextAsset']);
             const includeImages = ref(false);
-            const fallbackRaw = ref(false);
             const showAdvancedUnpack = ref(false);
 
             const repackMode = ref('patch');
-            const validateLevel = ref('fast');
 
             const fileHints = ref({
                 inspect: '',
@@ -606,7 +543,7 @@
             const sizeAdvice = (bytes) => {
                 const mb = bytes / 1024 / 1024;
                 if (mb <= 30) return '在线版可正常处理。';
-                if (mb <= 80) return '建议使用推荐/补丁模式，避免图片与 RAW。';
+                if (mb <= 80) return '建议使用推荐/补丁模式，避免大量图片导出。';
                 if (mb <= 140) return '建议只做结构检查或补丁回填，避免全量导出。';
                 return '文件较大，在线版可能拒绝处理，建议使用本地版。';
             };
@@ -625,18 +562,10 @@
                     targetFormat.value = 'json';
                     selectedTypes.value = ['MonoBehaviour', 'TextAsset'];
                     includeImages.value = false;
-                    fallbackRaw.value = false;
                 } else if (unpackPreset.value === 'images') {
                     targetFormat.value = 'json';
                     selectedTypes.value = ['Texture2D', 'Sprite'];
                     includeImages.value = true;
-                    fallbackRaw.value = false;
-                } else if (unpackPreset.value === 'raw') {
-                    targetFormat.value = 'raw';
-                    selectedTypes.value = ['__all__'];
-                    includeImages.value = false;
-                    fallbackRaw.value = true;
-                    showAdvancedUnpack.value = true;
                 }
             };
 
@@ -647,18 +576,6 @@
                     showAdvancedUnpack.value = true;
                 }
             };
-
-            const enterRawExport = () => {
-                activeMode.value = 'unpack';
-                unpackPreset.value = 'raw';
-                applyPresetDefaults();
-            };
-
-            watch(selectedTypes, (newVal) => {
-                if (newVal.includes('__all__') && newVal.length > 1) {
-                    selectedTypes.value = ['__all__'];
-                }
-            });
 
             const inspectBundle = async () => {
                 globalError.value = '';
@@ -672,19 +589,20 @@
                 loading.value.inspect = true;
 
                 try {
-                    const formData = new FormData();
+                    const formData = withGateToken(new FormData());
                     formData.append('bundle', inspectFile.value.files[0]);
-                    formData.append('inspect_depth', inspectDepth.value);
-
                     const response = await fetch('/unity/inspect', {
                         method: 'POST',
                         body: formData
                     });
 
+                    const gateMsg = await ensureGateMessage(response);
+                    if (gateMsg) throw new Error(gateMsg);
+
                     const data = await response.json();
 
                     if (!response.ok || !data.success) {
-                        throw new Error(data.error || '结构检查失败');
+                        throw new Error(data.error || data.message || '结构检查失败');
                     }
 
                     inspectReport.value = data.report;
@@ -704,10 +622,8 @@
                     return;
                 }
 
-                const formData = new FormData(repackForm.value);
+                const formData = withGateToken(new FormData(repackForm.value));
                 formData.set('repack_mode', repackMode.value);
-                formData.set('validate_level', validateLevel.value);
-
                 const originalBundle = formData.get('original_bundle');
                 const modifiedZip = formData.get('modified_zip');
                 if (!originalBundle || !originalBundle.name || !modifiedZip || !modifiedZip.name) {
@@ -723,10 +639,13 @@
                         body: formData
                     });
 
+                    const gateMsg = await ensureGateMessage(response);
+                    if (gateMsg) throw new Error(gateMsg);
+
                     const data = await response.json();
 
                     if (!response.ok || !data.success) {
-                        throw new Error(data.error || '预检失败');
+                        throw new Error(data.error || data.message || '预检失败');
                     }
 
                     validationReport.value = data.report;
@@ -743,7 +662,7 @@
                     return;
                 }
 
-                if (!confirm('预检已通过，是否开始正式合成？正式合成会自动执行完整预检。')) {
+                if (!confirm('预检已通过，是否开始正式合成？')) {
                     return;
                 }
 
@@ -774,13 +693,12 @@
                 });
 
                 try {
-                    const formData = new FormData(formElement);
+                    const formData = withGateToken(new FormData(formElement));
 
                     if (formElement === unpackForm.value) {
                         formData.set('preset', unpackPreset.value);
                         formData.set('format', targetFormat.value);
                         formData.set('include_images', includeImages.value ? '1' : '0');
-                        formData.set('fallback_raw', fallbackRaw.value ? '1' : '0');
 
                         formData.delete('types');
                         selectedTypes.value.forEach(typeName => formData.append('types', typeName));
@@ -788,7 +706,6 @@
 
                     if (formElement === repackForm.value) {
                         formData.set('repack_mode', repackMode.value);
-                        formData.set('validate_level', validateLevel.value);
                     }
 
                     const response = await fetch(formElement.action, {
@@ -821,10 +738,13 @@
                         window.URL.revokeObjectURL(downloadUrl);
                         a.remove();
                     } else {
+                        const gateMsg = await ensureGateMessage(response);
+                        if (gateMsg) throw new Error(gateMsg);
+
                         const contentType = response.headers.get('Content-Type') || '';
                         if (contentType.includes('application/json')) {
                             const data = await response.json();
-                            throw new Error(data.error || '操作失败');
+                            throw new Error(data.error || data.message || '操作失败');
                         }
 
                         const errorHtml = await response.text();
@@ -851,7 +771,6 @@
                 inspectFile,
                 unpackForm,
                 repackForm,
-                inspectDepth,
                 inspectReport,
                 validationReport,
                 globalError,
@@ -859,10 +778,8 @@
                 targetFormat,
                 selectedTypes,
                 includeImages,
-                fallbackRaw,
                 showAdvancedUnpack,
                 repackMode,
-                validateLevel,
                 fileHints,
                 loading,
                 activePresetTitle,
@@ -870,7 +787,6 @@
                 canRepack,
                 onFileHint,
                 selectPreset,
-                enterRawExport,
                 inspectBundle,
                 validateRepack,
                 submitRepack,

@@ -2,26 +2,40 @@
 import datetime
 
 import requests
-from flask import Flask
+from flask import Flask, request
 from flask_apscheduler import APScheduler
 
 from config import Config
 from extensions import init_limiter
 from security import init_security_handlers
+from auth_gate import init_gate_handlers
 from blueprints.unity import unity_bp
 from blueprints.home import home_bp
 from blueprints.deck_editor import deck_editor_bp
 from blueprints.card_sender import card_sender_bp
 from blueprints.pack_buyer import pack_buyer_bp
+from blueprints.eadp_auth import eadp_auth_bp
+from blueprints.diamond_tool import diamond_tool_bp
 from blueprints.downloads import downloads_bp
 from blueprints.level_editor import level_editor_bp
 from blueprints.feedback import feedback_bp
 from blueprints.phantom import phantom_bp
+from blueprints.gate import gate_bp
+from blueprints.admin_tokens import admin_tokens_bp
+from utils.home_tabs import resolve_home_tab
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+
+
+@app.context_processor
+def inject_home_tab():
+    return {'home_tab': resolve_home_tab(request.path)}
+
+
 app.config.from_object(Config)
 
 init_security_handlers(app)
+init_gate_handlers(app)
 init_limiter(app)
 
 # --- 唤醒逻辑开始 ---
@@ -59,6 +73,8 @@ scheduler.start()
 # --- 唤醒逻辑结束 ---
 
 app.register_blueprint(downloads_bp)
+app.register_blueprint(eadp_auth_bp)
+app.register_blueprint(diamond_tool_bp)
 app.register_blueprint(pack_buyer_bp)
 app.register_blueprint(card_sender_bp)
 app.register_blueprint(deck_editor_bp)
@@ -67,6 +83,8 @@ app.register_blueprint(unity_bp)
 app.register_blueprint(level_editor_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(phantom_bp)
+app.register_blueprint(gate_bp)
+app.register_blueprint(admin_tokens_bp)
 
 if __name__ == '__main__':
     import os

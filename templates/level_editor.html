@@ -12,18 +12,93 @@
     .thin-input::-webkit-outer-spin-button,
     .thin-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-    /* 移动端滚动修复：避免外层固定高度 + overflow-hidden 锁住页面上下滑动 */
-    #editor-app, .editor-scroll {
+    /* 纵向滚动区域 */
+    .editor-scroll {
         -webkit-overflow-scrolling: touch;
         touch-action: pan-y;
     }
+    /* 横向滚动区域（分类 pill 等），隐藏滚动条 */
+    .editor-scroll-x {
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
+        scrollbar-width: none;
+    }
+    .editor-scroll-x::-webkit-scrollbar { display: none; }
+
     #editor-app {
         overscroll-behavior-y: auto;
     }
+    .level-tab-btn-active .material-symbols-rounded {
+        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+
+    /* 弹窗：竖屏底部抽屉，桌面居中对话框 */
+    .editor-modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    .editor-modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+    }
+    .editor-modal-panel {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        max-height: min(92dvh, 100%);
+        min-height: 0;
+        border-radius: 1.5rem 1.5rem 0 0;
+        box-shadow: 0 -8px 32px -4px rgba(15, 23, 42, 0.18);
+    }
+    .editor-modal-handle {
+        width: 2.5rem;
+        height: 0.25rem;
+        background: #e2e8f0;
+        border-radius: 999px;
+        margin: 0.625rem auto 0;
+        flex-shrink: 0;
+    }
+    .editor-modal-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+        overscroll-behavior: contain;
+    }
+    .editor-modal-footer {
+        flex-shrink: 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    @media (min-width: 1024px) {
+        .editor-modal-overlay {
+            align-items: center;
+            padding: 1rem;
+        }
+        .editor-modal-panel {
+            border-radius: 1.5rem;
+            max-height: 90vh;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+    }
+
     @media (max-width: 1023px) {
+        .editor-modal-panel {
+            min-height: 55dvh;
+        }
         #editor-app {
             height: auto !important;
             min-height: calc(100dvh - 80px);
+            padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
         }
         #editor-app > main {
             overflow: visible !important;
@@ -32,7 +107,7 @@
         #editor-app > main > section:first-child {
             min-height: 0;
         }
-        #editor-app > main > section:first-child > .editor-scroll {
+        #editor-app > main > section:first-child > .editor-panel {
             overflow: visible !important;
             min-height: 0;
         }
@@ -78,9 +153,9 @@
 
     <main class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden border-x border-b border-slate-200 rounded-b-2xl shadow-sm bg-white relative">
         <section class="w-full lg:w-3/5 min-h-0 flex flex-col border-r border-slate-200 bg-slate-50 relative z-0">
-            <div class="flex px-2 md:px-4 pt-3 space-x-1 md:space-x-2 bg-slate-100 border-b border-slate-200 shrink-0 overflow-x-auto editor-scroll">
+            <div class="hidden lg:flex px-2 md:px-4 pt-3 space-x-1 md:space-x-2 bg-slate-100 border-b border-slate-200 shrink-0">
                 <button v-for="tab in tabs" :key="tab.id"
-                        @click="currentTab = tab.id"
+                        @click="switchTab(tab.id)"
                         :class="[
                             'px-4 md:px-5 py-2.5 md:py-3 text-sm font-bold rounded-t-xl transition-all duration-200 flex items-center gap-2 whitespace-nowrap',
                             currentTab === tab.id
@@ -93,7 +168,16 @@
                 </button>
             </div>
 
-            <div class="flex-1 min-h-0 overflow-visible lg:overflow-y-auto p-4 md:p-6 editor-scroll relative flex flex-col">
+            <div class="lg:hidden px-4 py-3 bg-slate-100 border-b border-slate-200 shrink-0 flex items-center gap-2.5">
+                <span class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-blue-600 flex items-center justify-center shrink-0">
+                    <span class="material-symbols-rounded text-[18px]">{{ currentTabMeta.icon }}</span>
+                </span>
+                <div class="min-w-0">
+                    <div class="text-sm font-extrabold text-slate-800 truncate">{{ currentTabMeta.name }}</div>
+                </div>
+            </div>
+
+            <div class="flex-1 min-h-0 overflow-visible lg:overflow-y-auto p-4 md:p-6 editor-scroll editor-panel relative flex flex-col">
                 
                 <div v-show="currentTab === 'json'" class="lg:hidden flex-1 min-h-[65vh] flex flex-col shadow-sm rounded-xl overflow-hidden border border-slate-200 shrink-0">
                     <div class="flex justify-between items-center px-4 py-3 bg-[#252526] text-slate-300 text-xs font-mono border-b border-[#3c3c3c]">
@@ -101,7 +185,7 @@
                             <span class="material-symbols-rounded text-[16px] text-[#4af626]">data_object</span>
                             <span>LevelConfig.json</span>
                         </div>
-                        <div class="flex items-center gap-2 md:gap-3 overflow-x-auto editor-scroll whitespace-nowrap">
+                        <div class="flex items-center gap-2 md:gap-3 overflow-x-auto editor-scroll-x whitespace-nowrap">
                             <button @click="copyJson" class="text-slate-400 hover:text-white transition">复制</button>
                             <label class="text-slate-400 hover:text-white transition cursor-pointer">
                                 导入<input type="file" accept=".json,application/json" class="hidden" @change="importJsonFile">
@@ -366,14 +450,29 @@
         </div>
     </main>
 
-    <div v-if="toast.show" class="fixed bottom-6 right-1/2 translate-x-1/2 md:translate-x-0 md:right-6 z-[70] px-5 py-3 rounded-2xl shadow-xl border font-bold text-sm whitespace-nowrap" :class="toast.type === 'error' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-white text-slate-700 border-slate-200'">
+    <nav v-show="!anyModalOpen" class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-slate-200/70 shadow-[0_-4px_24px_-4px_rgba(15,23,42,0.08)] pb-safe" aria-label="关卡编辑模块">
+        <div class="flex items-stretch h-[3.5rem] overflow-x-auto editor-scroll-x px-1">
+            <button v-for="tab in tabs" :key="tab.id"
+                    @click="switchTab(tab.id)"
+                    :class="[
+                        'flex flex-col items-center justify-center gap-0.5 min-w-[3.5rem] flex-1 max-w-[4.5rem] px-1 transition-colors',
+                        currentTab === tab.id ? 'text-blue-600 level-tab-btn-active' : 'text-slate-400 hover:text-slate-600'
+                    ]">
+                <span class="material-symbols-rounded text-[22px]">{{ tab.icon }}</span>
+                <span class="text-[10px] font-semibold leading-none">{{ tab.shortName }}</span>
+            </button>
+        </div>
+    </nav>
+
+    <div v-if="toast.show" class="fixed top-20 lg:top-auto lg:bottom-6 bottom-auto right-1/2 translate-x-1/2 md:translate-x-0 md:right-6 z-[70] px-5 py-3 rounded-2xl shadow-xl border font-bold text-sm whitespace-nowrap max-w-[calc(100vw-2rem)]" :class="toast.type === 'error' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-white text-slate-700 border-slate-200'">
         {{ toast.message }}
     </div>
 
-    <div v-if="searchModal.isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4">
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="searchModal.isOpen = false"></div>
-        <div class="relative bg-white rounded-[24px] md:rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
-            <div class="flex justify-between items-center px-5 md:px-6 py-4 md:py-5 border-b border-slate-100 shrink-0">
+    <div v-if="searchModal.isOpen" class="editor-modal-overlay">
+        <div class="editor-modal-backdrop" @click="searchModal.isOpen = false"></div>
+        <div class="editor-modal-panel lg:max-w-4xl">
+            <div class="editor-modal-handle lg:hidden" aria-hidden="true"></div>
+            <div class="flex justify-between items-center px-5 md:px-6 py-3 md:py-5 border-b border-slate-100 shrink-0">
                 <h3 class="text-lg md:text-xl font-extrabold text-slate-900 truncate pr-4">{{ searchModal.title }}</h3>
                 <button @click="searchModal.isOpen = false" class="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 hover:bg-slate-200 rounded-full transition shrink-0">
                     <span class="material-symbols-rounded block text-[20px]">close</span>
@@ -384,11 +483,11 @@
                     <span class="material-symbols-rounded absolute left-4 top-3.5 text-slate-400">search</span>
                     <input v-model="searchModal.keyword" type="text" :placeholder="searchModal.placeholder" class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition">
                 </div>
-                <div v-if="searchModal.type === 'level'" class="mt-3 flex gap-2 overflow-x-auto editor-scroll pb-1">
+                <div v-if="searchModal.type === 'level'" class="mt-3 flex gap-2 overflow-x-auto editor-scroll-x pb-1">
                     <button v-for="cat in levelCategories" :key="cat" @click="levelCategory = cat" :class="['px-3 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap', levelCategory === cat ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50']">{{ cat }}</button>
                 </div>
             </div>
-            <div class="flex-1 overflow-y-auto p-4 md:p-6 pt-0 md:pt-2 editor-scroll">
+            <div class="editor-modal-body p-4 md:p-6 pt-0 md:pt-2">
                 <div v-if="filteredModalItems.length === 0" class="text-center py-10 text-slate-400 font-medium text-sm">没有找到符合条件的结果。</div>
                 <div class="grid gap-2 md:gap-3" :class="modalGridClass">
                     <div v-for="item in filteredModalItems" :key="item.id" @click="searchModal.onSelect(item)" class="group cursor-pointer p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/50 transition flex items-center justify-between">
@@ -406,13 +505,14 @@
         </div>
     </div>
 
-    <div v-if="laneModal.isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4">
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="laneModal.isOpen = false"></div>
-        <div class="relative bg-white rounded-[24px] md:rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
-            <div class="flex justify-between items-center px-5 md:px-6 py-4 md:py-5 border-b border-slate-100 shrink-0">
-                <div>
-                    <h3 class="text-lg md:text-xl font-extrabold text-slate-900">道路卡牌 · LANE {{ laneModal.index + 1 }}</h3>
-                    <p class="text-[11px] md:text-xs text-slate-500 mt-1 hidden sm:block">输入卡牌名或 GUID 添加；可上移、下移、删除。</p>
+    <div v-if="laneModal.isOpen" class="editor-modal-overlay">
+        <div class="editor-modal-backdrop" @click="laneModal.isOpen = false"></div>
+        <div class="editor-modal-panel lg:max-w-3xl">
+            <div class="editor-modal-handle lg:hidden" aria-hidden="true"></div>
+            <div class="flex justify-between items-center px-5 md:px-6 py-3 md:py-5 border-b border-slate-100 shrink-0">
+                <div class="min-w-0 pr-3">
+                    <h3 class="text-lg md:text-xl font-extrabold text-slate-900 truncate">道路卡牌 · LANE {{ laneModal.index + 1 }}</h3>
+                    <p class="text-[11px] md:text-xs text-slate-500 mt-1">输入卡牌名或 GUID 添加；可上移、下移、删除。</p>
                 </div>
                 <button @click="laneModal.isOpen = false" class="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 hover:bg-slate-200 rounded-full transition shrink-0"><span class="material-symbols-rounded block text-[20px]">close</span></button>
             </div>
@@ -428,7 +528,7 @@
                     <button v-for="card in laneCardSuggestions.slice(0, 6)" :key="card.guid" @click="laneModal.input = card.name + ' (' + card.guid + ')'" class="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 hover:bg-blue-50 hover:text-blue-600 truncate max-w-full">{{ card.name }} ({{ card.guid }})</button>
                 </div>
             </div>
-            <div class="flex-1 overflow-y-auto p-4 md:p-6 editor-scroll">
+            <div class="editor-modal-body p-4 md:p-6">
                 <div v-if="!laneModal.cards.length" class="py-10 md:py-12 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl font-bold text-sm">当前道路暂无卡牌</div>
                 <div v-else class="space-y-2">
                     <div v-for="(guid, idx) in laneModal.cards" :key="idx" class="flex items-center gap-2 md:gap-3 p-2 md:p-3 bg-slate-50 border border-slate-200 rounded-xl">
@@ -443,21 +543,22 @@
                     </div>
                 </div>
             </div>
-            <div class="px-4 md:px-6 py-3 md:py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+            <div class="editor-modal-footer px-4 md:px-6 py-3 md:py-4 border-t border-slate-100 flex justify-end gap-2">
                 <button @click="laneModal.cards = []" class="px-4 py-2 md:py-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100 font-bold hover:bg-red-100 text-sm">清空</button>
                 <button @click="saveLaneCards" class="px-5 py-2 md:py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 text-sm">保存</button>
             </div>
         </div>
     </div>
 
-    <div v-if="eventModal.isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-4">
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="eventModal.isOpen = false"></div>
-        <div class="relative bg-white rounded-[24px] md:rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
-            <div class="flex justify-between items-center px-5 md:px-6 py-4 md:py-5 border-b border-slate-100 shrink-0">
-                <h3 class="text-lg md:text-xl font-extrabold text-slate-900">{{ eventModalTitle }}</h3>
+    <div v-if="eventModal.isOpen" class="editor-modal-overlay">
+        <div class="editor-modal-backdrop" @click="eventModal.isOpen = false"></div>
+        <div class="editor-modal-panel lg:max-w-2xl">
+            <div class="editor-modal-handle lg:hidden" aria-hidden="true"></div>
+            <div class="flex justify-between items-center px-5 md:px-6 py-3 md:py-5 border-b border-slate-100 shrink-0">
+                <h3 class="text-lg md:text-xl font-extrabold text-slate-900 truncate pr-4">{{ eventModalTitle }}</h3>
                 <button @click="eventModal.isOpen = false" class="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 hover:bg-slate-200 rounded-full transition shrink-0"><span class="material-symbols-rounded block text-[20px]">close</span></button>
             </div>
-            <div class="p-4 md:p-6 overflow-y-auto editor-scroll space-y-4">
+            <div class="editor-modal-body p-4 md:p-6 space-y-4">
                 <template v-if="eventModal.type === 'message'">
                     <field label="触发回合"><input v-model.number="eventForm.turn" type="number" class="form-input"></field>
                     <field label="说话者"><select v-model.number="eventForm.narrator" class="form-input"><option :value="0">无 (0)</option><option :value="1">戴夫 (1)</option><option :value="2">僵王 (2)</option></select></field>
@@ -493,7 +594,7 @@
                     <button v-for="card in resolveCardSuggestions(eventCardInput).slice(0, 6)" :key="card.guid" @click="eventCardInput = card.name + ' (' + card.guid + ')'" class="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 hover:bg-blue-50 hover:text-blue-600 truncate max-w-full">{{ card.name }} ({{ card.guid }})</button>
                 </div>
             </div>
-            <div class="px-4 md:px-6 py-3 md:py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+            <div class="editor-modal-footer px-4 md:px-6 py-3 md:py-4 border-t border-slate-100 flex justify-end gap-2">
                 <button @click="eventModal.isOpen = false" class="px-4 py-2 md:py-2.5 rounded-xl bg-slate-50 text-slate-600 border border-slate-200 font-bold hover:bg-slate-100 text-sm">取消</button>
                 <button @click="saveEvent" class="px-5 py-2 md:py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 text-sm">保存</button>
             </div>
@@ -538,14 +639,19 @@ document.addEventListener('DOMContentLoaded', function() {
         components: { Field, CardListEditor },
         setup() {
             const tabs = [
-                { id: 'basic', name: '基础规则', icon: 'tune' },
-                { id: 'opponent', name: '人机配置', icon: 'smart_toy' },
-                { id: 'player', name: '玩家配置', icon: 'person' },
-                { id: 'board', name: '战场设置', icon: 'grid_on' },
-                { id: 'events', name: '游戏事件', icon: 'view_timeline' },
-                { id: 'json', name: 'JSON 源码', icon: 'data_object' } // 新增移动端特供 Tab
+                { id: 'basic', name: '基础规则', shortName: '基础', icon: 'tune' },
+                { id: 'opponent', name: '人机配置', shortName: '人机', icon: 'smart_toy' },
+                { id: 'player', name: '玩家配置', shortName: '玩家', icon: 'person' },
+                { id: 'board', name: '战场设置', shortName: '战场', icon: 'grid_on' },
+                { id: 'events', name: '游戏事件', shortName: '事件', icon: 'view_timeline' },
+                { id: 'json', name: 'JSON 源码', shortName: 'JSON', icon: 'data_object' }
             ];
             const currentTab = ref('basic');
+            const currentTabMeta = computed(() => tabs.find(t => t.id === currentTab.value) || tabs[0]);
+            const switchTab = (tabId) => {
+                currentTab.value = tabId;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
             const currentLevelId = ref('');
             const activeLaneIndex = ref(0);
             const activeEventIndex = ref(-1);
@@ -566,6 +672,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             onUnmounted(() => {
                 window.removeEventListener('resize', handleResize);
+                document.body.style.overflow = '';
             });
 
             const initData = reactive({
@@ -902,6 +1009,12 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             const eventModal = reactive({ isOpen: false, type: 'message', row: -1 });
+            const anyModalOpen = computed(() => searchModal.isOpen || laneModal.isOpen || eventModal.isOpen);
+
+            watch(anyModalOpen, (open) => {
+                document.body.style.overflow = open ? 'hidden' : '';
+            });
+
             const eventForm = reactive({ turn: 0, narrator: 0, textKey: '', faction: 0, cardIds: [], laneIndex: -1, playDuringSurprise: false, continuePlaying: true });
             const eventCardInput = ref('');
             const eventModalTitle = computed(() => `${eventModal.row >= 0 ? '编辑' : '添加'}${({ message:'对话事件', reward:'解密发牌', draw:'强制抽卡', scripted:'强制出牌' })[eventModal.type]}`);
@@ -980,7 +1093,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 replaceConfig(levelConfig);
             });
 
-            return { tabs, currentTab, currentLevelId, busy, busyText, toast, initData, levelConfig, jsonText, jsonError, boardAbilitiesText, basicFlags, roleNumberFields, roleFlags, activeLaneIndex, activeEventIndex,
+            return { tabs, currentTab, currentTabMeta, switchTab, anyModalOpen, currentLevelId, busy, busyText, toast, initData, levelConfig, jsonText, jsonError, boardAbilitiesText, basicFlags, roleNumberFields, roleFlags, activeLaneIndex, activeEventIndex,
                 searchModal, filteredModalItems, modalGridClass, levelCategories, levelCategory, itemDotClass,
                 laneModal, laneCardSuggestions, eventModal, eventForm, eventCardInput, eventModalTitle,
                 onJsonInput, syncBoardAbilities, getHeroName, getDeckName, getCardName, laneCardsSummary, addShieldRow, removeShieldRow,

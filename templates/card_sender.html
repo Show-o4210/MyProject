@@ -3,6 +3,7 @@
 {% block title %}卡牌发送器 - PVZH Mod 工具箱{% endblock %}
 
 {% block content %}
+{% raw %}
 <div id="card-sender-app" class="px-4 sm:px-6 lg:px-8 py-8 md:py-10 max-w-5xl mx-auto" v-cloak>
 
     <section class="mb-6 md:mb-8">
@@ -52,6 +53,51 @@
 
                 <div class="space-y-5">
                     <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">认证方式</label>
+                        <div class="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+                            <button type="button" @click="switchAuthMode('manual')"
+                                class="px-4 py-2 rounded-xl text-sm font-bold transition"
+                                :class="form.auth_mode === 'manual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'">
+                                手动输入
+                            </button>
+                            <button type="button" @click="switchAuthMode('auto')"
+                                class="px-4 py-2 rounded-xl text-sm font-bold transition"
+                                :class="form.auth_mode === 'auto' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'">
+                                本地凭证
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="form.auth_mode === 'auto'" class="rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-4 space-y-3">
+                        <p class="text-sm text-slate-700">
+                            自动读取 <span class="font-mono font-bold">data/token.dat</span>
+                        </p>
+                        <p v-if="loadingStored" class="text-xs text-blue-600 flex items-center gap-1">
+                            <span class="material-symbols-rounded text-[16px] animate-spin">progress_activity</span>
+                            正在加载本地凭证...
+                        </p>
+                        <p v-if="form.stored_error" class="text-xs text-red-600" v-text="form.stored_error"></p>
+                        <div v-if="form.stored_loaded" class="flex flex-wrap items-center gap-2 text-xs">
+                            <span class="px-2.5 py-1 rounded-full font-bold bg-green-100 text-green-700">已加载</span>
+                            <span class="px-2.5 py-1 rounded-full font-bold"
+                                :class="form.token_valid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'">
+                                <span v-text="form.token_valid ? 'Token 有效' : 'Token 已过期或即将过期'"></span>
+                            </span>
+                            <span v-if="form.expires_at_text" class="text-slate-500">
+                                过期：<span v-text="form.expires_at_text"></span>
+                            </span>
+                        </div>
+                        <label v-if="form.has_refresh_token" class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                            <input type="checkbox" v-model="form.auto_refresh" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span>请求前自动续期 Token</span>
+                        </label>
+                        <button type="button" @click="reloadStoredCredentials"
+                            class="px-3 py-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold transition-colors">
+                            重新读取凭证
+                        </button>
+                    </div>
+
+                    <div>
                         <label class="block text-sm font-bold text-slate-700 mb-2">
                             EADP-AUTH-TOKEN
                             <span class="text-red-500">*</span>
@@ -63,11 +109,12 @@
                             placeholder="输入你的 EADP-AUTH-TOKEN"
                             autocomplete="off"
                             spellcheck="false"
+                            :readonly="form.auth_mode === 'auto'"
                             class="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition font-mono text-sm bg-slate-50 focus:bg-white"
                         >
 
                         <p class="text-xs text-slate-400 mt-2">
-                            Token 仅用于本次请求，不在页面内持久保存。
+                            凭证仅用于本次请求，不在页面内持久保存。
                         </p>
                     </div>
 
@@ -217,22 +264,23 @@
     </section>
 
 </div>
+{% endraw %}
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/eadp_token.js"></script>
 {% raw %}
 <script>
-    const { createApp, ref, computed } = Vue;
+    const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
         setup() {
-            const form = ref({
-                token: '',
-                persona_id: '',
+            const form = ref(Object.assign(EadpToken.createAuthForm(), {
                 card_count: 999999
-            });
+            }));
 
             const loading = ref(false);
+            const loadingStored = ref(false);
             const result = ref(null);
             const error = ref(null);
 
@@ -261,14 +309,31 @@
                 return JSON.stringify(result.value, null, 2);
             });
 
-            const validateForm = () => {
-                if (!form.value.token) {
-                    return '请填写 EADP-AUTH-TOKEN';
-                }
+            const reloadStoredCredentials = async () => {
+                loadingStored.value = true;
+                await EadpToken.initAutoCredentials(form.value, {
+                    setError: (msg) => { error.value = msg; }
+                });
+                loadingStored.value = false;
+            };
 
-                if (!form.value.persona_id) {
-                    return '请填写 EADP-PERSONA-ID';
+            const switchAuthMode = async (mode) => {
+                EadpToken.switchAuthMode(form.value, mode);
+                error.value = null;
+                if (mode === 'auto') {
+                    await reloadStoredCredentials();
                 }
+            };
+
+            onMounted(async () => {
+                if (form.value.auth_mode === 'auto') {
+                    await reloadStoredCredentials();
+                }
+            });
+
+            const validateForm = () => {
+                const authError = EadpToken.validateAuthForm(form.value);
+                if (authError) return authError;
 
                 if (!Number.isFinite(Number(form.value.card_count))) {
                     return '卡牌数量必须是有效数字';
@@ -323,11 +388,10 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({
-                            token: form.value.token,
-                            persona_id: form.value.persona_id,
-                            card_count: form.value.card_count
-                        })
+                        body: JSON.stringify(Object.assign(
+                            EadpToken.buildAuthPayload(form.value),
+                            { card_count: form.value.card_count }
+                        ))
                     });
 
                     let data = null;
@@ -343,6 +407,7 @@
 
                     if (response.ok && data && data.success !== undefined) {
                         result.value = data;
+                        EadpToken.applyTokenMeta(form.value, data.auth_meta);
 
                         if (!data.success) {
                             error.value = parseErrorMessage(response.status, data);
@@ -367,12 +432,15 @@
             return {
                 form,
                 loading,
+                loadingStored,
                 result,
                 error,
                 cardIdsCount,
                 safeCardCount,
                 totalCards,
                 formattedResponse,
+                switchAuthMode,
+                reloadStoredCredentials,
                 sendRequest
             };
         }

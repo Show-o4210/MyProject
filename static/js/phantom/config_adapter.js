@@ -101,9 +101,7 @@ export function mergePhantomConfigs(primary = {}, secondary = {}) {
   if (!isPcAlignedConfig(merged) && isPcAlignedConfig(secondary)) {
     return normalizePhantomConfig({
       ...secondary,
-      enums: primary.enums?.factions?.length ? primary.enums : secondary.enums,
-      card_index: primary.card_index?.length ? primary.card_index : secondary.card_index,
-      card_index_meta: primary.card_index_meta?.loaded ? primary.card_index_meta : secondary.card_index_meta
+      enums: primary.enums?.factions?.length ? primary.enums : secondary.enums
     });
   }
   return merged;

@@ -8,6 +8,7 @@ from logic_ea_api import (
     DEFAULT_REQUEST_TIMEOUT,
     build_pvzh_headers,
     post_soft_purchase,
+    resolve_request_credentials,
 )
 
 card_sender_bp = Blueprint('card_sender', __name__)
@@ -57,8 +58,7 @@ def send_cards():
     if not data:
         return jsonify({"success": False, "error": "无效的请求数据"}), 400
 
-    eadp_token = data.get('token', '').strip()
-    persona_id = data.get('persona_id', '').strip()
+    eadp_token, persona_id, auth_meta = resolve_request_credentials(data)
     card_count = data.get('card_count', 999999)
 
     if not eadp_token:
@@ -100,6 +100,7 @@ def send_cards():
             "status_code": response.status_code,
             "response": response_json if response_json else response_text,
             "total_cards": len(CARD_IDS) * card_count,
+            "auth_meta": auth_meta,
         })
 
     except requests.Timeout:

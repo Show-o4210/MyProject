@@ -15,6 +15,7 @@ from logic_ea_api import (
     DEFAULT_REQUEST_TIMEOUT,
     build_pvzh_headers,
     post_soft_purchase,
+    resolve_request_credentials,
 )
 
 pack_buyer_bp = Blueprint('pack_buyer', __name__)
@@ -162,8 +163,7 @@ def buy_pack():
     data = request.get_json(silent=True) or {}
 
     sku = str(data.get('sku', '')).strip()
-    token = str(data.get('token', '')).strip()
-    persona_id = str(data.get('persona_id', '')).strip()
+    token, persona_id, auth_meta = resolve_request_credentials(data)
     raw_cost = data.get('cost', 0)
 
     client_version = clean_field(data.get('client_version'), DEFAULT_CLIENT_VERSION, SAFE_VERSION_RE)
@@ -224,6 +224,7 @@ def buy_pack():
             "response": response_body,
             "raw_response": response_text[:4000],
             "warnings": warnings,
+            "auth_meta": auth_meta,
             "request_meta": {
                 "sku": sku,
                 "expected_cost": cost,

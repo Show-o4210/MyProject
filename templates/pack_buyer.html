@@ -3,6 +3,7 @@
 {% block title %}卡包购买器 - PVZH 魔改工坊{% endblock %}
 
 {% block content %}
+{% raw %}
 <div id="pack-buyer-app" class="py-6 md:py-8 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto" v-cloak>
     
     <div class="mb-6">
@@ -39,6 +40,51 @@
                 </h2>
                 <div class="space-y-4">
                     <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">认证方式</label>
+                        <div class="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+                            <button type="button" @click="switchAuthMode('manual')"
+                                class="px-4 py-2 rounded-lg text-sm font-bold transition"
+                                :class="form.auth_mode === 'manual' ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500'">
+                                手动输入
+                            </button>
+                            <button type="button" @click="switchAuthMode('auto')"
+                                class="px-4 py-2 rounded-lg text-sm font-bold transition"
+                                :class="form.auth_mode === 'auto' ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500'">
+                                本地凭证
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="form.auth_mode === 'auto'" class="rounded-xl border border-dashed border-pink-200 bg-pink-50/40 p-4 space-y-3">
+                        <p class="text-sm text-gray-700">
+                            自动读取 <span class="font-mono font-bold">data/token.dat</span>
+                        </p>
+                        <p v-if="loadingStored" class="text-xs text-pink-600 flex items-center gap-1">
+                            <span class="material-symbols-rounded text-[16px] animate-spin">progress_activity</span>
+                            正在加载本地凭证...
+                        </p>
+                        <p v-if="form.stored_error" class="text-xs text-red-600" v-text="form.stored_error"></p>
+                        <div v-if="form.stored_loaded" class="flex flex-wrap items-center gap-2 text-xs">
+                            <span class="px-2.5 py-1 rounded-full font-bold bg-green-100 text-green-700">已加载</span>
+                            <span class="px-2.5 py-1 rounded-full font-bold"
+                                :class="form.token_valid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'">
+                                <span v-text="form.token_valid ? 'Token 有效' : 'Token 已过期或即将过期'"></span>
+                            </span>
+                            <span v-if="form.expires_at_text" class="text-gray-500">
+                                过期：<span v-text="form.expires_at_text"></span>
+                            </span>
+                        </div>
+                        <label v-if="form.has_refresh_token" class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                            <input type="checkbox" v-model="form.auto_refresh" class="rounded border-gray-300 text-pink-500 focus:ring-pink-500">
+                            <span>请求前自动续期 Token</span>
+                        </label>
+                        <button type="button" @click="reloadStoredCredentials"
+                            class="px-3 py-1.5 rounded-lg bg-pink-100 hover:bg-pink-200 text-pink-700 text-xs font-bold transition-colors">
+                            重新读取凭证
+                        </button>
+                    </div>
+
+                    <div>
                         <label class="block text-sm font-bold text-gray-700 mb-2">
                             EADP-AUTH-TOKEN
                             <span class="text-red-500">*</span>
@@ -47,6 +93,7 @@
                                v-model.trim="form.token"
                                placeholder="输入你的 EADP-AUTH-TOKEN"
                                autocomplete="off"
+                               :readonly="form.auth_mode === 'auto'"
                                class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors font-mono text-sm">
                     </div>
                     <div>
@@ -243,26 +290,27 @@
     </div>
 
 </div>
+{% endraw %}
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/eadp_token.js"></script>
 {% raw %}
 <script>
     const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
         setup() {
-            const form = ref({
-                token: '',
-                persona_id: '',
+            const form = ref(Object.assign(EadpToken.createAuthForm(), {
                 sku: '',
                 cost: null,
                 client_version: '1.64.6',
                 content_version: '45a337051e72592e53c9bf8a4b590639',
                 platform: 'Android'
-            });
+            }));
             
             const loading = ref(false);
+            const loadingStored = ref(false);
             const loadingPacks = ref(false);
             const result = ref(null);
             const error = ref(null);
@@ -335,18 +383,31 @@
                 form.value.sku = pack.sku;
                 form.value.cost = pack.cost;
             };
+
+            const reloadStoredCredentials = async () => {
+                loadingStored.value = true;
+                await EadpToken.initAutoCredentials(form.value, {
+                    setError: (msg) => { error.value = msg; }
+                });
+                loadingStored.value = false;
+            };
+
+            const switchAuthMode = async (mode) => {
+                EadpToken.switchAuthMode(form.value, mode);
+                error.value = null;
+                if (mode === 'auto') {
+                    await reloadStoredCredentials();
+                }
+            };
             
             const buyPack = async () => {
                 result.value = null;
                 error.value = null;
                 warnings.value = [];
                 
-                if (!form.value.token) {
-                    error.value = '请填写 EADP-AUTH-TOKEN';
-                    return;
-                }
-                if (!form.value.persona_id) {
-                    error.value = '请填写 EADP-PERSONA-ID';
+                const authError = EadpToken.validateAuthForm(form.value);
+                if (authError) {
+                    error.value = authError;
                     return;
                 }
                 if (!form.value.sku) {
@@ -364,20 +425,22 @@
                     const response = await fetch('/api/buy-pack', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            token: form.value.token,
-                            persona_id: form.value.persona_id,
-                            sku: form.value.sku,
-                            cost: form.value.cost,
-                            client_version: form.value.client_version,
-                            content_version: form.value.content_version,
-                            platform: form.value.platform
-                        })
+                        body: JSON.stringify(Object.assign(
+                            EadpToken.buildAuthPayload(form.value),
+                            {
+                                sku: form.value.sku,
+                                cost: form.value.cost,
+                                client_version: form.value.client_version,
+                                content_version: form.value.content_version,
+                                platform: form.value.platform
+                            }
+                        ))
                     });
                     
                     const data = await readJsonSafely(response);
                     result.value = data;
                     warnings.value = data.warnings || [];
+                    EadpToken.applyTokenMeta(form.value, data.auth_meta);
                     
                     if (response.status === 429) {
                         error.value = '请求过于频繁，请稍后再试（每分钟最多5次）';
@@ -394,23 +457,32 @@
             };
             
             const clearForm = () => {
-                form.value.token = '';
-                form.value.persona_id = '';
-                form.value.sku = '';
-                form.value.cost = null;
+                const keepVersion = {
+                    client_version: form.value.client_version,
+                    content_version: form.value.content_version,
+                    platform: form.value.platform,
+                };
+                form.value = Object.assign(EadpToken.createAuthForm(), keepVersion, {
+                    sku: '',
+                    cost: null,
+                });
                 result.value = null;
                 error.value = null;
                 warnings.value = [];
             };
             
-            onMounted(() => {
+            onMounted(async () => {
                 loadSettings();
                 loadPacks();
+                if (form.value.auth_mode === 'auto') {
+                    await reloadStoredCredentials();
+                }
             });
             
             return {
                 form,
                 loading,
+                loadingStored,
                 loadingPacks,
                 result,
                 error,
@@ -421,6 +493,8 @@
                 filteredPacks,
                 formattedResponse,
                 selectPack,
+                switchAuthMode,
+                reloadStoredCredentials,
                 buyPack,
                 clearForm,
                 loadSettings

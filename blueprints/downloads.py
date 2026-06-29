@@ -17,7 +17,7 @@ def find_tool(item_id):
 
 @downloads_bp.route('/downloads')
 def index():
-    return render_template('tab_downloads.html', tools=load_downloads_data())
+    return redirect('/?tab=download')
 
 
 @downloads_bp.route('/downloads/<item_id>')

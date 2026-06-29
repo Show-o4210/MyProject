@@ -1,14 +1,20 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>卡组工坊 Pro - PVZH 魔改云端</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
-    <style>
+{% extends "base.html" %}
+
+{% block title %}卡组工坊 Pro - PVZH Mod 工具箱{% endblock %}
+
+{% block body_class %}h-screen overflow-hidden{% endblock %}
+
+{% block footer_visible %}hidden{% endblock %}
+
+{% block header_brand_extra %}
+<span class="hidden sm:inline text-slate-300 font-normal">/</span>
+<span class="hidden sm:inline text-xs font-bold text-slate-600 truncate max-w-[7rem] md:max-w-none">卡组工坊 Pro</span>
+{% endblock %}
+
+{% block main_class %}max-w-none w-full h-[calc(100dvh-3.5rem)] overflow-hidden flex flex-col{% endblock %}
+
+{% block head_extra %}
+<style>
         :root {
             --primary: #2563eb; /* 对应 Tailwind 的 blue-600 */
             --secondary: #10b981;
@@ -98,16 +104,6 @@
         .edge-docked.edge-left { transform: translateX(-25px) scale(0.9); }
         .edge-docked:active { opacity: 1; transform: translateX(0) scale(1); }
 
-        /* 导出菜单选项 */
-        .export-option {
-            border: 2px solid transparent;
-            transition: all 0.2s;
-        }
-        .export-option:active { border-color: var(--primary); background: #eff6ff; transform: scale(0.98); }
-        @media (min-width: 768px) {
-            .export-option:hover { border-color: var(--primary); background: #eff6ff; }
-        }
-
         /* 移除 number input 的上下箭头 - 跨浏览器兼容 */
         input[type="number"].no-spinner {
             -moz-appearance: textfield;
@@ -121,40 +117,18 @@
             margin: 0;
         }
     </style>
-</head>
-<body class="h-screen flex flex-col overflow-hidden">
+{% endblock %}
 
+{% block content %}
     {% raw %}
     <div id="app" class="flex flex-col h-full w-full max-w-[1600px] mx-auto">
-        <!-- 头部导航 (纯白实体 + 回到主页) -->
-        <header class="h-16 md:h-20 bg-white border-b border-slate-200 shadow-sm flex items-center px-4 md:px-8 justify-between z-20 flex-shrink-0">
-            <div class="flex items-center space-x-3 md:space-x-4">
-                <a href="/" class="p-2 md:p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-500 hover:text-slate-700 transition active:scale-95 flex items-center justify-center" title="回到主页">
-                    <span class="material-symbols-rounded text-[20px] md:text-[22px]">home</span>
-                </a>
-                <div class="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                    <span class="material-symbols-rounded text-[24px] md:text-[28px]">layers</span>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg md:text-xl tracking-tight text-slate-800 leading-tight">卡组工坊 <span class="text-blue-600 italic font-black">PRO</span></h1>
-                    <p class="text-[10px] md:text-xs text-slate-500 font-medium">云端魔改管理套件</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center space-x-2 md:space-x-4">
-                <button @click="showImportDialog = true" 
-                        class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2 md:px-5 md:py-2.5 rounded-xl md:rounded-2xl flex items-center transition shadow-sm active:scale-95 font-semibold text-sm md:text-base">
-                    <span class="material-symbols-rounded mr-1 md:mr-2 text-[18px] md:text-[20px]">download</span>
-                    <span class="hidden md:inline">导入</span>
-                </button>
-                <button @click="showExportMenu = true" 
-                        class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 md:px-5 md:py-2.5 rounded-xl md:rounded-2xl flex items-center transition shadow-lg shadow-slate-200 active:scale-95 font-semibold text-sm md:text-base">
-                    <span class="material-symbols-rounded mr-1 md:mr-2 text-[18px] md:text-[20px]">ios_share</span>
-                    <span class="hidden md:inline">分享与导出</span>
-                    <span class="md:hidden">导出</span>
-                </button>
-            </div>
-        </header>
+        <teleport to="#header-tool-slot">
+            <button type="button" @click="quickExport"
+                class="inline-flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl text-white bg-slate-800 hover:bg-brand-600 text-xs sm:text-sm font-semibold transition active:scale-95 shadow-soft">
+                <span class="material-symbols-rounded text-[18px]">inventory_2</span>
+                <span class="hidden sm:inline">打包导出</span>
+            </button>
+        </teleport>
 
         <main class="flex-grow flex flex-col md:flex-row overflow-hidden p-0 md:p-6 gap-0 md:gap-6 relative">
             
@@ -327,103 +301,6 @@
             </transition>
         </div>
 
-        <!-- ========== 导入中心对话框 ========== -->
-        <transition name="v">
-            <div v-if="showImportDialog" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4" @click.self="showImportDialog = false">
-                <div class="bg-white w-full max-w-lg md:rounded-[2rem] rounded-t-[2rem] overflow-hidden shadow-2xl flex flex-col">
-                    <div class="p-6 md:p-8 border-b border-slate-100 flex justify-between items-center bg-white">
-                        <div>
-                            <h3 class="text-2xl font-black text-slate-800">导入卡组</h3>
-                            <p class="text-sm text-slate-500 font-medium mt-1">解析来自他人的分享链接或代码</p>
-                        </div>
-                        <button @click="showImportDialog = false" class="bg-slate-50 hover:bg-slate-100 border border-slate-100 p-2.5 rounded-full text-slate-500 transition active:scale-90">
-                            <span class="material-symbols-rounded">close</span>
-                        </button>
-                    </div>
-                    <div class="p-6 md:p-8 bg-slate-50/50">
-                        <textarea v-model="importCode" placeholder="在此粘贴卡组分享链接 (URL) 或 Base64 代码..." rows="4" 
-                                  class="w-full bg-white border border-slate-200 rounded-2xl p-4 font-mono text-sm text-slate-700 placeholder-slate-400 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none shadow-sm resize-none"></textarea>
-                        
-                        <div class="flex gap-4 mt-6">
-                            <button @click="showImportDialog = false" class="flex-1 bg-white border border-slate-200 text-slate-600 font-bold py-3.5 rounded-2xl hover:bg-slate-50 transition active:scale-95 shadow-sm">
-                                取消
-                            </button>
-                            <button @click="importFromPaste" class="flex-1 bg-blue-600 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition active:scale-95 flex justify-center items-center gap-2">
-                                <span class="material-symbols-rounded text-[20px]">check_circle</span> 解析导入
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </transition>
-
-        <!-- ========== 统一分享/导出中心对话框 ========== -->
-        <transition name="v">
-            <div v-if="showExportMenu" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4" @click.self="showExportMenu = false">
-                <div class="bg-white w-full max-w-xl md:rounded-[2rem] rounded-t-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                    <div class="p-6 md:p-8 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                        <div>
-                            <h3 class="text-2xl font-black text-slate-800">导出中心</h3>
-                            <p class="text-sm text-slate-500 font-medium mt-1">选择最适合你的导出方式</p>
-                        </div>
-                        <button @click="showExportMenu = false" class="bg-slate-50 hover:bg-slate-100 border border-slate-100 p-2.5 rounded-full text-slate-500 transition active:scale-90">
-                            <span class="material-symbols-rounded">close</span>
-                        </button>
-                    </div>
-                    
-                    <div class="p-6 md:p-8 overflow-y-auto no-scrollbar grid grid-cols-1 gap-4 bg-slate-50/50">
-                        
-                        <!-- 选项：全局配置 -->
-                        <div @click="copyGlobalDeckCode" class="export-option p-5 bg-white border border-slate-200 rounded-2xl cursor-pointer flex items-center gap-5 shadow-sm">
-                            <div class="w-14 h-14 bg-blue-50 border border-blue-100 text-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-rounded text-3xl">hub</span>
-                            </div>
-                            <div class="flex-grow">
-                                <h4 class="font-bold text-slate-800 text-lg">全局同步链接 <span class="bg-rose-100 text-rose-600 text-[10px] px-2 py-0.5 rounded-md ml-1 align-middle">推荐</span></h4>
-                                <p class="text-xs text-slate-500 mt-1 font-medium leading-relaxed">包含本地暂存的<span class="font-bold text-blue-600">所有卡组</span>修改，生成专属分享链接供他人一键导入。</p>
-                            </div>
-                            <span class="material-symbols-rounded text-slate-300 hidden md:block">chevron_right</span>
-                        </div>
-
-                        <!-- 选项：ZIP -->
-                        <div @click="quickExport" class="export-option p-5 bg-white border border-slate-200 rounded-2xl cursor-pointer flex items-center gap-5 shadow-sm">
-                            <div class="w-14 h-14 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-rounded text-3xl">inventory_2</span>
-                            </div>
-                            <div class="flex-grow">
-                                <h4 class="font-bold text-slate-800 text-lg">一键打包 Mod (ZIP)</h4>
-                                <p class="text-xs text-slate-500 mt-1 font-medium leading-relaxed">向云端提交当前所有修改，直接生成可导入游戏的完整 Mod 补丁包。</p>
-                            </div>
-                            <span class="material-symbols-rounded text-slate-300 hidden md:block">chevron_right</span>
-                        </div>
-
-                        <!-- 选项：单卡组 -->
-                        <div @click="copyDeckCode" class="export-option p-5 bg-white border border-slate-200 rounded-2xl cursor-pointer flex items-center gap-5 shadow-sm opacity-90 hover:opacity-100">
-                            <div class="w-12 h-12 bg-slate-50 border border-slate-100 text-slate-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-rounded text-2xl">share</span>
-                            </div>
-                            <div class="flex-grow">
-                                <h4 class="font-bold text-slate-700">仅分享当前卡组</h4>
-                                <p class="text-xs text-slate-400 mt-0.5 font-medium">生成正在编辑的单卡组链接</p>
-                            </div>
-                        </div>
-
-                        <!-- 选项：CURL/Developer -->
-                        <div @click="copyCurlConfig" class="export-option p-5 bg-white border border-slate-200 rounded-2xl cursor-pointer flex items-center gap-5 shadow-sm opacity-90 hover:opacity-100 mt-2">
-                            <div class="w-12 h-12 bg-slate-800 text-slate-300 rounded-2xl flex items-center justify-center flex-shrink-0">
-                                <span class="material-symbols-rounded text-2xl">terminal</span>
-                            </div>
-                            <div class="flex-grow">
-                                <h4 class="font-bold text-slate-700">开发者 JSON 导出</h4>
-                                <p class="text-xs text-slate-400 mt-0.5 font-medium">导出结构化的 JSON 数据，供 CURL 或后端联调使用</p>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-        </transition>
-
         <!-- ========== 全局 Toast 提示 ========== -->
         <transition name="v">
             <div v-if="toast.msg" :class="['fixed top-6 md:top-10 left-1/2 -translate-x-1/2 px-6 py-3.5 rounded-2xl shadow-xl z-[100] font-bold text-sm flex items-center gap-3', 
@@ -436,8 +313,10 @@
         </transition>
     </div>
     {% endraw %}
+{% endblock %}
 
-    <script>
+{% block scripts %}
+<script>
         const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
 
         createApp({
@@ -450,9 +329,6 @@
                 const currentDeck = ref(null);
                 const deckCards = ref([]);
                 const searchQuery = ref("");
-                const showExportMenu = ref(false);
-                const showImportDialog = ref(false);
-                const importCode = ref('');
                 const isDesktop = ref(window.innerWidth >= 768);
                 
                 // Toast
@@ -562,15 +438,6 @@
                             if (res.data.raw_bundle_data) {
                                 localStorage.setItem('pvzh_raw_bundle_data', JSON.stringify(res.data.raw_bundle_data));
                             }
-                            
-                            // 核心修复：确保基础字典加载完毕后，再执行 URL 导入！
-                            const urlParams = new URLSearchParams(window.location.search);
-                            if (urlParams.has('import')) {
-                                importDeckFromCode(urlParams.get('import'));
-                                // 导入完成后清除地址栏参数
-                                window.history.replaceState({}, '', window.location.pathname);
-                            }
-                            
                         } else {
                             throw new Error(res.msg || "后端返回异常");
                         }
@@ -688,91 +555,7 @@
                     }
                 };
 
-                // ========== 导入功能 ==========
-                const importDeckFromCode = (code) => {
-                    try {
-                        let cleanCode = code.trim(); // 修复：剔除复制粘贴带来的首尾空格
-                        
-                        // 更健壮的 URL 提取方式
-                        if (cleanCode.includes('import=')) {
-                            try {
-                                const url = new URL(cleanCode);
-                                cleanCode = url.searchParams.get('import');
-                            } catch (e) {
-                                // 如果用户复制了不完整的 URL (例如没有 http://)，手动截取
-                                cleanCode = cleanCode.split('import=')[1].split('&')[0];
-                            }
-                        }
-                        
-                        if (!cleanCode) throw new Error('提取分享码失败');
-                        
-                        // 修复：atob 前剔除可能存在的换行符和多余空格
-                        cleanCode = cleanCode.replace(/\s/g, '');
-                        const decoded = decodeURIComponent(atob(cleanCode));
-                        const importData = JSON.parse(decoded);
-                        
-                        if (importData.v !== 1) throw new Error('分享码版本不兼容');
-                        
-                        if (importData.t === 'global') {
-                            let importedCount = 0;
-                            for (const [eng_id, cards] of Object.entries(importData.m)) {
-                                let targetExists = false;
-                                for (const decks of Object.values(heroDecks.value)) {
-                                    if (decks.find(d => d.eng_id === eng_id)) {
-                                        targetExists = true; break;
-                                    }
-                                }
-                                if (targetExists) {
-                                    localStorage.setItem(`pvzh_deck_${eng_id}`, JSON.stringify(cards));
-                                    importedCount++;
-                                }
-                            }
-                            if (currentDeck.value && importData.m[currentDeck.value.eng_id]) {
-                                selectDeck(currentDeck.value);
-                            }
-                            showToast(`✨ 成功导入 ${importedCount} 个卡组修改`, 'success');
-                            
-                        } else {
-                            // 单卡组导入
-                            let targetDeck = null;
-                            for (const decks of Object.values(heroDecks.value)) {
-                                targetDeck = decks.find(d => d.eng_id === importData.h);
-                                if (targetDeck) break;
-                            }
-                            if (!targetDeck) throw new Error(`未找到目标英雄: ${importData.h}`);
-                            
-                            selectDeck(targetDeck);
-                            
-                            deckCards.value = importData.c.map(cardItem => {
-                                const cardInfo = cardDb.value.find(c => String(c.CardGuid) === String(cardItem.i));
-                                return {
-                                    name: cardInfo ? cardInfo.name : `未知卡牌(${String(cardItem.i).slice(-8)})`,
-                                    cardguid: cardItem.i,
-                                    count: cardItem.cnt,
-                                    // 核心修复：导入时必须补全 Faction 阵营字段，否则打包时默认变植物！
-                                    faction: cardInfo ? cardInfo.Faction : 0 
-                                };
-                            });
-                            saveToLocal();
-                            showToast(`✨ 成功导入：${importData.n}`, 'success');
-                        }
-                        return true;
-                    } catch (e) {
-                        console.error('导入失败:', e);
-                        showToast(`导入解析失败，请检查分享码`, 'error');
-                        return false;
-                    }
-                };
-
-                const importFromPaste = () => {
-                    if (!importCode.value.trim()) return showToast("请输入分享链接或代码", "error");
-                    if (importDeckFromCode(importCode.value)) {
-                        showImportDialog.value = false;
-                        importCode.value = '';
-                    }
-                };
-
-                // ========== 导出功能 ==========
+                // ========== 打包导出 ==========
                 const getModifiedDecks = () => {
                     const mods = {};
                     for (let i = 0; i < localStorage.length; i++) {
@@ -787,42 +570,6 @@
                         }
                     }
                     return mods;
-                };
-
-                const copyDeckCode = async () => {
-                    if (!currentDeck.value || deckCards.value.length === 0) return showToast("当前无卡组数据", "error");
-                    const data = { v: 1, n: currentDeck.value.chn_name, h: currentDeck.value.eng_id, c: deckCards.value.map(c => ({i: c.cardguid, cnt: c.count})) };
-                    const code = btoa(encodeURIComponent(JSON.stringify(data)));
-                    const url = `${window.location.origin}/deck-editor?import=${code}`;
-                    try { await navigator.clipboard.writeText(url); showToast('单卡组链接已复制'); showExportMenu.value = false; } 
-                    catch (e) { prompt('请手动复制链接：', url); }
-                };
-
-                const copyGlobalDeckCode = async () => {
-                    const allMods = getModifiedDecks();
-                    const count = Object.keys(allMods).length;
-                    if (count === 0) return showToast('未检测到暂存记录，请先编辑并保存卡组', 'error');
-                    
-                    const data = { v: 1, t: 'global', m: allMods };
-                    const code = btoa(encodeURIComponent(JSON.stringify(data)));
-                    const url = `${window.location.origin}/deck-editor?import=${code}`;
-                    try { await navigator.clipboard.writeText(url); showToast(`已生成包含 ${count} 个卡组的全局链接！`); showExportMenu.value = false;} 
-                    catch (e) { prompt('请手动复制链接：', url); }
-                };
-
-                const copyCurlConfig = async () => {
-                    const allMods = getModifiedDecks();
-                    if (Object.keys(allMods).length === 0) return showToast('没有可导出的数据', 'error');
-                    
-                    const exportArr = Object.entries(allMods).map(([deck_id, cards]) => ({
-                        deck_id,
-                        total_cards: cards.reduce((s, c) => s + c.count, 0),
-                        cards: cards.map(c => ({ id: c.cardguid, count: c.count }))
-                    }));
-                    
-                    const jsonStr = JSON.stringify(exportArr, null, 2);
-                    try { await navigator.clipboard.writeText(jsonStr); showToast('JSON 数据已复制到剪贴板 (开发者用)'); showExportMenu.value = false;} 
-                    catch (e) { console.log(jsonStr); showToast('复制失败，已打印至控制台', 'error'); }
                 };
 
                 const quickExport = async () => {
@@ -862,7 +609,6 @@
                         a.click();
                         window.URL.revokeObjectURL(url);
                         showToast("✨ ZIP 打包成功！开始下载。");
-                        showExportMenu.value = false;
                     } catch (error) {
                         console.error("导出错误:", error);
                         showToast(`打包失败: ${error.message}`, "error");
@@ -881,30 +627,18 @@
                 onMounted(() => {
                     fetchInitData();
                     window.addEventListener('resize', handleResize);
-                    
-                    // 修复：解析并触发 Import 参数导入
-                    const urlParams = new URLSearchParams(window.location.search);
-                    if (urlParams.has('import')) {
-                        const importParam = urlParams.get('import');
-                        setTimeout(() => {
-                            importDeckFromCode(importParam);
-                            // 导入完成后清除地址栏的链接参数，保持美观且防止刷新二次导入
-                            window.history.replaceState({}, '', window.location.pathname);
-                        }, 1000);
-                    }
                 });
                 
                 onUnmounted(() => window.removeEventListener('resize', handleResize));
 
                 return {
                     activeTab, isLoadingData, heroDecks, cardDb, currentDeck, deckCards, searchQuery, filteredCards, totalCards,
-                    toast, showExportMenu, showImportDialog, importCode, isDesktop, fabPos, fabExpanded, isDocked, fabEdge,
+                    toast, isDesktop, fabPos, fabExpanded, isDocked, fabEdge,
                     handleTouchStart, handleTouchMove, handleTouchEnd, toggleFab, switchTab,
                     selectDeck, quickAddCard, adjustCardCount, clearDeck, saveToLocal, clearLocalData, hasLocalMod,
-                    copyDeckCode, copyGlobalDeckCode, copyCurlConfig, quickExport, importFromPaste, validateCardCount
+                    quickExport, validateCardCount
                 };
             }
         }).mount('#app');
-    </script>
-</body>
-</html>
+</script>
+{% endblock %}

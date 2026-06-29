@@ -21,6 +21,7 @@ UNITY_TASK_LOCK = threading.Lock()
 
 MAX_BUNDLE_SIZE = 140 * 1024 * 1024      # 140MB，在线版硬限制
 MAX_PATCH_ZIP_SIZE = 90 * 1024 * 1024    # 90MB，回填补丁包硬限制
+MAX_PATCH_FILES = 200                    # 补丁包最多 200 个文件
 TEMP_PREFIX = "unity_tool_"
 
 LIGHT_EDITABLE_TYPES = {"MonoBehaviour", "TextAsset", "Texture2D", "Sprite", "GameObject", "Material"}
@@ -218,26 +219,10 @@ def transform_json_tree(tree, mode='expand', process_strategy='auto'):
 
 def guess_export_modes(type_name):
     if type_name in IMAGE_TYPES:
-        return ["png", "raw"]
+        return ["png"]
     if type_name in JSON_LIKE_TYPES or type_name in LIGHT_EDITABLE_TYPES:
-        return ["json", "csv", "raw"]
-    return ["raw"]
-
-
-def get_object_display_name(obj):
-    try:
-        if obj.type.name in ["Texture2D", "Sprite"]:
-            data = obj.read()
-            return getattr(data, 'name', '') or f"Object_{obj.path_id}"
-
-        tree = obj.read_typetree()
-        if isinstance(tree, dict):
-            return tree.get("m_Name") or f"Object_{obj.path_id}"
-
-    except Exception:
-        pass
-
-    return f"Object_{obj.path_id}"
+        return ["json", "csv"]
+    return []
 
 
 def inspect_env_light(env):
@@ -254,56 +239,12 @@ def inspect_env_light(env):
             "name": f"Object_{obj.path_id}",
             "editable": type_name in LIGHT_EDITABLE_TYPES,
             "export_modes": guess_export_modes(type_name),
-            "depth": "fast"
         })
 
     return {
         "total_objects": len(objects),
         "type_counts": type_counts,
         "objects": objects,
-        "depth": "fast"
-    }
-
-
-def inspect_env(env):
-    objects = []
-    type_counts = {}
-
-    for obj in env.objects:
-        type_name = obj.type.name
-        type_counts[type_name] = type_counts.get(type_name, 0) + 1
-
-        item = {
-            "path_id": str(obj.path_id),
-            "type": type_name,
-            "name": get_object_display_name(obj),
-            "editable": False,
-            "export_modes": [],
-            "depth": "deep"
-        }
-
-        if type_name in ["Texture2D", "Sprite"]:
-            item["editable"] = True
-            item["export_modes"] = ["png", "raw"]
-
-        else:
-            try:
-                tree = obj.read_typetree()
-                if tree:
-                    item["editable"] = True
-                    item["export_modes"] = ["json", "csv", "raw"]
-                else:
-                    item["export_modes"] = ["raw"]
-            except Exception:
-                item["export_modes"] = ["raw"]
-
-        objects.append(item)
-
-    return {
-        "total_objects": len(objects),
-        "type_counts": type_counts,
-        "objects": objects,
-        "depth": "deep"
     }
 
 
@@ -357,8 +298,14 @@ def find_patch_for_object(obj, zip_file_map, fallback_map, index_data):
     return actual_zip_path, expected_filename, match_source
 
 
-def validate_patch_against_bundle(env, zf, process_mode='auto', validate_level='fast', repack_mode='patch'):
+def validate_patch_against_bundle(env, zf, repack_mode='patch'):
     zip_file_map, fallback_map, index_data, entries = build_zip_patch_maps(zf)
+
+    if len(entries) > MAX_PATCH_FILES:
+        raise ValueError(
+            f"补丁包文件过多（{len(entries)} 个，上限 {MAX_PATCH_FILES}）。"
+            "请只保留修改过的 JSON/PNG/CSV 与 _index.json。"
+        )
 
     report = {
         "ok": True,
@@ -372,11 +319,10 @@ def validate_patch_against_bundle(env, zf, process_mode='auto', validate_level='
         "items": [],
         "unmatched_files": [],
         "has_index": bool(index_data),
-        "validate_level": validate_level,
         "repack_mode": repack_mode
     }
 
-    if repack_mode == 'patch' and len(entries) > 200:
+    if repack_mode == 'patch' and len(entries) > 50:
         report["summary"]["warnings"] += 1
         report["items"].append({
             "path_id": "-",
@@ -387,7 +333,7 @@ def validate_patch_against_bundle(env, zf, process_mode='auto', validate_level='
             "match_source": "repack_mode",
             "status": "warning",
             "level": "warning",
-            "message": "当前 ZIP 文件数量较多，看起来像完整导出包。在线版建议只保留修改过的文件和 _index.json。"
+            "message": "ZIP 文件较多，建议只保留修改过的文件和 _index.json。"
         })
 
     matched_zip_paths = set()
@@ -408,7 +354,7 @@ def validate_patch_against_bundle(env, zf, process_mode='auto', validate_level='
         item = {
             "path_id": str(obj.path_id),
             "type": obj.type.name,
-            "name": f"Object_{obj.path_id}" if validate_level == 'fast' else get_object_display_name(obj),
+            "name": f"Object_{obj.path_id}",
             "file": expected_filename,
             "zip_path": actual_zip_path,
             "match_source": match_source,
@@ -419,57 +365,24 @@ def validate_patch_against_bundle(env, zf, process_mode='auto', validate_level='
 
         lower_name = expected_filename.lower()
 
-        try:
-            if lower_name.endswith('.png'):
-                if obj.type.name not in ["Texture2D", "Sprite"]:
-                    item["status"] = "error"
-                    item["level"] = "danger"
-                    item["message"] = "PNG 只能回填到 Texture2D 或 Sprite"
-                elif validate_level == 'full':
-                    with zf.open(actual_zip_path) as fp:
-                        img = Image.open(fp)
-                        img.verify()
-                    item["message"] = "图片格式有效，可回填"
-
-            elif lower_name.endswith('.json'):
-                if validate_level == 'full':
-                    raw_json_str = read_text_from_zip(zf, actual_zip_path)
-                    cleaned_str = clean_json_string(raw_json_str) if process_mode == 'auto' else raw_json_str
-                    parsed = json.loads(cleaned_str)
-
-                    if not isinstance(parsed, (dict, list)):
-                        item["status"] = "warning"
-                        item["level"] = "warning"
-                        item["message"] = "JSON 不是对象或数组，可能无法正确 save_typetree"
-                    else:
-                        item["message"] = "JSON 格式有效，可回填"
-
-            elif lower_name.endswith('.csv'):
-                if validate_level == 'full':
-                    csv_text = read_text_from_zip(zf, actual_zip_path)
-                    parsed = FormatManager.from_csv(csv_text)
-
-                    if not parsed:
-                        item["status"] = "warning"
-                        item["level"] = "warning"
-                        item["message"] = "CSV 未解析出有效字段"
-                    else:
-                        item["message"] = "CSV 可解析，可回填"
-
-            elif lower_name.endswith('.dat'):
-                item["status"] = "warning"
+        if lower_name.endswith('.png'):
+            if obj.type.name not in ["Texture2D", "Sprite"]:
+                item["status"] = "error"
                 item["level"] = "danger"
-                item["message"] = "RAW/DAT 属于高危回填，可能导致资源损坏"
+                item["message"] = "PNG 只能回填到 Texture2D 或 Sprite"
 
-            else:
-                item["status"] = "warning"
-                item["level"] = "warning"
-                item["message"] = "未知扩展名，将按 RAW 处理"
+        elif lower_name.endswith(('.json', '.csv')):
+            pass
 
-        except Exception as e:
+        elif lower_name.endswith('.dat'):
             item["status"] = "error"
             item["level"] = "danger"
-            item["message"] = str(e)
+            item["message"] = "不支持 RAW/DAT 二进制回填"
+
+        else:
+            item["status"] = "error"
+            item["level"] = "danger"
+            item["message"] = "不支持的文件类型，仅允许 JSON / CSV / PNG"
 
         if item["status"] == "error":
             report["summary"]["errors"] += 1
@@ -522,36 +435,28 @@ def get_unpack_policy():
 
     selected_types = request.form.getlist('types')
     include_images = parse_bool_form('include_images', False)
-    fallback_raw = parse_bool_form('fallback_raw', False)
     include_index = parse_bool_form('include_index', True)
 
     if preset == 'recommended':
         selected_types = DEFAULT_RECOMMENDED_TYPES
         target_format = 'json'
         include_images = False
-        fallback_raw = False
         include_index = True
     elif preset == 'patch':
         selected_types = DEFAULT_PATCH_TYPES
         target_format = 'json'
         include_images = False
-        fallback_raw = False
         include_index = True
     elif preset == 'images':
         selected_types = DEFAULT_IMAGE_TYPES
         target_format = 'json'
         include_images = True
-        fallback_raw = False
         include_index = True
     elif preset == 'advanced':
         if not selected_types:
             selected_types = DEFAULT_RECOMMENDED_TYPES
-    elif preset == 'raw':
-        target_format = 'raw'
-        fallback_raw = True
-        include_index = True
-        if not selected_types:
-            selected_types = ['__all__']
+        if target_format not in {'json', 'csv'}:
+            target_format = 'json'
 
     return {
         "preset": preset,
@@ -559,16 +464,12 @@ def get_unpack_policy():
         "process_mode": process_mode,
         "selected_types": selected_types,
         "include_images": include_images,
-        "fallback_raw": fallback_raw,
         "include_index": include_index,
     }
 
 
 def should_export_object(obj, policy):
-    selected_types = set(policy["selected_types"])
-    if '__all__' in selected_types:
-        return True
-    return obj.type.name in selected_types
+    return obj.type.name in set(policy["selected_types"])
 
 
 def export_image_object(obj, zf, workdir, index_data):
@@ -580,13 +481,6 @@ def export_image_object(obj, zf, workdir, index_data):
     image_path = os.path.join(workdir, f"image_{obj.path_id}.png")
     data.image.save(image_path, 'PNG')
     zf.write(image_path, file_name)
-    index_data[str(obj.path_id)] = file_name
-
-
-def export_raw_object(obj, zf, index_data):
-    raw_data = obj.get_raw_data()
-    file_name = f"Raw/{obj.type.name}_{obj.path_id}.dat"
-    zf.writestr(file_name, raw_data)
     index_data[str(obj.path_id)] = file_name
 
 
@@ -631,14 +525,12 @@ def inspect_bundle():
         cleanup_old_temp()
         reject_if_too_large(MAX_BUNDLE_SIZE, "Bundle 文件")
         file = request.files.get('bundle')
-        inspect_depth = request.form.get('inspect_depth', 'fast')
-
         if not file:
             return jsonify({"success": False, "error": "请选择 Bundle 文件"}), 400
 
         bundle_path = save_upload_to_workdir(file, workdir, "bundle")
         env = UnityPy.load(bundle_path)
-        report = inspect_env_light(env) if inspect_depth == 'fast' else inspect_env(env)
+        report = inspect_env_light(env)
 
         return jsonify({
             "success": True,
@@ -695,34 +587,17 @@ def unpack():
                         if policy["include_images"]:
                             export_image_object(obj, zf, workdir, index_data)
                             exported_count += 1
-                        elif policy["target_format"] == 'raw':
-                            export_raw_object(obj, zf, index_data)
-                            exported_count += 1
                         else:
                             skipped_count += 1
                         continue
 
-                    if policy["target_format"] == 'raw':
-                        export_raw_object(obj, zf, index_data)
-                        exported_count += 1
-                        continue
-
                     if export_typetree_object(obj, zf, index_data, policy):
-                        exported_count += 1
-                    elif policy["fallback_raw"]:
-                        export_raw_object(obj, zf, index_data)
                         exported_count += 1
                     else:
                         skipped_count += 1
 
                 except Exception:
                     failed_count += 1
-                    if policy["fallback_raw"]:
-                        try:
-                            export_raw_object(obj, zf, index_data)
-                            exported_count += 1
-                        except Exception:
-                            pass
 
             if policy["include_index"]:
                 zf.writestr("_index.json", json.dumps(index_data, indent=4, ensure_ascii=False))
@@ -732,7 +607,6 @@ def unpack():
                 "format": policy["target_format"],
                 "selected_types": policy["selected_types"],
                 "include_images": policy["include_images"],
-                "fallback_raw": policy["fallback_raw"],
                 "exported_count": exported_count,
                 "skipped_count": skipped_count,
                 "failed_count": failed_count
@@ -740,7 +614,7 @@ def unpack():
 
         if exported_count == 0:
             shutil.rmtree(workdir, ignore_errors=True)
-            return render_template('error.html', msg="没有导出任何对象。请切换为高级自定义，选择更多对象类型，或开启 RAW 兜底。"), 400
+            return render_template('error.html', msg="没有导出任何对象。请切换为高级自定义，选择更多对象类型。"), 400
 
         register_cleanup(workdir)
         return send_file(
@@ -775,8 +649,6 @@ def validate_repack():
         reject_if_too_large(MAX_BUNDLE_SIZE + MAX_PATCH_ZIP_SIZE, "上传内容")
         orig_file = request.files.get('original_bundle')
         mod_zip = request.files.get('modified_zip')
-        process_mode = request.form.get('mode', 'auto')
-        validate_level = request.form.get('validate_level', 'fast')
         repack_mode = request.form.get('repack_mode', 'patch')
 
         if not orig_file or not mod_zip:
@@ -788,13 +660,7 @@ def validate_repack():
         env = UnityPy.load(orig_path)
 
         with zipfile.ZipFile(zip_path, 'r') as zf:
-            report = validate_patch_against_bundle(
-                env,
-                zf,
-                process_mode=process_mode,
-                validate_level=validate_level,
-                repack_mode=repack_mode
-            )
+            report = validate_patch_against_bundle(env, zf, repack_mode=repack_mode)
 
         return jsonify({"success": True, "report": report})
 
@@ -836,19 +702,12 @@ def repack():
         env = UnityPy.load(orig_path)
 
         with zipfile.ZipFile(zip_path, 'r') as zf:
-            # 正式合成前使用完整预检，避免快速预检漏掉损坏 JSON / PNG。
-            validate_report = validate_patch_against_bundle(
-                env,
-                zf,
-                process_mode=process_mode,
-                validate_level='full',
-                repack_mode=repack_mode
-            )
+            validate_report = validate_patch_against_bundle(env, zf, repack_mode=repack_mode)
 
             if not validate_report["ok"]:
                 return render_template(
                     'error.html',
-                    msg=f"预检未通过，已中止打包。错误数：{validate_report['summary']['errors']}。请先回到页面执行完整预检查看详情。"
+                    msg=f"预检未通过，已中止打包。错误数：{validate_report['summary']['errors']}。请先回到页面执行预检查看详情。"
                 ), 400
 
             zip_file_map, fallback_map, index_data, _ = build_zip_patch_maps(zf)
@@ -898,8 +757,7 @@ def repack():
                         modified_files_count += 1
 
                     else:
-                        obj.set_raw_data(zf.read(actual_zip_path))
-                        modified_files_count += 1
+                        raise Exception(f"不支持的文件类型 [{expected_filename}]，仅允许 JSON / CSV / PNG")
 
                 except Exception as e:
                     raise Exception(f"文件 [{expected_filename}] 注入失败：{e}")
