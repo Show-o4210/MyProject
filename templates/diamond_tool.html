@@ -23,7 +23,7 @@
                         </h1>
 
                         <p class="text-sm md:text-base text-slate-500 leading-relaxed max-w-2xl">
-                            通过每日登录 + 联赛奖励同步接口生成钻石。支持手动 Token 或自动读取。
+                            您可以通过此工具即可快速刷取钻石。支持通过手动输入token刷取钻石或通过邀请码和游戏id自动刷取钻石。注：token需要您自行抓包获取，邀请码则自动抓取。游戏id即设置里的player id  
                         </p>
                     </div>
 
@@ -40,7 +40,7 @@
             <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 md:p-6 space-y-5">
 
                 <div>
-                    <label class="block text-sm font-bold text-slate-700 mb-2">认证方式</label>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">刷取方式</label>
                     <div class="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
                         <button type="button" @click="switchAuthMode('manual')"
                             class="px-4 py-2 rounded-xl text-sm font-bold transition"
@@ -50,14 +50,14 @@
                         <button type="button" @click="switchAuthMode('auto')"
                             class="px-4 py-2 rounded-xl text-sm font-bold transition"
                             :class="form.auth_mode === 'auto' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500'">
-                            本地凭证
+                            自动刷取
                         </button>
                     </div>
                 </div>
 
                 <div v-if="form.auth_mode === 'auto'" class="rounded-2xl border border-dashed border-amber-200 bg-amber-50/40 p-4 space-y-3">
                     <p class="text-sm text-slate-700">
-                        自动读取 <span class="font-mono font-bold">data/token.dat</span>
+                        自动读取 <span class="font-mono font-bold">token</span>
                     </p>
                     <p v-if="loadingStored" class="text-xs text-amber-600 flex items-center gap-1">
                         <span class="material-symbols-rounded text-[16px] animate-spin">progress_activity</span>
@@ -86,9 +86,9 @@
 
                 <div>
                     <label class="block text-sm font-bold text-slate-700 mb-2">
-                        EADP-AUTH-TOKEN <span class="text-red-500">*</span>
+                        输入token <span class="text-red-500">*</span>
                     </label>
-                    <input type="text" v-model.trim="form.token" placeholder="输入你的 EADP-AUTH-TOKEN"
+                    <input type="text" v-model.trim="form.token" placeholder="输入你的token"
                         autocomplete="off" spellcheck="false"
                         :readonly="form.auth_mode === 'auto'"
                         class="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-amber-100 focus:border-amber-400 outline-none transition font-mono text-sm bg-slate-50 focus:bg-white">
@@ -96,9 +96,9 @@
 
                 <div>
                     <label class="block text-sm font-bold text-slate-700 mb-2">
-                        EADP-PERSONA-ID <span class="text-red-500">*</span>
+                        输入游戏id <span class="text-red-500">*</span>
                     </label>
-                    <input type="text" v-model.trim="form.persona_id" placeholder="输入你的 EADP-PERSONA-ID"
+                    <input type="text" v-model.trim="form.persona_id" placeholder="输入你的游戏id"
                         autocomplete="off" spellcheck="false"
                         class="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-amber-100 focus:border-amber-400 outline-none transition font-mono text-sm bg-slate-50 focus:bg-white">
                 </div>
@@ -142,10 +142,10 @@
                     <div class="text-sm text-amber-800">
                         <h3 class="font-extrabold mb-2">注意事项</h3>
                         <ul class="list-disc list-inside space-y-1 leading-relaxed">
-                            <li>本工具限流 <strong>10 次/分钟</strong>（全局限流仍生效）</li>
-                            <li>每轮执行：每日登录 → 联赛奖励同步</li>
+                            <li>本工具限流 <strong>10 次/分钟</strong>（全局限流仍然生效）</li>
+                            <li>刷钻石不影响联网对局，无封号风险</li>
                             <li>单次最多 <strong>5 轮</strong>，默认每轮 10000 钻石</li>
-                            <li>仅供学习交流，请勿滥用</li>
+                            <li>仅供学习交流，请勿滥用和盗刷</li>
                         </ul>
                     </div>
                 </div>
