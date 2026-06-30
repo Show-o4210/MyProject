@@ -1,5 +1,6 @@
+import { ASSEMBLY_SUFFIX, deepClone } from './utils.js';
+
 const NAMESPACE_ENGINE = 'PvZCards.Engine.Components.';
-const ASSEMBLY_SUFFIX = ', EngineLib, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null';
 
 const SIMPLE_ABILITY_COMPONENTS = new Set(['Multishot', 'AttacksInAllLanes', 'PlaysFaceDown']);
 const COUNTER_ABILITY_COMPONENTS = new Set(['Aquatic', 'Truestrike', 'Strikethrough', 'Deadly', 'Frenzy']);
@@ -42,14 +43,6 @@ function ensureArray(value) {
 
 function ensureNumberArray(value) {
   return ensureArray(value).map(v => Number(v)).filter(v => Number.isFinite(v));
-}
-
-function deepClone(value) {
-  try {
-    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-  } catch (_) {
-    return value;
-  }
 }
 
 function subtypeDisplayName(option) {

@@ -1,104 +1,66 @@
-# blueprints/pack_buyer.py
 import json
 import os
 import re
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from flask import Blueprint, jsonify, render_template, request
 
-from database import supabase
 from extensions import limiter
+from logic_ea_api import (
+    CLIENT_ID,
+    DEFAULT_CLIENT_VERSION,
+    DEFAULT_CONTENT_VERSION,
+    DEFAULT_PLATFORM,
+    DEFAULT_REQUEST_TIMEOUT,
+    build_pvzh_headers,
+    post_soft_purchase,
+)
 
 pack_buyer_bp = Blueprint('pack_buyer', __name__)
 
-# ===================== 常量配置 =====================
-PACK_API_URL = "https://pvz-heroes.awspopcap.com/persistence/v2/inventory/commitSoftPurchase"
-
-CLIENT_ID = os.getenv("PVZH_CLIENT_ID", "pvzheroes-2015-google-client")
-DEFAULT_CLIENT_VERSION = os.getenv("PVZH_CLIENT_VERSION", "1.64.6")
-DEFAULT_CONTENT_VERSION = os.getenv("PVZH_CONTENT_VERSION", "45a337051e72592e53c9bf8a4b590639")
-DEFAULT_PLATFORM = os.getenv("PVZH_PLATFORM", "Android")
-REQUEST_TIMEOUT = int(os.getenv("PVZH_PACK_TIMEOUT", "12"))
-
-# 卡包数据文件路径
-PACK_DATA_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'name_id_cost.txt')
+PACK_DATA_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'data', 'name_id_cost.txt'
+)
 
 SAFE_VERSION_RE = re.compile(r"^[0-9A-Za-z._-]{1,64}$")
 SAFE_CONTENT_VERSION_RE = re.compile(r"^[0-9A-Za-z._-]{1,128}$")
 SAFE_PLATFORM_RE = re.compile(r"^[0-9A-Za-z._ -]{1,32}$")
 
 
-def get_current_user_from_cookie():
-    """从 Cookie 中获取当前登录用户。"""
-    token = request.cookies.get('access_token')
-    if not token:
-        return None
-
-    try:
-        user_res = supabase.auth.get_user(token)
-        if user_res and user_res.user:
-            profile_res = supabase.table('profiles') \
-                .select('*') \
-                .eq('id', user_res.user.id) \
-                .execute()
-            if profile_res.data:
-                raw_user = profile_res.data[0]
-                return {k: (str(v) if k == 'id' else v) for k, v in raw_user.items()}
-    except Exception:
-        # 不把鉴权异常暴露给前端，避免泄露 Supabase 细节。
-        pass
-
-    return None
-
-
 def load_packs_from_file() -> List[Dict[str, Any]]:
-    """
-    从 name_id_cost.txt 解析卡包数据。
-    格式：4行一组
-    [序号]
-    name:xxx
-    id:xxx
-    cost:xxx
-    """
-    packs = []
-
+    packs: List[Dict[str, Any]] = []
     if not os.path.exists(PACK_DATA_FILE):
-        print(f"卡包数据文件不存在: {PACK_DATA_FILE}")
         return packs
 
     try:
         with open(PACK_DATA_FILE, 'r', encoding='utf-8') as f:
-            lines = [line.strip() for line in f if line.strip()]
+            lines = [line.strip() for line in f.readlines()]
 
-        for i in range(0, len(lines), 4):
-            if i + 3 >= len(lines):
+        i = 0
+        while i < len(lines):
+            if not lines[i].startswith('['):
+                i += 1
+                continue
+
+            block = lines[i:i + 4]
+            if len(block) < 4:
                 break
 
             try:
-                serial = lines[i].strip('[]')
-                name_line = lines[i + 1]
-                id_line = lines[i + 2]
-                cost_line = lines[i + 3]
-
-                name = name_line[5:].strip() if name_line.startswith('name:') else name_line.strip()
-                sku = id_line[3:].strip() if id_line.startswith('id:') else id_line.strip()
-                cost_str = cost_line[5:].strip() if cost_line.startswith('cost:') else cost_line.strip()
-                cost = int(cost_str) if cost_str.isdigit() else 0
-
-                if not sku:
-                    continue
-
+                index = int(block[0].strip('[]'))
+                name = block[1].split(':', 1)[1].strip()
+                sku = block[2].split(':', 1)[1].strip()
+                cost = int(block[3].split(':', 1)[1].strip())
                 packs.append({
-                    'serial': serial,
+                    'index': index,
                     'name': name,
                     'sku': sku,
-                    'cost': cost
+                    'cost': cost,
                 })
-            except Exception as e:
+            except (ValueError, IndexError) as e:
                 print(f"解析卡包数据出错: {e}")
-                continue
+            i += 4
 
         return packs
     except Exception as e:
@@ -126,7 +88,6 @@ def clean_field(value: Any, default: str, pattern: re.Pattern) -> str:
 
 
 def parse_upstream_body(response: requests.Response) -> Tuple[Any, str]:
-    """同时保留 JSON 和原始文本，方便前端排查。"""
     response_text = response.text or ''
     try:
         return response.json(), response_text
@@ -147,7 +108,6 @@ def stringify_body(body: Any) -> str:
 
 
 def humanize_pack_error(status_code: int, body: Any) -> str:
-    """把服务端返回转成用户能看懂的原因。"""
     text = stringify_body(body).lower()
 
     if status_code in (401, 403) or 'token' in text or 'auth' in text or 'unauthorized' in text:
@@ -171,44 +131,34 @@ def humanize_pack_error(status_code: int, body: Any) -> str:
 
 @pack_buyer_bp.route('/pack-buyer')
 def pack_buyer_page():
-    """渲染卡包购买器页面。"""
     return render_template('pack_buyer.html', current_tab='pack_buyer')
 
 
 @pack_buyer_bp.route('/api/packs', methods=['GET'])
 def get_packs():
-    """获取所有卡包列表。"""
     packs = load_packs_from_file()
     return jsonify({
         'success': True,
         'packs': packs,
-        'total': len(packs)
+        'total': len(packs),
     })
 
 
 @pack_buyer_bp.route('/api/pack-settings', methods=['GET'])
 def get_pack_settings():
-    """返回当前默认请求版本，前端可展示并允许用户手动覆盖。"""
     return jsonify({
         'success': True,
         'client_id': CLIENT_ID,
         'client_version': DEFAULT_CLIENT_VERSION,
         'content_version': DEFAULT_CONTENT_VERSION,
-        'platform': DEFAULT_PLATFORM
+        'platform': DEFAULT_PLATFORM,
     })
 
 
 @pack_buyer_bp.route('/api/buy-pack', methods=['POST'])
 @limiter.limit("5 per minute")
 def buy_pack():
-    """
-    购买卡包。
-    注意：不记录用户的 EADP-AUTH-TOKEN，响应里也不会回显 Token。
-    """
-    current_user = get_current_user_from_cookie()
-    if not current_user:
-        return jsonify({"success": False, "error": "请先登录后再使用"}), 401
-
+    """购买卡包，无需登录，直接使用前端传入的 Token 和 Persona ID。"""
     data = request.get_json(silent=True) or {}
 
     sku = str(data.get('sku', '')).strip()
@@ -243,34 +193,25 @@ def buy_pack():
     elif not matched_pack:
         warnings.append("未在本地卡包列表中找到该 SKU；如果是手动输入，请确认 SKU 和价格完全正确。")
 
-    utc = str(int(time.time() * 1000))
-
     payload = {
         "Sku": sku,
         "EventId": None,
         "Cards": None,
         "ExpectedCost": cost,
-        "KeyName": None
+        "KeyName": None,
     }
 
-    headers = {
-        "Content-Type": "application/json",
-        "EADP-AUTH-TOKEN": token,
-        "EADP-PERSONA-ID": persona_id,
-        "X-EADP-Client-Id": CLIENT_ID,
-        "X-Pvzh-UTC": utc,
-        "X-Pvzh-Platform": platform,
-        "X-Pvzh-Content-Version": content_version,
-        "X-Pvzh-Client-Version": client_version
-    }
+    headers = build_pvzh_headers(
+        token,
+        persona_id,
+        client_version=client_version,
+        content_version=content_version,
+        platform=platform,
+    )
+    utc_ms = headers["X-Pvzh-UTC"]
 
     try:
-        response = requests.post(
-            PACK_API_URL,
-            json=payload,
-            headers=headers,
-            timeout=REQUEST_TIMEOUT
-        )
+        response = post_soft_purchase(payload, headers, timeout=DEFAULT_REQUEST_TIMEOUT)
 
         response_body, response_text = parse_upstream_body(response)
         success = response.status_code == 200
@@ -289,8 +230,8 @@ def buy_pack():
                 "platform": platform,
                 "client_version": client_version,
                 "content_version": content_version,
-                "utc_ms": utc
-            }
+                "utc_ms": utc_ms,
+            },
         })
 
     except requests.Timeout:

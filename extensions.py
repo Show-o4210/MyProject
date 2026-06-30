@@ -29,7 +29,4 @@ def init_limiter(app):
                 "retry_after": e.description if hasattr(e, 'description') else 60
             }), 429
             
-        if request.endpoint == 'auth.login':
-            return render_template('login.html', error=error_msg, show_register=(request.form.get('action') == 'register')), 429
-            
         return render_template('error.html', message=error_msg), 429

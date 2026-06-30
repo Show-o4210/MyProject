@@ -1,6 +1,6 @@
 # security.py
 from flask import request, jsonify, make_response
-from database import supabase
+from database import get_supabase
 import datetime
 import os
 import re
@@ -180,7 +180,7 @@ def log_security_event(ip, user_agent, reason, severity="medium", blocked=True):
             "timestamp": utc_now_iso(),
             "blocked": blocked,
         }
-        result = supabase.table("security_logs").insert(data).execute()
+        result = get_supabase().table("security_logs").insert(data).execute()
         print(f"[SECURITY] {'BLOCKED' if blocked else 'LOGGED'} {ip} {request.method} {request.path} - {reason}")
         return result
     except Exception as e:
@@ -296,7 +296,7 @@ def init_security_handlers(app):
 
         try:
             today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-            result = supabase.table("security_logs") \
+            result = get_supabase().table("security_logs") \
                 .select("ip, severity, reason, request_path, request_method, timestamp, blocked", count="exact") \
                 .gte("timestamp", f"{today}T00:00:00") \
                 .order("timestamp", desc=True) \

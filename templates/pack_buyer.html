@@ -382,7 +382,7 @@
                     if (response.status === 429) {
                         error.value = '请求过于频繁，请稍后再试（每分钟最多5次）';
                     } else if (response.status === 401) {
-                        error.value = data.error || '请先登录后再使用此工具';
+                        error.value = data.error || 'Token 或 Persona ID 无效，请重新获取后再试';
                     } else if (!data.success) {
                         error.value = data.error || `请求失败（状态码: ${response.status || data.status_code || '未知'}）`;
                     }

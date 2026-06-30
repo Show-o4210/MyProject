@@ -2,215 +2,206 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>幻影卡牌工坊</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>幻影卡牌工坊 · 单卡编辑</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/phantom.css') }}">
 </head>
 <body>
   <div id="phantom-app" v-cloak>
     <header class="topbar">
-      <div>
-        <div class="eyebrow">PVZ-H Tools · Phantom v1</div>
-        <h1>幻影卡牌工坊</h1>
+      <div class="topbar-brand">
+        <div class="eyebrow">PVZ-H · JSON Creator</div>
+        <h1>🃏 幻影卡牌工坊</h1>
       </div>
+      <button class="btn btn-small topbar-menu-btn" @click="openMobileMenu" aria-label="菜单">☰</button>
       <div class="topbar-actions">
-        <span class="status-chip" :class="configStatus">[[ configStatus === 'loaded' ? '资源已加载' : configStatus === 'loading' ? '加载资源中' : '使用兜底配置' ]]</span>
-        <button class="btn btn-primary" @click="newCard">新建卡牌</button>
-        <button class="btn" @click="exportProject">导出工程</button>
-        <button class="btn" @click="exportGeneratedProjectJson">导出卡牌 JSON</button>
-        <button class="btn mobile-preview-btn" @click="openPreviewTab">JSON 预览</button>
-        <label class="btn file-btn">导入工程<input type="file" accept=".phantom,.json" @change="importProjectFile"></label>
+        <span class="status-chip" :class="configStatus">[[ configStatus === 'loaded' ? '✅ 资源就绪' : configStatus === 'loading' ? '⏳ 加载中' : '⚠️ 兜底配置' ]]</span>
+        <button class="btn" @click="resetCard">🗑️ 重置</button>
+        <button class="btn" @click="copyPreview">📋 复制 JSON</button>
+        <button class="btn" @click="setActiveTab('json')">📄 输出</button>
       </div>
     </header>
 
     <main class="app-shell">
       <aside class="sidebar">
-        <div class="sidebar-title">功能区</div>
-        <button v-for="tab in tabs" :key="tab.id" class="nav-item" :class="{active: activeTab === tab.id}" @click="activeTab = tab.id">
-          <span class="nav-icon">[[ tab.icon ]]</span><span class="nav-label">[[ tab.name ]]</span>
+        <div class="sidebar-title">创作分区</div>
+        <button v-for="tab in tabs" :key="tab.id" class="nav-item" :class="{active: activeTab === tab.id}" @click="setActiveTab(tab.id)">
+          <span class="nav-icon">[[ tab.icon ]]</span>
+          <span class="nav-label">[[ tab.name ]]</span>
         </button>
       </aside>
 
       <section class="workspace">
         <div class="workspace-head">
-          <div><h2>[[ currentTab.name ]]</h2><p>[[ currentTab.desc ]]</p></div>
+          <div>
+            <h2>[[ currentTab.icon ]] [[ currentTab.name ]]</h2>
+            <p>[[ currentTab.desc ]]</p>
+          </div>
           <div class="head-badges">
-            <span class="badge">[[ apiReady ? 'API 已挂载' : 'API 未确认' ]]</span>
-            <span class="badge">配置 [[ phantomConfig.version ]]</span>
-            <span class="badge">技能节点 [[ phantomConfig.skillLibrary.total_nodes || 0 ]]</span>
+            <span class="badge">🃏 [[ cardDisplayTitle ]]</span>
+            <span class="badge" v-if="card.guid">🔑 [[ card.guid ]]</span>
+            <span class="badge" v-if="realLogicEntityCount">⚡ [[ realLogicEntityCount ]] 技能组</span>
           </div>
         </div>
 
-        <section v-show="activeTab === 'project'" class="tab-panel two-column">
-          <div class="card-panel">
-            <div class="panel-head"><h3>本地工程列表</h3><button class="btn btn-small" @click="newProject">新建工程</button></div>
-            <div class="empty-note">第一版暂不接服务器存储，默认使用浏览器 localStorage + 工程文件导入导出。</div>
-            <div class="project-card active"><strong>[[ project.name ]]</strong><span>[[ project.cards.length ]] 张卡牌</span></div>
-          </div>
-          <div class="card-panel">
-            <div class="panel-head"><h3>当前 Mod 包含的卡牌</h3><button class="btn btn-small" @click="newCard">新增</button></div>
-            <div v-if="project.cards.length === 0" class="empty-note">还没有卡牌。点击“新建卡牌”添加一张占位卡。</div>
-            <div v-for="card in project.cards" :key="card.localId" class="roster-item" :class="{active: currentCard && currentCard.localId === card.localId}" @click="selectCard(card.localId)">
-              <div><strong>[[ cardDisplayName(card) ]]</strong><span>GUID：[[ card.guid || '未设置' ]]<template v-if="cardIndexSummary(card)"> · [[ cardIndexSummary(card) ]]</template></span></div>
-              <button class="ghost-danger" @click.stop="removeCard(card.localId)">移除</button>
-            </div>
-          </div>
-        </section>
-
+        <!-- 基础属性 -->
         <section v-show="activeTab === 'basic'" class="tab-panel">
-          <div class="grid-2">
-            <div class="card-panel">
-              <h3>快速操作</h3>
-              <div class="button-row">
-                <button class="btn btn-primary" @click="saveProject">保存当前修改</button>
-                <button class="btn" @click="exportGeneratedCardJson">导出当前卡牌 JSON</button>
-                <label class="btn file-btn">从 card_data JSON 导入<input type="file" accept=".json" @change="importCardJsonFile"></label>
-              </div>
-              <label>指定导入 GUID<input v-model="importGuid" placeholder="多卡 JSON 必填；单卡可留空"></label>
-              <p class="hint">v0.4 已接入真实属性写入与 AB 包注入：右侧预览会按原 CardModel 结构生成游戏卡牌 JSON，也支持从 card_data 条目反向导入到当前表单。</p>
+          <div class="section-block">
+            <div class="section-head"><h3>📥 导入卡牌 JSON</h3></div>
+            <p class="hint">支持单卡 JSON 或 card_data 格式。多卡文件请填写 GUID。导入后技能会自动解析到结构树。</p>
+            <div class="inline-form">
+              <label class="grow">GUID（多卡 JSON 必填）<input v-model="importGuid" placeholder="例如 1"></label>
+              <label class="btn file-btn">选择 JSON<input type="file" accept=".json" @change="importCardJsonFile"></label>
             </div>
-            <div class="card-panel">
-              <h3>标识与预制体</h3>
+          </div>
+
+          <div class="section-block">
+            <div class="section-head"><h3>🔑 标识与预制体</h3></div>
+            <div class="form-grid">
+              <label>GUID<input v-model="card.guid" type="number" placeholder="929802724" @change="syncCardFromIndex" @blur="syncCardFromIndex"></label>
+              <label>卡牌名<input v-model="card.name" placeholder="显示名称"></label>
+              <label class="span-2">Prefab Name<input v-model="card.prefabName" placeholder="UUID / Prefab"></label>
+              <div class="index-hint span-2" v-if="cardIndexInfo">
+                <div><strong>📇 索引匹配：</strong>[[ cardIndexInfo.NAME_CN || '未命名' ]]</div>
+                <div class="muted">UUID：[[ cardIndexInfo.UUID ]]<template v-if="cardIndexInfo.TEXTURE_NAME"> · 贴图 [[ cardIndexInfo.TEXTURE_NAME ]]</template></div>
+                <button class="mini-btn" @click="syncCardFromIndex">🔄 同步名称 / UUID</button>
+              </div>
+              <div class="index-hint span-2 muted" v-else>未匹配到 index 索引。填写 GUID 后可尝试自动同步。</div>
+            </div>
+          </div>
+
+          <div class="section-block two-col-section">
+            <div class="sub-section">
+              <h3>🎴 卡牌定义</h3>
               <div class="form-grid">
-                <label>GUID<input v-model="currentCard.guid" type="number" placeholder="例如 929802724" @change="syncCurrentCardFromIndex" @blur="syncCurrentCardFromIndex"></label>
-                <label>卡牌名<input v-model="currentCard.name" placeholder="显示名称"></label>
-                <label class="span-2">Prefab Name<input v-model="currentCard.prefabName" placeholder="UUID / Prefab 名称" ></label>
-                <div class="index-hint span-3" v-if="currentCardIndexInfo">
-                  <div><strong>索引匹配：</strong>[[ currentCardIndexInfo.NAME_CN || '未命名' ]]</div>
-                  <div class="muted">GUID：[[ currentCardIndexInfo.GUID ]] · UUID：[[ currentCardIndexInfo.UUID ]]<template v-if="currentCardIndexInfo.TEXTURE_NAME"> · 贴图：[[ currentCardIndexInfo.TEXTURE_NAME ]]</template></div>
-                  <div class="inline-actions"><button class="mini-btn" @click="syncCurrentCardFromIndex">按当前 GUID 同步名称 / UUID</button></div>
-                </div>
-                <div class="index-hint span-3 muted" v-else>
-                  未从 data/index.json 按当前 GUID 匹配到卡牌。
-                  <div class="tiny-hint" v-if="phantomConfig.cardIndexMeta">
-                    索引状态：[[ phantomConfig.cardIndexMeta.loaded ? '已读取' : '未读取' ]]；
-                    数量：[[ phantomConfig.cardIndexMeta.count || 0 ]]；
-                    来源：[[ phantomConfig.cardIndexMeta.source || '无' ]]
-                    <template v-if="phantomConfig.cardIndexMeta.error">；提示：[[ phantomConfig.cardIndexMeta.error ]]</template>
-                  </div>
-                </div>
+                <label>阵营<select v-model="card.faction"><option v-for="item in options.factions" :key="item.id" :value="item.value">[[ labelOf(item) ]]</option></select></label>
+                <label>BaseId<select v-model="card.baseId"><option v-for="item in options.baseIds" :key="item.id" :value="item.value">[[ labelOf(item) ]]</option></select></label>
+                <label>Color<select v-model="card.color"><option v-for="item in options.colors" :key="item.id" :value="item.value">[[ labelOf(item) ]]</option></select></label>
+                <label>稀有度<select v-model="card.rarity"><option v-for="item in options.rarities" :key="item.id" :value="item.id">[[ labelOf(item) ]]</option></select></label>
+                <label>系列<select v-model="card.set"><option v-for="item in options.sets" :key="item.id" :value="item.value">[[ labelOf(item) ]]</option></select></label>
+                <label>Set Key<input v-model="card.setRarityKey" placeholder="可选"></label>
+              </div>
+              <button class="btn btn-small" @click="applyCardTypeDefaults">⚙️ 按类型同步攻血 / Flags</button>
+            </div>
+            <div class="sub-section">
+              <h3>💰 数值与造价</h3>
+              <div class="form-grid">
+                <label>费用<input v-model.number="card.cost" type="number"></label>
+                <label>攻击<input v-model.number="card.attack" type="number"></label>
+                <label>生命<input v-model.number="card.health" type="number"></label>
+                <label>制作价<input v-model.number="card.craftBuy" type="number"></label>
+                <label>分解价<input v-model.number="card.craftSell" type="number"></label>
+                <label class="check-line"><input type="checkbox" v-model="card.hasAttack"> 输出 Attack</label>
+                <label class="check-line"><input type="checkbox" v-model="card.hasHealth"> 输出 Health</label>
               </div>
             </div>
           </div>
 
-          <div class="grid-2">
-            <div class="card-panel">
-              <h3>卡牌定义</h3>
-              <div class="form-grid">
-                <label>阵营<select v-model="currentCard.faction"><option v-for="item in options.factions" :key="item.id" :value="item.value">[[ labelOf(item) ]]</option></select></label>
-                <label>BaseId<select v-model="currentCard.baseId"><option v-for="item in options.baseIds" :key="item.id" :value="item.value">[[ labelOf(item) ]]</option></select></label>
-                <label>Color<select v-model="currentCard.color"><option v-for="item in options.colors" :key="item.id" :value="item.value">[[ labelOf(item) ]]</option></select></label>
-                <label>稀有度<select v-model="currentCard.rarity"><option v-for="item in options.rarities" :key="item.id" :value="item.id">[[ labelOf(item) ]] · [[ item.value ]]</option></select></label>
-                <label>系列<select v-model="currentCard.set"><option v-for="item in options.sets" :key="item.id" :value="item.value">[[ labelOf(item) ]]</option></select></label>
-                <label>Set/Rarity Key<input v-model="currentCard.setRarityKey" placeholder="可选"></label><button class="btn btn-small span-2" @click="applyCardTypeDefaults">根据 BaseId / 阵营同步攻血与 Flags</button>
+          <div class="section-block two-col-section">
+            <div class="sub-section">
+              <h3>🚩 核心 Flags</h3>
+              <div class="checkbox-grid"><label v-for="flag in options.flags" :key="flag.id"><input type="checkbox" :value="flag.value" v-model="card.flags"> [[ labelOf(flag) ]]</label></div>
+            </div>
+            <div class="sub-section">
+              <h3>🤖 AI 倾向性</h3>
+              <div class="form-grid compact-form">
+                <label>Subtype Aff.<input v-model="card.affinities.subtypes" placeholder="逗号分隔"></label>
+                <label>Subtype Wt.<input v-model="card.affinities.subtypeWeights" placeholder="逗号分隔"></label>
+                <label>Tag Aff.<input v-model="card.affinities.tags" placeholder="逗号分隔"></label>
+                <label>Tag Wt.<input v-model="card.affinities.tagWeights" placeholder="逗号分隔"></label>
               </div>
             </div>
-            <div class="card-panel">
-              <h3>数值与造价</h3>
-              <div class="form-grid">
-                <label>制作价格<input v-model.number="currentCard.craftBuy" type="number"></label>
-                <label>分解价格<input v-model.number="currentCard.craftSell" type="number"></label>
-                <label>费用<input v-model.number="currentCard.cost" type="number"></label>
-                <label>攻击<input v-model.number="currentCard.attack" type="number"></label>
-                <label>生命<input v-model.number="currentCard.health" type="number"></label>
-                <label class="check-line"><input type="checkbox" v-model="currentCard.hasAttack"> 输出 Attack 组件</label>
-                <label class="check-line"><input type="checkbox" v-model="currentCard.hasHealth"> 输出 Health 组件</label>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div class="card-panel"><h3>核心标记 Flags</h3><div class="checkbox-grid"><label v-for="flag in options.flags" :key="flag.id"><input type="checkbox" :value="flag.value" v-model="currentCard.flags"> [[ labelOf(flag) ]]</label></div></div>
-            <div class="card-panel"><h3>AI 倾向性</h3><div class="form-grid"><label>Subtype Affinities<input v-model="currentCard.affinities.subtypes" placeholder="逗号分隔"></label><label>Subtype Weights<input v-model="currentCard.affinities.subtypeWeights" placeholder="逗号分隔"></label><label>Tag Affinities<input v-model="currentCard.affinities.tags" placeholder="逗号分隔"></label><label>Tag Weights<input v-model="currentCard.affinities.tagWeights" placeholder="逗号分隔"></label><label>Card Affinities<input v-model="currentCard.affinities.cards" placeholder="逗号分隔 GUID"></label><label>Card Weights<input v-model="currentCard.affinities.cardWeights" placeholder="逗号分隔"></label></div></div>
           </div>
         </section>
 
-        <section v-show="activeTab === 'subtypes'" class="tab-panel">
-          <div class="card-panel">
-            <h3>新增自定义种族</h3>
-            <div class="inline-form"><input v-model="newSubtype.id" type="number" placeholder="ID"><input v-model="newSubtype.name" placeholder="种族名称"><button class="btn" @click="addSubtype">保存到本地库</button></div>
-            <label class="check-line"><input type="checkbox" v-model="settings.syncSubtypes"> 保持【底层逻辑种族】自动同步到【UI显示种族】</label>
+        <!-- 种族标签 -->
+        <section v-show="activeTab === 'traits'" class="tab-panel">
+          <div class="section-block">
+            <div class="section-head"><h3>➕ 自定义种族</h3></div>
+            <div class="inline-form">
+              <input v-model="newSubtype.id" type="number" placeholder="种族 ID">
+              <input v-model="newSubtype.name" placeholder="种族名称">
+              <button class="btn" @click="addSubtype">保存</button>
+            </div>
+            <p class="hint">逻辑种族会自动同步到 UI 显示层。</p>
           </div>
-          <div class="grid-2">
-            <div class="card-panel"><h3>底层逻辑种族</h3><div class="checkbox-grid compact"><label v-for="s in options.subtypes" :key="s.id"><input type="checkbox" :value="s.value" v-model="currentCard.logicSubtypes"> [[ s.id ]] · [[ labelOf(s) ]]</label></div></div>
-            <div class="card-panel"><h3>UI 显示层种族</h3><div class="checkbox-grid compact"><label v-for="s in options.subtypes" :key="s.id"><input type="checkbox" :value="s.value" v-model="currentCard.displaySubtypes"> [[ s.id ]] · [[ labelOf(s) ]]</label></div></div>
+          <div class="section-block two-col-section">
+            <div class="sub-section">
+              <h3>🧬 底层逻辑种族</h3>
+              <div class="checkbox-grid compact"><label v-for="s in options.subtypes" :key="s.id"><input type="checkbox" :value="s.value" v-model="card.logicSubtypes"> [[ s.id ]] · [[ labelOf(s) ]]</label></div>
+            </div>
+            <div class="sub-section">
+              <h3>🎨 UI 显示种族</h3>
+              <div class="checkbox-grid compact"><label v-for="s in options.subtypes" :key="'d'+s.id"><input type="checkbox" :value="s.value" v-model="card.displaySubtypes"> [[ s.id ]] · [[ labelOf(s) ]]</label></div>
+            </div>
+          </div>
+          <div class="section-block two-col-section">
+            <div class="sub-section">
+              <h3>🏷️ 逻辑标签</h3>
+              <textarea v-model="card.logicTagsText" placeholder="每行一个，如 destroy"></textarea>
+            </div>
+            <div class="sub-section">
+              <h3>💬 展示标签</h3>
+              <textarea v-model="card.displayTagsText" placeholder="每行一个展示标签"></textarea>
+            </div>
           </div>
         </section>
 
-        <section v-show="activeTab === 'tags'" class="tab-panel">
-          <div class="card-panel"><label class="check-line"><input type="checkbox" v-model="settings.syncTags"> 保持【逻辑标签】自动同步到【显示标签】</label></div>
-          <div class="grid-2">
-            <div class="card-panel"><h3>底层逻辑标签</h3><textarea v-model="currentCard.logicTagsText" placeholder="每行一个标签，例如 destroy"></textarea><button class="btn btn-small">添加标签</button></div>
-            <div class="card-panel"><h3>UI 显示标签</h3><textarea v-model="currentCard.displayTagsText" placeholder="每行一个展示标签"></textarea><button class="btn btn-small">删除选中标签</button></div>
-          </div>
-        </section>
-
+        <!-- 特殊能力 -->
         <section v-show="activeTab === 'abilities'" class="tab-panel">
-          <div class="card-panel">
-            <div class="panel-head">
-              <div>
-                <h3>特殊能力编辑器</h3>
-                <p class="hint">v0.9 开始按原 Py 的能力结构补齐：左侧搜索勾选独立组件，中间查看已选能力，右侧参数会写入真实组件字段。</p>
-              </div>
-              <button class="btn btn-small danger" @click="clearSpecialAbilities">清空基础能力</button>
+          <div class="section-block">
+            <div class="section-head">
+              <h3>✨ 基础特殊能力</h3>
+              <button class="btn btn-small danger" @click="clearSpecialAbilities">清空</button>
             </div>
-            <div class="ability-editor-grid">
-              <div class="ability-column">
-                <input v-model="abilitySearch" placeholder="搜索能力，例如 Teamup / Armor / Frenzy">
-                <div class="ability-list">
-                  <label v-for="ability in filteredSpecialAbilities" :key="ability.id" class="ability-item" :class="{active: currentCard.specialAbilities.includes(ability.id)}">
-                    <input type="checkbox" :value="ability.id" v-model="currentCard.specialAbilities">
-                    <span>[[ ability.name ]]</span>
-                    <em>[[ ability.id ]] · [[ ability.type || 'bool' ]]</em>
-                  </label>
-                </div>
-              </div>
+            <input v-model="abilitySearch" placeholder="🔍 搜索能力，如 Teamup / Armor">
+            <div class="ability-pick-grid">
+              <label v-for="ability in filteredSpecialAbilities" :key="ability.id" class="ability-chip" :class="{active: card.specialAbilities.includes(ability.id)}">
+                <input type="checkbox" :value="ability.id" v-model="card.specialAbilities">
+                <span>[[ ability.name ]]</span>
+                <em>[[ ability.id ]]</em>
+              </label>
+            </div>
+          </div>
 
-              <div class="ability-column">
-                <h4>已选基础能力</h4>
-                <div v-if="!selectedSpecialAbilityDetails.length" class="empty-note">尚未选择基础特殊能力。</div>
-                <div v-for="ability in selectedSpecialAbilityDetails" :key="ability.id" class="selected-ability-card">
-                  <div class="selected-ability-head">
-                    <strong>[[ ability.name ]]</strong>
-                    <button class="mini-btn danger" @click="removeSpecialAbility(ability.id)">移除</button>
-                  </div>
-                  <p class="hint">组件键：[[ ability.id ]]，类型：[[ ability.type || 'bool' ]]</p>
-                  <div class="form-grid compact-form" v-if="ability.type === 'int'">
-                    <label>[[ ability.label || '数值' ]]<input v-model.number="currentCard.abilityParams[ability.id]" type="number" min="0"></label>
-                  </div>
-                  <div class="form-grid compact-form" v-else-if="ability.id === 'Teamup'">
-                    <label class="check-line"><input type="checkbox" v-model="currentCard.abilityParams.TeamupCreateInFront"> 同时输出 CreateInFront</label>
-                  </div>
-                  <div class="form-grid compact-form" v-else-if="ability.type === 'combo'">
-                    <label>参数<select v-model.number="currentCard.abilityParams[ability.id]"><option v-for="(val, label) in ability.options" :key="label" :value="val">[[ label ]]</option></select></label>
-                  </div>
-                </div>
+          <div class="section-block" v-if="selectedSpecialAbilityDetails.length">
+            <h3>⚙️ 已选能力参数</h3>
+            <div v-for="ability in selectedSpecialAbilityDetails" :key="ability.id" class="selected-ability-card">
+              <div class="selected-ability-head">
+                <strong>[[ ability.name ]]</strong>
+                <button class="mini-btn danger" @click="removeSpecialAbility(ability.id)">移除</button>
+              </div>
+              <div class="form-grid compact-form" v-if="ability.type === 'int'">
+                <label>[[ ability.label || '数值' ]]<input v-model.number="card.abilityParams[ability.id]" type="number" min="0"></label>
+              </div>
+              <div class="form-grid compact-form" v-else-if="ability.id === 'Teamup'">
+                <label class="check-line"><input type="checkbox" v-model="card.abilityParams.TeamupCreateInFront"> 输出 CreateInFront</label>
+              </div>
+              <div class="form-grid compact-form" v-else-if="ability.type === 'combo'">
+                <label>参数<select v-model.number="card.abilityParams[ability.id]"><option v-for="(val, label) in ability.options" :key="label" :value="val">[[ label ]]</option></select></label>
               </div>
             </div>
           </div>
 
-          <div class="grid-2">
-            <div class="card-panel">
-              <div class="panel-head"><h3>根目录特殊能力 special_abilities</h3><button class="btn btn-small danger" @click="clearRootAbilities">清空</button></div>
-              <p class="hint">这部分写入 card_data 根目录的 special_abilities，主要影响 UI 标签/展示逻辑，与上方独立组件不是同一个位置。</p>
-              <div class="checkbox-grid compact"><label v-for="preset in options.rootAbilityPresets" :key="preset.id"><input type="checkbox" :value="preset.id" v-model="currentCard.rootSpecialAbilities"> [[ preset.id ]] · [[ preset.name ]]</label></div>
+          <div class="section-block two-col-section">
+            <div class="sub-section">
+              <div class="section-head"><h3>🏷️ UI 展示能力</h3><button class="btn btn-small danger" @click="clearRootAbilities">清空</button></div>
+              <div class="checkbox-grid compact"><label v-for="preset in options.rootAbilityPresets" :key="preset.id"><input type="checkbox" :value="preset.id" v-model="card.rootSpecialAbilities"> [[ preset.name ]]</label></div>
             </div>
-
-            <div class="card-panel">
-              <h3>赋予触发类能力 GrantedTriggeredAbilities</h3>
-              <p class="hint">对齐原 Py：双重攻击 g=562；先攻/Overshoot g=564, vt=1, va=伤害。自定义能力可直接填写 g/vt/va。</p>
+            <div class="sub-section">
+              <h3>⚡ 触发类能力</h3>
               <div class="inline-form">
                 <select v-model="newTriggeredAbilityType"><option v-for="preset in triggeredAbilityPresets" :key="preset.id" :value="preset.id">[[ preset.name ]]</option></select>
                 <button class="btn" @click="addTriggeredPreset">添加</button>
               </div>
               <div v-if="newTriggeredAbilityType === 'Custom'" class="form-grid compact-form">
-                <label>g / ID<input v-model.number="customTriggeredAbility.g" type="number" min="0"></label>
+                <label>g<input v-model.number="customTriggeredAbility.g" type="number"></label>
                 <label>vt<input v-model.number="customTriggeredAbility.vt" type="number"></label>
                 <label>va<input v-model.number="customTriggeredAbility.va" type="number"></label>
               </div>
               <div class="triggered-list">
-                <div v-if="!currentCard.triggeredAbilities.length" class="empty-note">暂无触发类能力。</div>
-                <div v-for="(item, index) in currentCard.triggeredAbilities" :key="index" class="triggered-row">
+                <div v-if="!card.triggeredAbilities.length" class="empty-state small">暂无触发能力</div>
+                <div v-for="(item, index) in card.triggeredAbilities" :key="index" class="triggered-row">
                   <strong>[[ describeTriggeredAbility(item) ]]</strong>
                   <div class="form-grid compact-form">
                     <label>g<input v-model.number="item.g" type="number"></label>
@@ -224,263 +215,196 @@
           </div>
         </section>
 
-        <section v-show="activeTab === 'logic'" class="tab-panel logic-layout">
-          <div class="logic-toolbar simplified-toolbar">
-            <div class="mode-tabs">
-              <button class="btn btn-small" :class="{active: activeLogicMode === 'tree_editor'}" @click="activeLogicMode = 'tree_editor'">编辑</button>
-              <button class="btn btn-small" :class="{active: activeLogicMode === 'real_tree'}" @click="activeLogicMode = 'real_tree'">预览</button>
-              <button class="btn btn-small" :class="{active: activeLogicMode === 'source'}" @click="activeLogicMode = 'source'">源码</button>
+        <!-- 技能逻辑（PC 对齐） -->
+        <section v-show="activeTab === 'logic'" class="tab-panel logic-workspace">
+          <div class="logic-hero">
+            <div class="logic-hero-text">
+              <h3>⚡ 技能逻辑编辑器</h3>
+              <p>与 PC 端结构树模式对齐。修改结构树或参数后会自动同步到卡牌 JSON。</p>
             </div>
-            <div class="button-row logic-primary-actions">
-              <button class="btn btn-small" @click="refreshTreeFromRealLogic">从真实技能刷新</button>
-              <button class="btn btn-small btn-primary" @click="saveSkillTreeToRealLogic">应用到真实技能</button>
-              <button class="btn btn-small" @click="logicAdvancedOpen = !logicAdvancedOpen">[[ logicAdvancedOpen ? '收起高级' : '高级' ]]</button>
+            <div class="logic-stat-row">
+              <span class="stat-pill">🌳 [[ skillTreeRows.length ]] 节点</span>
+              <span class="stat-pill">📦 [[ realLogicEntityCount ]] 技能组</span>
+              <span class="stat-pill" v-if="selectedSkillTreeNode">🎯 [[ selectedTreeNodeLabel ]]</span>
             </div>
-          </div>
-          <div class="logic-status-card">
-            <strong>当前真实技能：[[ realLogicEntityCount ]] 个实体</strong>
-            <span v-if="realLogicEntityCount">导入卡牌后已自动读取为结构树草稿。修改树后，点击“应用到真实技能”才会写回。</span>
-            <span v-else>当前卡牌暂无真实技能实体。可以从模板开始创建，或从技能库手动添加节点。</span>
-          </div>
-          <div v-show="logicAdvancedOpen" class="advanced-actions-card">
-            <button class="btn btn-small" @click="syncSkillTreeSource">结构树 → 源码</button>
-            <button class="btn btn-small" @click="applySkillTreeSource">源码 → 结构树</button>
-            <button class="btn btn-small" @click="copyRealLogicEntitiesToSource">真实技能 → 源码</button>
-            <button class="btn btn-small btn-primary" @click="applyRealLogicEntitiesSource">源码 → 真实技能</button>
           </div>
 
-          <div v-show="activeLogicMode === 'tree_editor'" class="logic-grid tree-editor-grid">
-            <div class="card-panel skill-library-panel">
-              <div class="panel-head"><div><h3>技能模板</h3><p class="hint">优先用模板起步，再在结构树里改参数。模板只追加到草稿，不会自动写回真实技能。</p></div></div>
-              <div class="template-grid">
-                <button v-for="tpl in skillTemplatePresets" :key="tpl.id" class="template-card" @click="insertSkillTemplate(tpl.id)">
-                  <strong>[[ tpl.name ]]</strong>
-                  <span>[[ tpl.badge ]]</span>
-                  <em>[[ tpl.description ]]</em>
-                </button>
+          <div class="logic-toolbar">
+            <button class="btn btn-small btn-primary" @click="addAbilityGroup">➕ 新建技能组</button>
+            <button class="btn btn-small" :disabled="!canLogicUndo" @click="logicUndo">↩️ 撤销</button>
+            <button class="btn btn-small" :disabled="!canLogicRedo" @click="logicRedo">↪️ 重做</button>
+            <button class="btn btn-small" @click="expandAllSkillTree">📂 展开</button>
+            <button class="btn btn-small" @click="collapseAllSkillTree">📁 折叠</button>
+            <button class="btn btn-small" @click="refreshTreeFromRealLogic">🔄 读取</button>
+            <button class="btn btn-small danger" @click="clearSkillTreeDraft">🗑️ 清空</button>
+          </div>
+
+          <div class="logic-panel-tabs">
+            <button v-for="ws in logicWorkspaceTabs" :key="ws.id" class="logic-panel-tab" :class="{active: logicWorkspace === ws.id}" @click="setLogicWorkspace(ws.id)">
+              <span>[[ ws.icon ]]</span>
+              <span>[[ isMobile ? ws.shortName : ws.name ]]</span>
+            </button>
+          </div>
+
+          <!-- 组件库 -->
+          <div v-show="logicWorkspace === 'library'" class="logic-pane logic-pane-library">
+            <div class="library-toolbar">
+              <input v-model="skillSearch" placeholder="🔍 搜索组件（支持中文名）">
+              <div class="button-row">
+                <button class="btn btn-primary btn-small" :disabled="!selectedPaletteItem" @click="addFromPalette(false)">➕ 插入到选中父节点</button>
+                <button class="btn btn-small" :disabled="!selectedPaletteItem || !(selectedPaletteItem.kind === 'preset' || selectedPaletteItem.isPreset)" @click="addFromPalette(true)">🌱 加为根节点</button>
               </div>
-
-              <div class="panel-head stacked-head"><div><h3>技能库</h3><p class="hint">进阶用法：选中中间树节点作为父节点，再点击这里的技能节点添加。</p></div></div>
-              <input v-model="skillSearch" placeholder="搜索组件 / 类型 / 描述">
-              <div class="skill-library-list compact-library">
-                <div v-if="!filteredSkillCategories.length" class="empty-note">当前搜索条件下没有节点。</div>
-                <div v-for="category in filteredSkillCategories" :key="category.id" class="skill-category">
-                  <strong>[[ category.name ]] <small>[[ category.nodes.length ]]</small></strong>
-                  <button v-for="node in category.nodes" :key="node.id" class="skill-node" :class="{active: selectedSkillNode && selectedSkillNode.id === node.id}" @click="selectSkillNode(node)">
-                    <span>[[ node.name ]]</span><em>[[ node.id ]]</em>
+            </div>
+            <div v-if="!filteredPalette.length" class="empty-state">没有匹配的组件。</div>
+            <div v-for="group in filteredPalette" :key="group.id" class="palette-group">
+              <button class="palette-group-head" @click="togglePaletteGroup(group.id)">
+                <span>[[ group.name ]]</span>
+                <span class="category-meta">[[ isPaletteGroupExpanded(group.id) ? '▾' : '▸' ]]</span>
+              </button>
+              <div v-show="isPaletteGroupExpanded(group.id)" class="palette-group-body">
+                <template v-for="child in group.children" :key="child.id">
+                  <div v-if="child.kind === 'subcategory'" class="palette-subgroup">
+                    <div class="palette-subtitle">[[ child.name ]]</div>
+                    <div class="palette-node-grid">
+                      <button v-for="node in child.children" :key="node.id" class="palette-node" :class="{active: selectedPaletteItem && selectedPaletteItem.id === node.id}" @click="selectPaletteItem(node)">
+                        [[ node.name ]]
+                      </button>
+                    </div>
+                  </div>
+                  <button v-else-if="child.kind === 'node' || child.kind === 'preset'" class="palette-node palette-node-block" :class="{active: selectedPaletteItem && selectedPaletteItem.id === child.id}" @click="selectPaletteItem(child)">
+                    [[ child.name ]]
                   </button>
-                </div>
-              </div>
-              <div class="button-column sticky-actions">
-                <button class="btn btn-primary" :disabled="!selectedSkillNode" @click="addSelectedSkillNodeAsChild">添加到选中节点</button>
-                <button class="btn" :disabled="!selectedSkillNode" @click="addSelectedSkillNodeAsRoot">添加为根节点</button>
+                </template>
               </div>
             </div>
+          </div>
 
-            <div class="card-panel skill-tree-panel">
-              <div class="panel-head">
-                <div><h3>技能结构树</h3><p class="hint">导入原卡后会自动读取真实技能。选中节点后可在右侧编辑参数。</p></div>
-                <div class="button-row">
-                  <button class="btn btn-small" @click="selectedSkillTreeNodeUid = ''">取消选中</button>
-                  <button class="ghost-danger" @click="clearSkillTreeDraft">清空</button>
-                </div>
+          <!-- 工作区结构树 -->
+          <div v-show="logicWorkspace === 'tree'" class="logic-pane logic-pane-tree">
+            <div class="template-strip">
+              <span class="strip-label">🌱 快速模板</span>
+              <button v-for="tpl in skillTemplatePresets" :key="tpl.id" class="template-pill" @click="insertSkillTemplate(tpl.id)">[[ tpl.name ]]</button>
+            </div>
+            <div class="logic-tree-card">
+              <div v-if="!skillTreeRows.length" class="empty-state">
+                <strong>🌳 工作区为空</strong>
+                <p>点击「新建技能组」，或使用上方快速模板。</p>
+                <button class="btn" @click="addAbilityGroup">➕ 新建技能组</button>
               </div>
-              <div v-if="!skillTreeRows.length" class="empty-note">当前技能树为空。可以点击左侧模板，或从技能库添加根节点。</div>
               <div v-else class="skill-tree-list">
-                <div v-for="row in skillTreeRows" :key="row.node.uid" class="skill-tree-row" :class="{selected: selectedSkillTreeNodeUid === row.node.uid, disabled: row.node.disabled}" :style="{ '--depth': row.depth }" @click="selectSkillTreeNode(row.node.uid)">
+                <div v-for="row in skillTreeRows" :key="row.node.uid" class="skill-tree-row" :class="{selected: selectedSkillTreeNodeUid === row.node.uid, disabled: row.node.disabled}" :style="{'--depth': row.depth}" @click="selectSkillTreeNode(row.node.uid)">
                   <button class="tree-expander" @click.stop="toggleSkillTreeNodeCollapsed(row)">[[ row.hasChildren ? (row.node.collapsed ? '▸' : '▾') : '•' ]]</button>
                   <div class="tree-node-main">
-                    <strong>[[ row.node.name ]]</strong>
-                    <span>[[ row.node.node_id ]] · [[ row.node.category ]]</span>
-                    <em>[[ treeNodeSummary(row.node) ]]</em>
+                    <strong>[[ row.label ]]<template v-if="nodeHasChildrenHint(row.node.node_id)"> 🖱️</template></strong>
+                    <span>[[ row.node.node_id ]]</span>
+                    <em>[[ row.paramText || treeNodeSummary(row.node) ]]</em>
                   </div>
                 </div>
               </div>
-              <div class="tree-actions">
-                <button class="btn btn-small" :disabled="!selectedSkillTreeNode" @click="moveSelectedSkillTreeNode(-1)">上移</button>
-                <button class="btn btn-small" :disabled="!selectedSkillTreeNode" @click="moveSelectedSkillTreeNode(1)">下移</button>
-                <button class="btn btn-small" :disabled="!selectedSkillTreeNode" @click="duplicateSelectedSkillTreeNode">复制</button>
-                <button class="btn btn-small" :disabled="!selectedSkillTreeNode" @click="toggleSelectedSkillTreeNodeDisabled">禁用/启用</button>
-                <button class="ghost-danger" :disabled="!selectedSkillTreeNode" @click="removeSelectedSkillTreeNode">删除</button>
+              <div class="tree-toolbar" v-if="skillTreeRows.length">
+                <button class="btn btn-small" :disabled="!selectedSkillTreeNode" @click="moveSelectedSkillTreeNode(-1)">⬆️</button>
+                <button class="btn btn-small" :disabled="!selectedSkillTreeNode" @click="moveSelectedSkillTreeNode(1)">⬇️</button>
+                <button class="btn btn-small" :disabled="!selectedSkillTreeNode" @click="duplicateSelectedSkillTreeNode">📋</button>
+                <button class="btn btn-small" :disabled="!selectedSkillTreeNode" @click="toggleSelectedSkillTreeNodeDisabled">🚫</button>
+                <button class="btn btn-small danger" :disabled="!selectedSkillTreeNode" @click="removeSelectedSkillTreeNode">🗑️</button>
+                <button class="btn btn-small" :disabled="!selectedSkillTreeNode" @click="setLogicWorkspace('inspector')">🛠️ 检查器</button>
               </div>
             </div>
+            <div class="logic-desc-card">
+              <h4>📝 技能结构预览</h4>
+              <pre class="logic-desc-pre">[[ logicDescPreview ]]</pre>
+            </div>
+          </div>
 
-            <div class="card-panel inspector-panel">
-              <h3>参数面板</h3>
-              <div v-if="!selectedSkillTreeNode" class="empty-note">选择中间结构树节点后，可以在这里编辑参数。选择左侧技能库节点时，会显示节点定义。</div>
-              <div v-else class="inspector-box">
-                <strong>[[ selectedSkillTreeNode.name ]]</strong>
-                <span>[[ selectedSkillTreeNode.node_id ]] · [[ selectedSkillTreeNode.category ]]</span>
-                <span v-if="selectedSkillTreeNode.relation && selectedSkillTreeNode.relation.key" class="hint">关系：[[ selectedSkillTreeNode.relation.key ]] [[ selectedSkillTreeNode.relation.mode === 'array' ? '数组项' : '对象' ]]</span>
-                <label class="check-line"><input type="checkbox" v-model="selectedSkillTreeNode.disabled"> 禁用该节点</label>
-                <div v-if="Object.keys(selectedSkillTreeNode.editable_params || {}).length" class="param-editor">
-                  <label v-for="(meta, key) in selectedSkillTreeNode.editable_params" :key="key">[[ key ]]
-                    <select v-if="meta.type === 'enum'" v-model="selectedSkillTreeNode.params[key]"><option v-for="opt in meta.options || []" :key="opt" :value="opt">[[ opt ]]</option></select>
-                    <input v-else-if="meta.type === 'bool'" type="checkbox" v-model="selectedSkillTreeNode.params[key]">
-                    <input v-else-if="meta.type === 'int' || meta.type === 'float'" type="number" v-model.number="selectedSkillTreeNode.params[key]" :min="meta.min" :max="meta.max">
-                    <textarea v-else-if="meta.type === 'json'" v-model="selectedSkillTreeNode.params[key]"></textarea>
-                    <input v-else v-model="selectedSkillTreeNode.params[key]">
-                  </label>
+          <!-- 检查器 -->
+          <div v-show="logicWorkspace === 'inspector'" class="logic-pane logic-pane-inspector">
+            <div v-if="!selectedSkillTreeNode" class="empty-state">
+              <strong>🛠️ 未选中节点</strong>
+              <p>请在工作区中选择一个节点。</p>
+              <button class="btn" @click="setLogicWorkspace('tree')">🌳 返回工作区</button>
+            </div>
+            <div v-else class="inspector-card">
+              <div class="inspector-head">
+                <div>
+                  <h3>[[ selectedTreeNodeLabel ]]</h3>
+                  <span class="muted">[[ selectedSkillTreeNode.node_id ]]</span>
                 </div>
-                <div v-else class="empty-note">该节点没有明确参数定义。可以在源码模式中直接编辑 JSON。</div>
-                <details class="node-json-details"><summary>查看节点 JSON</summary><pre>[[ selectedSkillTreeNodeJson ]]</pre></details>
+                <label class="check-line"><input type="checkbox" :checked="selectedSkillTreeNode.disabled" @change="toggleSelectedSkillTreeNodeDisabled"> 禁用（不导出）</label>
               </div>
-
-              <h3>当前库节点</h3>
-              <div v-if="selectedSkillNode" class="inspector-box compact-inspector">
-                <strong>[[ selectedSkillNode.name ]]</strong>
-                <span>[[ selectedSkillNode.id ]] · [[ selectedSkillNode.category ]]</span>
-                <textarea readonly :value="selectedSkillNode.description || '暂无描述，后续由 logic_translator 接入。'"></textarea>
+              <div v-if="selectedSkillTreeNode.node_id === 'AbilityGroup'" class="empty-state small">技能组本身没有可编辑参数。</div>
+              <div v-else-if="inspectorFields.length" class="inspector-form">
+                <label v-for="field in inspectorFields" :key="field.key" class="inspector-field">
+                  <span>[[ field.label ]]</span>
+                  <select v-if="field.config.type === 'enum'" :value="selectedSkillTreeNode.params[field.key]" @change="updateInspectorParam(field.key, $event.target.value)">
+                    <option v-for="opt in field.options" :key="opt" :value="opt">[[ formatEnumLabel(opt, field.enumNames) ]]</option>
+                  </select>
+                  <input v-else-if="field.config.type === 'bool'" type="checkbox" :checked="!!selectedSkillTreeNode.params[field.key]" @change="updateInspectorParam(field.key, $event.target.checked)">
+                  <input v-else-if="field.config.type === 'int' || field.config.type === 'float'" type="number" :value="selectedSkillTreeNode.params[field.key]" :min="field.config.min" :max="field.config.max" @change="updateInspectorParam(field.key, Number($event.target.value))">
+                  <select v-else-if="field.config.type === 'component_picker' || field.config.type === 'terrain_picker'" :value="selectedSkillTreeNode.params[field.key] || ''" @change="updateInspectorParam(field.key, $event.target.value)">
+                    <option value=""></option>
+                    <option v-for="opt in field.options" :key="opt" :value="opt">[[ formatEnumLabel(opt, field.enumNames) || opt ]]</option>
+                  </select>
+                  <input v-else :value="selectedSkillTreeNode.params[field.key]" @change="updateInspectorParam(field.key, $event.target.value)">
+                </label>
               </div>
+              <div v-else class="empty-state small">当前节点没有可编辑参数。</div>
+              <div class="inspector-actions" v-if="replaceCandidates.length">
+                <button class="btn btn-small" @click="showReplaceMenu = !showReplaceMenu">🔄 更换为同类节点</button>
+                <div v-if="showReplaceMenu" class="replace-menu">
+                  <button v-for="cand in replaceCandidates" :key="cand.id" class="replace-item" @click="replaceSelectedNode(cand.id)">[[ cand.name ]]</button>
+                </div>
+              </div>
+              <details class="node-json-details"><summary>查看节点 JSON</summary><pre>[[ selectedSkillTreeNodeJson ]]</pre></details>
             </div>
           </div>
 
-          <div v-show="activeLogicMode === 'real_tree'" class="grid-2">
-            <div class="card-panel">
-              <div class="panel-head">
-                <div><h3>真实结构预览</h3><p class="hint">这里是当前卡牌 logicEntities 的只读预览。编辑请回到“编辑”模式。</p></div>
-                <div class="button-row"><button class="btn btn-small" @click="refreshTreeFromRealLogic">刷新到编辑树</button></div>
-              </div>
-              <div v-if="!realLogicEntityCount" class="empty-note">当前卡牌还没有真实 logicEntities。</div>
-              <pre v-else class="json-tab-pre">[[ realLogicEntityTreeJson ]]</pre>
+          <!-- 技能 JSON -->
+          <div v-show="logicWorkspace === 'json'" class="logic-pane">
+            <div class="json-panel-head">
+              <p class="hint">展示当前卡牌 logicEntities（随结构树自动同步）。</p>
+              <button class="btn btn-small" @click="copySkillJson">📋 复制技能 JSON</button>
             </div>
-            <div class="card-panel">
-              <div class="panel-head"><div><h3>结构树草稿预览</h3><p class="hint">这是当前编辑树草稿。点击“应用到真实技能”后才会影响导出与 AB 打包。</p></div></div>
-              <pre class="json-tab-pre">[[ skillTreeDraftJson ]]</pre>
-            </div>
-          </div>
-
-          <div v-show="activeLogicMode === 'source'" class="card-panel">
-            <div class="panel-head"><div><h3>技能源码</h3><p class="hint">高级兜底区。普通修改优先使用编辑模式和模板。</p></div><div class="button-row"><button class="btn" @click="syncSkillTreeSource">结构树 → 源码</button><button class="btn btn-primary" @click="applySkillTreeSource">源码 → 结构树</button><button class="btn" @click="copyRealLogicEntitiesToSource">真实技能 → 源码</button><button class="btn btn-primary" @click="applyRealLogicEntitiesSource">源码 → 真实技能</button></div></div>
-            <textarea class="source-textarea" v-model="currentCard.skillLogicSource" placeholder="可生成 skill_tree 草稿，也可读取 real_logic_entities 后写回 logicEntities"></textarea>
+            <pre class="json-tab-pre">[[ realLogicEntitiesJson ]]</pre>
           </div>
         </section>
 
-        <section v-show="activeTab === 'export'" class="tab-panel">
-          <div class="grid-2">
-            <div class="card-panel">
-              <h3>card_data JSON 导入 / 导出</h3>
-              <p class="hint">这里保留纯 JSON 流程，方便你先检查生成结果，再决定是否注入 AB 包。</p>
-              <div class="form-grid">
-                <label class="span-2">批量导入 card_data JSON<input type="file" accept=".json" @change="importCardsAsProject"></label>
-                <label class="span-2">JSON 输出文件名<input v-model="exportName" placeholder="card_data_1"></label>
-              </div>
-              <div class="button-row">
-                <button class="btn btn-primary" @click="exportGeneratedProjectJson">导出当前工程卡牌 JSON</button>
-                <button class="btn" @click="exportProject">导出 .phantom 工程</button>
-                <button class="btn" @click="openPreviewTab">打开 JSON 预览 Tab</button>
-              </div>
-              <div class="empty-note">当前工程内没有 GUID 的卡牌会在导出 card_data JSON 时被自动跳过。</div>
-            </div>
-
-            <div class="card-panel">
-              <h3>工程校验</h3>
-              <p class="hint">打包前检查 GUID、基础字段、组件列表与数字字段。错误会阻止打包，警告允许继续处理。</p>
-              <div class="button-row">
-                <button class="btn btn-primary" :disabled="validateBusy" @click="validateCurrentProject">[[ validateBusy ? '校验中...' : '校验当前工程' ]]</button>
-              </div>
-              <div v-if="validationResult" class="result-box" :class="validationResult.ok ? 'ok' : 'bad'">
-                <strong>[[ validationResult.message ]]</strong>
-                <span>卡牌 [[ validationResult.summary.cards ]] · 错误 [[ validationResult.summary.errors ]] · 警告 [[ validationResult.summary.warnings ]]</span>
-              </div>
-              <div v-if="validationResult?.errors?.length" class="issue-list">
-                <div v-for="item in validationResult.errors" :key="item.guid + item.field + item.message" class="issue error"><b>[[ item.guid ]]</b><span>[[ item.field ]]：[[ item.message ]]</span></div>
-              </div>
-              <div v-if="validationResult?.warnings?.length" class="issue-list">
-                <div v-for="item in validationResult.warnings" :key="item.guid + item.field + item.message" class="issue warning"><b>[[ item.guid ]]</b><span>[[ item.field ]]：[[ item.message ]]</span></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div class="card-panel">
-              <h3>AB 包预检</h3>
-              <p class="hint">上传原始 card_data AssetBundle，先确认能找到名称包含 cards 的 TextAsset / MonoBehaviour，并读取原始卡牌数量。</p>
-              <div class="form-grid">
-                <label class="span-2">原始 AssetBundle 文件<input type="file" @change="selectBundleFile"></label>
-                <label>目标资源名关键字<input v-model="bundleTargetAssetName" placeholder="cards"></label>
-                <label>输出文件名<input v-model="bundleOutputName" placeholder="card_data_1"></label>
-              </div>
-              <div class="button-row">
-                <button class="btn" :disabled="inspectBusy" @click="inspectSelectedBundle">[[ inspectBusy ? '预检中...' : '检查 AB 包' ]]</button>
-              </div>
-              <div v-if="bundleInspectResult" class="result-box" :class="bundleInspectResult.ok ? 'ok' : 'bad'">
-                <strong>[[ bundleInspectResult.message ]]</strong>
-                <span v-if="bundleInspectResult.detail?.resources?.length">匹配资源：[[ bundleInspectResult.detail.resources[0].name ]] · [[ bundleInspectResult.detail.resources[0].type ]] · [[ bundleInspectResult.detail.resources[0].card_count ]] 张卡牌</span>
-              </div>
-              <div class="empty-note">[[ packStatus || '建议先预检 AB 包，再执行注入打包。' ]]</div>
-            </div>
-
-            <div class="card-panel">
-              <h3>AB 包注入与打包</h3>
-              <p class="hint">后端会寻找名称包含 cards 的 JSON 资源，并把当前工程卡牌按 GUID 覆盖写入。打包前会自动执行工程校验。</p>
-              <div class="button-row">
-                <button class="btn btn-primary" :disabled="packBusy" @click="packCurrentProjectToBundle">[[ packBusy ? '正在打包...' : '注入当前工程并下载' ]]</button>
-                <button class="btn" @click="exportGeneratedProjectJson">先导出 JSON 检查</button>
-              </div>
-              <div class="empty-note">打包失败时，优先确认：工程校验是否通过、目标资源名是否包含 cards、UnityPy 是否已安装。</div>
-            </div>
-          </div>
-
-          <div class="card-panel">
-            <h3>修改差异预览</h3>
-            <p class="hint">可上传原始 card_data JSON；如果不上传 JSON，则会尝试从当前选择的原始 AB 包中读取 cards 数据进行对比。</p>
-            <div class="form-grid">
-              <label class="span-2">原始 card_data JSON<input type="file" accept=".json" @change="selectDiffJsonFile"></label>
-            </div>
+        <!-- JSON 输出 -->
+        <section v-show="activeTab === 'json'" class="tab-panel">
+          <div class="section-block highlight-block">
+            <div class="section-head"><h3>📄 卡牌 JSON 输出</h3></div>
+            <p class="hint">标准 card_data 单卡格式，可直接用于游戏数据。编辑会自动保存到浏览器本地。</p>
             <div class="button-row">
-              <button class="btn btn-primary" :disabled="diffBusy" @click="runDiffPreview">[[ diffBusy ? '对比中...' : '生成差异预览' ]]</button>
-              <span class="hint">[[ selectedDiffJsonName ? '已选择原始 JSON：' + selectedDiffJsonName : '未选择 JSON 时，将尝试使用当前 AB 包。' ]]</span>
-            </div>
-            <div v-if="diffResult" class="diff-wrap">
-              <div class="result-box" :class="diffResult.ok ? 'ok' : 'bad'"><strong>[[ diffResult.message ]]</strong><span>原始 [[ diffSummary.original_count ]] · 当前 [[ diffSummary.modded_count ]] · 新增 [[ diffSummary.added ]] · 移除 [[ diffSummary.removed ]] · 修改 [[ diffSummary.changed ]]</span></div>
-              <div v-if="diffResult.diff?.added_cards?.length" class="diff-section"><h4>新增卡牌</h4><span v-for="item in diffResult.diff.added_cards" :key="item.guid" class="pill">[[ item.guid ]]</span></div>
-              <div v-if="diffResult.diff?.changed_cards?.length" class="diff-section"><h4>字段变化</h4><div v-for="card in diffResult.diff.changed_cards.slice(0, 20)" :key="card.guid" class="diff-card"><strong>GUID [[ card.guid ]]</strong><div v-for="change in card.changes.slice(0, 12)" :key="change.field" class="diff-row"><span>[[ change.label ]]</span><code>[[ JSON.stringify(change.before) ]]</code><b>→</b><code>[[ JSON.stringify(change.after) ]]</code></div></div></div>
-            </div>
-          </div>
-        </section>
-
-        <section v-show="activeTab === 'preview_json'" class="tab-panel">
-          <div class="card-panel preview-tab-card">
-            <div class="panel-head">
-              <div><h3>当前卡牌 JSON</h3><p class="hint">手机竖屏下右侧预览会隐藏，所以这里提供独立预览页。</p></div>
-              <button class="btn btn-small" @click="copyPreview">复制当前卡牌</button>
+              <button class="btn btn-primary" @click="copyPreview">📋 复制</button>
+              <button class="btn" @click="exportCardJson">💾 下载 JSON</button>
             </div>
             <pre class="json-tab-pre">[[ previewJson ]]</pre>
           </div>
-          <div class="card-panel preview-tab-card">
-            <div class="panel-head">
-              <div><h3>当前工程 card_data JSON</h3><p class="hint">这里展示会被注入 AB 包的完整工程级 JSON。</p></div>
-              <button class="btn btn-small" @click="copyProjectPreview">复制工程 JSON</button>
-            </div>
-            <pre class="json-tab-pre">[[ projectPreviewJson ]]</pre>
-          </div>
-        </section>
-
-        <section v-show="activeTab === 'theme'" class="tab-panel">
-          <div class="grid-2">
-            <div class="card-panel">
-              <h3>界面设置</h3>
-              <p class="hint">原项目主题系统暂不迁移。Web 版使用统一简洁样式；这里加入字库和本地化引用点。</p>
-              <div class="setting-row"><span>语言</span><select v-model="settings.language"><option v-for="lang in phantomConfig.supportedLanguages" :key="lang" :value="lang">[[ lang ]]</option></select></div>
-              <div class="setting-row"><span>字体</span><select v-model="settings.font"><option v-for="font in phantomConfig.fonts" :key="font.id" :value="font.id">[[ font.name ]]</option></select></div>
-              <div class="setting-row"><span>紧凑模式</span><input type="checkbox" v-model="settings.compactMode"></div>
-              <div class="setting-row"><span>右侧 JSON 预览</span><input type="checkbox" v-model="settings.showPreview"></div>
-            </div>
-            <div class="card-panel">
-              <h3>资源层状态</h3>
-              <div class="resource-stats"><span>字库：[[ phantomConfig.fonts.length ]]</span><span>语言：[[ phantomConfig.supportedLanguages.length ]]</span><span>技能节点：[[ phantomConfig.skillLibrary.total_nodes || 0 ]]</span><span>技能分类：[[ phantomConfig.skillLibrary.categories.length || 0 ]]</span></div>
-              <p class="hint" v-for="note in phantomConfig.notes" :key="note">[[ note ]]</p>
-            </div>
-          </div>
         </section>
       </section>
-
-      <aside class="preview" v-if="settings.showPreview">
-        <div class="preview-head"><h3>JSON 预览</h3><button class="btn btn-small" @click="copyPreview">复制</button></div>
-        <pre>[[ previewJson ]]</pre>
-      </aside>
     </main>
+
+    <nav class="bottom-nav" aria-label="主导航">
+      <button v-for="tab in tabs" :key="tab.id" class="bottom-nav-item" :class="{active: activeTab === tab.id}" @click="setActiveTab(tab.id)">
+        <span class="bottom-nav-icon">[[ tab.icon ]]</span>
+        <span class="bottom-nav-label">[[ tab.shortName ]]</span>
+      </button>
+    </nav>
+
+    <div class="mobile-sheet-backdrop" :class="{open: mobileMenuOpen}" @click="closeMobileSheets"></div>
+    <div class="mobile-sheet" :class="{open: mobileMenuOpen}">
+      <div class="mobile-sheet-head">
+        <h3>快捷操作</h3>
+        <button class="btn btn-small" @click="closeMobileSheets">关闭</button>
+      </div>
+      <div class="mobile-action-list">
+        <button class="btn" @click="resetCard(); closeMobileSheets()">🗑️ 重置草稿</button>
+        <button class="btn" @click="copyPreview(); closeMobileSheets()">📋 复制 JSON</button>
+        <button class="btn" @click="setActiveTab('json'); closeMobileSheets()">📄 JSON 输出</button>
+        <label class="btn file-btn">📥 导入 JSON<input type="file" accept=".json" @change="importCardJsonFile"></label>
+      </div>
+    </div>
+
+    <div class="phantom-toast" :class="{show: toastMessage}">[[ toastMessage ]]</div>
   </div>
 
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>

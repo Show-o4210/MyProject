@@ -22,17 +22,9 @@ class LevelEditorLogic:
 
     # ================= 数据字典读取 =================
     def get_card_index(self):
-        """返回卡牌索引列表 (从 index.json)"""
-        path = os.path.join(self.data_dir, "index.json")
-        if not os.path.exists(path):
-            return []
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return [{"guid": int(item["GUID"]), "name_cn": item["NAME_CN"]} for item in data]
-        except Exception as e:
-            print(f"读取 index.json 失败: {e}")
-            return []
+        """返回卡牌索引列表 (从 data/index.json)"""
+        from utils.card_index import to_level_editor_cards
+        return to_level_editor_cards()
 
     def get_deck_db(self):
         """返回卡组列表 (从 decks.json)"""

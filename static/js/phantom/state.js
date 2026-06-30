@@ -1,4 +1,9 @@
-export const STORAGE_KEY = 'pvzh_phantom_gui_shell_v09';
+export const STORAGE_KEY = 'pvzh_phantom_single_card_v1';
+
+export function labelOf(item) {
+  if (!item) return '';
+  return item.name || item.label || item.value || item.id || '';
+}
 
 export function createEmptyCard() {
   return {
@@ -39,38 +44,34 @@ export function createEmptyCard() {
     triggeredAbilities: [],
     logicEntities: [],
     skillTreeDraft: {
-      format: 'phantom.skill_tree.v1',
-      version: 1,
+      format: 'phantom.skill_tree.v3',
+      version: 3,
       roots: [],
       notes: []
-    },
-    skillLogicSource: ''
-  };
-}
-
-export function createDefaultProject() {
-  return {
-    name: '未命名 Phantom 工程',
-    version: '0.9-field-ability-complete',
-    cards: [createEmptyCard()],
-    updatedAt: new Date().toISOString()
+    }
   };
 }
 
 export const tabs = [
-  { id: 'project', icon: '🏠', name: '工程大厅', desc: '工程列表与当前 Mod 卡牌清单。' },
-  { id: 'basic', icon: '📋', name: '基础属性', desc: 'GUID、Prefab、阵营、稀有度、费用、攻血与 Flags。' },
-  { id: 'subtypes', icon: '🧬', name: '种族配置', desc: '底层逻辑种族与 UI 显示种族。' },
-  { id: 'tags', icon: '🏷️', name: '标签配置', desc: '逻辑标签与展示标签。' },
-  { id: 'abilities', icon: '✨', name: '特殊能力', desc: '基础特殊能力与触发类能力列表。' },
-  { id: 'logic', icon: '🧩', name: '技能逻辑', desc: 'Web 结构树编辑器、技能库、参数面板与源码兜底。' },
-  { id: 'export', icon: '💾', name: '封包导出', desc: '工程校验、AB 预检、差异预览与一键注入。' },
-  { id: 'preview_json', icon: '🧾', name: 'JSON 预览', desc: '独立 JSON 预览页，专门适配手机竖屏查看与复制。' },
-  { id: 'theme', icon: '⚙️', name: '界面设置', desc: 'Web 版简洁样式设置壳子。' }
+  { id: 'basic', icon: '📋', name: '基础属性', desc: '导入 JSON、GUID、阵营、费用、攻血与核心标记。', shortName: '属性' },
+  { id: 'traits', icon: '🧬', name: '种族标签', desc: '底层种族与逻辑 / 展示标签。', shortName: '标签' },
+  { id: 'abilities', icon: '✨', name: '特殊能力', desc: '组件能力与触发类技能。', shortName: '能力' },
+  { id: 'logic', icon: '⚡', name: '技能逻辑', desc: '结构树编辑技能，自动同步到 JSON。', shortName: '技能' },
+  { id: 'json', icon: '📄', name: 'JSON 输出', desc: '预览、复制与下载单卡 JSON。', shortName: 'JSON' }
+];
+
+export const logicWorkspaceTabs = [
+  { id: 'library', icon: '📚', name: '组件库', shortName: '组件' },
+  { id: 'tree', icon: '🌳', name: '工作区', shortName: '工作区' },
+  { id: 'inspector', icon: '🛠️', name: '检查器', shortName: '检查' },
+  { id: 'json', icon: '📋', name: '技能 JSON', shortName: 'JSON' }
 ];
 
 export const fallbackOptions = {
-  factions: [{ id: 'Plants', value: 'Plants', name: '植物 (Plants)' }, { id: 'Zombies', value: 'Zombies', name: '僵尸 (Zombies)' }],
+  factions: [
+    { id: 'Plants', value: 'Plants', name: '植物 (Plants)' },
+    { id: 'Zombies', value: 'Zombies', name: '僵尸 (Zombies)' }
+  ],
   baseIds: [{ id: 'Base', value: 'Base', name: '植物 (Base)' }],
   colors: [{ id: 'Guardian', value: 'Guardian', name: '守卫 (Guardian)' }],
   rarities: [{ id: '4', value: 'R0', name: '基础卡 (Common)' }],
@@ -84,16 +85,13 @@ export const fallbackOptions = {
 export const emptyConfig = {
   loaded: false,
   version: 'fallback',
-  stage: 'frontend-fallback',
+  stage: 'json-creator',
   cardIndex: [],
   cardIndexMeta: { source: '', count: 0, loaded: false, error: '' },
-  language: 'zh-CN',
-  defaultFont: 'system-ui',
-  supportedLanguages: ['zh-CN'],
-  fonts: [],
-  localization: { 'zh-CN': {} },
+  nodeDef: {},
+  localization: { node_names: {}, param_names: {}, enum_names: {} },
+  palette: [],
+  userPresets: {},
   skillLibrary: { total_nodes: 0, categories: [] },
-  cardIndex: [],
-  enums: fallbackOptions,
-  notes: []
+  enums: fallbackOptions
 };

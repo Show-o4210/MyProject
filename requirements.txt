@@ -3,6 +3,8 @@ UnityPy>=1.20.26
 Pillow
 gunicorn
 supabase
+pydantic>=2.11.0,<3
+pydantic-core>=2.27.0,<3
 python-dotenv
 Flask-Limiter
 requests

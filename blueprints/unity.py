@@ -5,6 +5,7 @@ import json5
 import zipfile
 import tempfile
 import re
+from utils.json_clean import clean_json_string
 import io
 import csv
 import os
@@ -109,16 +110,6 @@ def read_text_from_zip(zf, path):
             continue
 
     return raw_bytes.decode('utf-8', errors='ignore')
-
-
-def clean_json_string(s):
-    if not isinstance(s, str):
-        return s
-
-    cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', s)
-    cleaned = cleaned.replace('\ufeff', '').strip()
-    cleaned = cleaned.replace('，', ',').replace('“', '"').replace('”', '"')
-    return cleaned
 
 
 def safe_name(name):

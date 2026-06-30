@@ -1,116 +1,82 @@
-import { tabs, fallbackOptions, emptyConfig, createEmptyCard, createDefaultProject } from './state.js';
-import { loadProject, saveProject as persistProject, downloadJson, downloadBlob, readJsonFile } from './project.js';
-import { pingPhantom, loadPhantomConfig, validatePhantomProject, inspectPhantomBundle, diffPhantomCards, packPhantomBundle } from './api.js';
-import { createTranslator, labelOf } from './i18n.js';
-import { filterSkillCategories } from './skill_library.js';
-import { normalizeSkillTreeDraft, createTreeNodeFromLibraryNode, flattenSkillTree, findNodeAndParent, addChildNode, removeTreeNode, moveTreeNode, duplicateTreeNode, treeNodeSummary, buildTreeFromRealLogicEntities, buildRealLogicEntitiesFromTreeDraft, buildSkillTreeSource, getSkillTemplatePresets, createSkillTemplateTree } from './skill_tree.js';
-import { generateGameCardEntry, generateProjectCardsJson, cardFormFromGameEntry, extractEntryFromImportedJson } from './card_serializer.js';
+import {
+  tabs, logicWorkspaceTabs,
+  fallbackOptions, emptyConfig, labelOf,
+  createEmptyCard
+} from './state.js';
+import { loadCard, saveCard, clearCardStorage, downloadJson, readJsonFile } from './card_storage.js';
+import { pingPhantom, loadPhantomConfig } from './api.js';
+import { filterPaletteTree, collectReplaceCandidates } from './logic_palette.js';
+import {
+  normalizeLogicTreeDraft, createNodeFromDef, flattenSkillTree,
+  findNodeAndParent, addChildNode, removeTreeNode, moveTreeNode, duplicateTreeNode,
+  treeNodeSummary, buildTreeFromLogicEntities, parseTreeToLogicEntities,
+  getSkillTemplatePresets, createSkillTemplateTree, migrateLegacyTreeDraft,
+  addAbilityGroup, replaceTreeNode, onParamUpdated, getInspectorFields,
+  formatEnumLabel, restoreNodeFromSnapshot, canInsertNode, treeHasContent
+} from './logic_engine.js';
+import {
+  createLogicHistory, saveHistorySnapshot, canUndo, canRedo, undoHistory, redoHistory, clearHistory
+} from './logic_history.js';
+import {
+  generateGameCardEntry,
+  cardFormFromGameEntry, extractEntryFromImportedJson
+} from './card_serializer.js';
 
 const { createApp } = Vue;
 
 createApp({
   delimiters: ['[[', ']]'],
   data() {
-    const project = loadProject();
     return {
       tabs,
+      logicWorkspaceTabs,
       options: { ...fallbackOptions },
       phantomConfig: { ...emptyConfig },
-      project,
-      activeTab: 'project',
-      currentCardId: project.cards[0]?.localId || null,
+      card: loadCard(),
+      activeTab: 'basic',
       newSubtype: { id: '', name: '' },
-      newGrantedAbility: '',
       abilitySearch: '',
       newTriggeredAbilityType: 'DoubleStrike',
       customTriggeredAbility: { g: 0, vt: 0, va: 0 },
-      exportName: 'card_data_1',
-      bundleTargetAssetName: 'cards',
-      bundleOutputName: 'card_data_1',
-      selectedBundleFile: null,
-      packStatus: '',
-      packBusy: false,
-      validateBusy: false,
-      inspectBusy: false,
-      diffBusy: false,
-      validationResult: null,
-      bundleInspectResult: null,
-      diffResult: null,
-      selectedDiffJsonFile: null,
-      selectedDiffJsonName: '',
-      originalDiffJson: null,
       importGuid: '',
       skillSearch: '',
-      selectedSkillNode: null,
-      activeLogicMode: 'tree_editor',
-      realLogicViewMode: 'tree',
-      logicAdvancedOpen: false,
+      selectedPaletteItem: null,
+      logicWorkspace: 'tree',
       selectedSkillTreeNodeUid: '',
-      settings: {
-        syncSubtypes: true,
-        syncTags: true,
-        compactMode: false,
-        showPreview: true,
-        mobilePreviewMode: true,
-        language: 'zh-CN',
-        font: 'system-ui'
-      },
-      apiReady: false,
-      configStatus: 'loading'
+      expandedPaletteGroups: {},
+      logicHistory: createLogicHistory(),
+      showReplaceMenu: false,
+      mobileMenuOpen: false,
+      viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 1280,
+      viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 800,
+      toastMessage: '',
+      toastTimer: null,
+      configStatus: 'loading',
+      logicTreeRevision: 0,
+      _syncingLogic: false
     };
   },
   computed: {
-    t() {
-      return createTranslator({ ...this.phantomConfig, language: this.settings.language });
-    },
     currentTab() {
       return this.tabs.find(tab => tab.id === this.activeTab) || this.tabs[0];
     },
-    currentCard() {
-      if (!this.project.cards.length) {
-        const card = createEmptyCard();
-        this.project.cards.push(card);
-        this.currentCardId = card.localId;
-      }
-      return this.project.cards.find(card => card.localId === this.currentCardId) || this.project.cards[0];
+    cardIndexInfo() {
+      return this.findCardIndexInfo(this.card);
     },
-    cardIndexList() {
-      return this.phantomConfig.cardIndex || [];
+    nodeDef() {
+      return this.phantomConfig.nodeDef || {};
     },
-    currentCardIndexInfo() {
-      return this.findCardIndexInfo(this.currentCard);
+    logicLocalization() {
+      return this.phantomConfig.localization || { node_names: {}, param_names: {}, enum_names: {} };
     },
-    skillCategories() {
-      return filterSkillCategories(this.phantomConfig.skillLibrary, this.skillSearch);
+    filteredPalette() {
+      return filterPaletteTree(this.phantomConfig.palette || [], this.skillSearch);
     },
-    triggerSkillNodes() {
-      const category = (this.phantomConfig.skillLibrary?.categories || []).find(item => item.id === 'Trigger');
-      return category?.nodes || [];
-    },
-    configSummary() {
-      return {
-        version: this.phantomConfig.version,
-        stage: this.phantomConfig.stage,
-        fonts: this.phantomConfig.fonts.length,
-        skill_nodes: this.phantomConfig.skillLibrary?.total_nodes || 0,
-        skill_categories: this.phantomConfig.skillLibrary?.categories?.length || 0,
-        languages: this.phantomConfig.supportedLanguages
-      };
-    },
-    currentGameCardJson() {
-      return generateGameCardEntry(this.currentCard, this.phantomConfig);
-    },
-    projectGameCardsJson() {
-      return generateProjectCardsJson(this.project, this.phantomConfig);
+    gameCardJson() {
+      return generateGameCardEntry(this.card, this.phantomConfig);
     },
     previewJson() {
-      return JSON.stringify(this.currentGameCardJson, null, 2);
-    },
-    projectPreviewJson() {
-      return JSON.stringify(this.projectGameCardsJson, null, 2);
-    },
-    diffSummary() {
-      return this.diffResult?.diff?.summary || { original_count: 0, modded_count: 0, added: 0, removed: 0, changed: 0 };
+      return JSON.stringify(this.gameCardJson, null, 2);
     },
     filteredSpecialAbilities() {
       const q = (this.abilitySearch || '').toLowerCase().trim();
@@ -119,76 +85,114 @@ createApp({
       return list.filter(item => `${item.id} ${item.name} ${item.type || ''}`.toLowerCase().includes(q));
     },
     selectedSpecialAbilityDetails() {
-      const selected = new Set(this.currentCard.specialAbilities || []);
+      const selected = new Set(this.card.specialAbilities || []);
       return (this.options.specialAbilities || []).filter(item => selected.has(item.id));
-    },
-    abilityOptionMap() {
-      const map = {};
-      for (const ability of this.options.specialAbilities || []) map[ability.id] = ability;
-      return map;
     },
     triggeredAbilityPresets() {
       return [
         { id: 'DoubleStrike', name: '💥 双重攻击', data: { g: 562, vt: 0, va: 0 } },
         { id: 'Overshoot', name: '🎯 先攻', data: { g: 564, vt: 1, va: 2 } },
-        { id: 'Custom', name: '🧩 自定义能力', data: null }
+        { id: 'Custom', name: '🧩 自定义', data: null }
       ];
-    },
-    filteredSkillCategories() {
-      return this.skillCategories || [];
     },
     skillTemplatePresets() {
       return getSkillTemplatePresets();
     },
-    currentSkillTreeDraft() {
-      const normalized = normalizeSkillTreeDraft(this.currentCard.skillTreeDraft);
-      if (this.currentCard.skillTreeDraft !== normalized) this.currentCard.skillTreeDraft = normalized;
-      return this.currentCard.skillTreeDraft;
+    skillTreeDraft() {
+      return this.card.skillTreeDraft || normalizeLogicTreeDraft();
     },
     skillTreeRows() {
-      return flattenSkillTree(this.currentSkillTreeDraft.roots || []);
+      void this.logicTreeRevision;
+      return flattenSkillTree(this.skillTreeDraft.roots || [], this.logicLocalization);
     },
     selectedSkillTreeNode() {
-      return findNodeAndParent(this.currentSkillTreeDraft.roots || [], this.selectedSkillTreeNodeUid).node;
+      void this.logicTreeRevision;
+      return findNodeAndParent(this.skillTreeDraft.roots || [], this.selectedSkillTreeNodeUid).node;
     },
     selectedSkillTreeNodeJson() {
       return this.selectedSkillTreeNode ? JSON.stringify(this.selectedSkillTreeNode, null, 2) : '';
     },
-    skillTreeDraftJson() {
-      return JSON.stringify(buildSkillTreeSource(this.currentSkillTreeDraft), null, 2);
-    },
-    realLogicEntityTree() {
-      return buildTreeFromRealLogicEntities(this.currentCard.logicEntities || [], this.phantomConfig.skillLibrary);
-    },
-    realLogicEntityTreeJson() {
-      return JSON.stringify(this.realLogicEntityTree, null, 2);
-    },
     realLogicEntitiesJson() {
-      return JSON.stringify(this.currentCard.logicEntities || [], null, 2);
+      return JSON.stringify(this.card.logicEntities || [], null, 2);
     },
     realLogicEntityCount() {
-      return Array.isArray(this.currentCard.logicEntities) ? this.currentCard.logicEntities.length : 0;
+      return Array.isArray(this.card.logicEntities) ? this.card.logicEntities.length : 0;
+    },
+    isMobile() {
+      return this.viewportWidth <= 768 || (this.viewportWidth <= 900 && this.isPortrait);
+    },
+    isPortrait() {
+      return this.viewportHeight >= this.viewportWidth;
+    },
+    selectedTreeNodeLabel() {
+      if (!this.selectedSkillTreeNode) return '未选中节点';
+      return this.logicLocalization.node_names?.[this.selectedSkillTreeNode.node_id] || this.selectedSkillTreeNode.node_id;
+    },
+    inspectorFields() {
+      void this.logicTreeRevision;
+      return getInspectorFields(this.selectedSkillTreeNode, this.nodeDef, this.logicLocalization);
+    },
+    replaceCandidates() {
+      if (!this.selectedSkillTreeNode) return [];
+      return collectReplaceCandidates(this.selectedSkillTreeNode.node_id, this.nodeDef, this.logicLocalization);
+    },
+    canLogicUndo() {
+      return canUndo(this.logicHistory);
+    },
+    canLogicRedo() {
+      return canRedo(this.logicHistory);
+    },
+    logicDescPreview() {
+      const entities = this.card.logicEntities || [];
+      if (!entities.length) return '暂无技能。请在工作区搭建结构树，或导入含技能的卡牌 JSON。';
+      const parts = [];
+      for (let i = 0; i < entities.length; i += 1) {
+        const comps = (entities[i]?.components || []).map(c => {
+          const t = String(c?.$type || '');
+          return t.split('.').pop()?.split(',')[0]?.replace('Descriptor', '').replace('Effect', '') || 'Component';
+        });
+        parts.push(`技能组 ${i + 1}：${comps.join(' → ')}`);
+      }
+      return parts.join('\n');
+    },
+    cardDisplayTitle() {
+      return this.cardIndexInfo?.NAME_CN || this.card.name || (this.card.guid ? `卡牌 ${this.card.guid}` : '未命名卡牌');
     }
   },
   watch: {
-    project: {
+    card: {
       deep: true,
-      handler(value) { persistProject(value); }
+      handler(value) { saveCard(value); }
     },
-    'currentCard.logicSubtypes'(value) {
-      if (this.settings.syncSubtypes) this.currentCard.displaySubtypes = [...value];
+    'card.logicSubtypes'(value) {
+      this.card.displaySubtypes = [...value];
     },
-    'currentCard.logicTagsText'(value) {
-      if (this.settings.syncTags) this.currentCard.displayTagsText = value;
+    'card.logicTagsText'(value) {
+      this.card.displayTagsText = value;
+    },
+    filteredPalette: {
+      immediate: true,
+      handler(groups) {
+        if (!groups?.length) return;
+        const next = { ...this.expandedPaletteGroups };
+        let changed = false;
+        for (const g of groups) {
+          if (next[g.id] === undefined) {
+            next[g.id] = Object.keys(next).length < 2;
+            changed = true;
+          }
+        }
+        if (changed) this.expandedPaletteGroups = next;
+      }
     }
   },
   async mounted() {
-    try {
-      const result = await pingPhantom();
-      this.apiReady = !!result.ok;
-    } catch (error) {
-      console.warn(error.message);
-    }
+    this.applyViewportMode();
+    this._onViewportResize = () => this.applyViewportMode();
+    window.addEventListener('resize', this._onViewportResize, { passive: true });
+    window.addEventListener('orientationchange', this._onViewportResize, { passive: true });
+
+    try { await pingPhantom(); } catch (error) { console.warn(error.message); }
 
     try {
       const config = await loadPhantomConfig();
@@ -197,29 +201,74 @@ createApp({
         loaded: true,
         version: config.version,
         stage: config.stage,
-        defaultFont: config.default_font || 'system-ui',
-        supportedLanguages: config.supported_languages || ['zh-CN'],
-        fonts: config.fonts || [],
-        localization: config.localization || { 'zh-CN': {} },
+        nodeDef: config.node_def || {},
+        localization: config.localization || emptyConfig.localization,
+        palette: config.palette || [],
+        userPresets: config.user_presets || {},
         skillLibrary: config.skill_library || { categories: [], total_nodes: 0 },
         cardIndex: Array.isArray(config.card_index) ? config.card_index : [],
         cardIndexMeta: config.card_index_meta || { source: '', count: 0, loaded: false, error: '' },
-        enums: config.enums || fallbackOptions,
-        notes: config.notes || []
+        enums: config.enums || fallbackOptions
       };
       this.options = { ...fallbackOptions, ...this.phantomConfig.enums };
-      this.settings.language = config.default_language || 'zh-CN';
-      this.settings.font = config.default_font || 'system-ui';
-      this.configStatus = 'loaded';
-      this.project.cards = this.project.cards.map(card => this.prepareImportedCard(card, { forceSkillTree: false }));
-      this.autoLoadRealLogicTreeForCurrentCard(false);
+      const paletteReady = (this.phantomConfig.palette || []).length > 0;
+      const nodeDefReady = Object.keys(this.phantomConfig.nodeDef || {}).length > 0;
+      this.configStatus = paletteReady && nodeDefReady ? 'loaded' : 'fallback';
+      if (!paletteReady || !nodeDefReady) {
+        console.warn('组件库或节点定义未就绪，请检查 /api/phantom/config 与静态兜底配置。');
+      }
     } catch (error) {
       this.configStatus = 'fallback';
       console.warn(error.message);
     }
+
+    this.card.skillTreeDraft = normalizeLogicTreeDraft(this.card.skillTreeDraft);
+    this.card = this.prepareImportedCard(this.card);
+    this.reloadLogicTree(true);
+    this.bumpLogicTree();
+  },
+  beforeUnmount() {
+    if (this._onViewportResize) {
+      window.removeEventListener('resize', this._onViewportResize);
+      window.removeEventListener('orientationchange', this._onViewportResize);
+    }
+    if (this.toastTimer) clearTimeout(this.toastTimer);
   },
   methods: {
     labelOf,
+    formatEnumLabel,
+    bumpLogicTree() {
+      this.logicTreeRevision += 1;
+    },
+    applyViewportMode() {
+      this.viewportWidth = window.innerWidth;
+      this.viewportHeight = window.innerHeight;
+    },
+    setActiveTab(tabId) {
+      this.activeTab = tabId;
+      this.mobileMenuOpen = false;
+      if (this.isMobile) window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    setLogicWorkspace(id) { this.logicWorkspace = id; },
+    openMobileMenu() { this.mobileMenuOpen = true; },
+    closeMobileSheets() { this.mobileMenuOpen = false; },
+    showToast(message) {
+      this.toastMessage = message;
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => {
+        this.toastMessage = '';
+        this.toastTimer = null;
+      }, 2200);
+    },
+    isPaletteGroupExpanded(groupId) {
+      return !!this.expandedPaletteGroups[groupId];
+    },
+    togglePaletteGroup(groupId) {
+      this.expandedPaletteGroups = {
+        ...this.expandedPaletteGroups,
+        [groupId]: !this.expandedPaletteGroups[groupId]
+      };
+    },
     normalizeIndexText(value) {
       const text = String(value ?? '').trim();
       if (/^\d+$/.test(text)) return String(Number(text));
@@ -232,106 +281,86 @@ createApp({
       if (!guid) return null;
       return list.find(item => this.normalizeIndexText(item.GUID) === guid) || null;
     },
-    cardDisplayName(card) {
-      const info = this.findCardIndexInfo(card);
-      return info?.NAME_CN || card?.name || (card?.guid ? `卡牌 ${card.guid}` : '未命名卡牌');
-    },
-    cardIndexSummary(card) {
-      const info = this.findCardIndexInfo(card);
-      if (!info) return '';
-      const name = info.NAME_CN || '';
-      const uuid = info.UUID ? String(info.UUID).slice(0, 8) : '';
-      return [name, uuid].filter(Boolean).join(' · ');
-    },
-    enrichCardWithIndex(card, { overwriteName = true, overwritePrefab = true } = {}) {
-      const info = this.findCardIndexInfo(card);
-      if (!info) return card;
-      if (info.NAME_CN && overwriteName) card.name = info.NAME_CN;
-      if (info.UUID && overwritePrefab) card.prefabName = info.UUID;
-      card.indexInfo = { GUID: String(info.GUID || ''), UUID: info.UUID || '', NAME_CN: info.NAME_CN || '', TEXTURE_NAME: info.TEXTURE_NAME || '' };
-      return card;
-    },
-    syncCurrentCardFromIndex() {
-      const info = this.findCardIndexInfo(this.currentCard);
+    syncCardFromIndex() {
+      const info = this.findCardIndexInfo(this.card);
       if (!info) {
-        alert('未从 data/index.json 按当前 GUID 匹配到卡牌。');
+        this.showToast('未匹配到 GUID 索引');
         return;
       }
-      this.currentCard.name = info.NAME_CN || this.currentCard.name;
-      this.currentCard.prefabName = info.UUID || this.currentCard.prefabName;
-      this.currentCard.indexInfo = { GUID: String(info.GUID || ''), UUID: info.UUID || '', NAME_CN: info.NAME_CN || '', TEXTURE_NAME: info.TEXTURE_NAME || '' };
+      this.card.name = info.NAME_CN || this.card.name;
+      this.card.prefabName = info.UUID || this.card.prefabName;
+      this.showToast('已同步名称与 UUID');
     },
-    newProject() {
-      if (!confirm('新建工程会覆盖当前浏览器本地工程，确定继续？')) return;
-      this.project = createDefaultProject();
-      this.currentCardId = this.project.cards[0].localId;
-      this.activeTab = 'project';
+    resetCard() {
+      if (!confirm('清空本地草稿并重新开始？')) return;
+      clearCardStorage();
+      this.card = createEmptyCard();
+      this.reloadLogicTree(true);
+      this.setActiveTab('basic');
+      this.showToast('已重置草稿');
     },
-    saveProject() { this.project = persistProject(this.project); },
-    newCard() {
-      const card = createEmptyCard();
-      card.name = `自定义卡牌 ${this.project.cards.length + 1}`;
-      this.project.cards.push(card);
-      this.currentCardId = card.localId;
-      this.activeTab = 'basic';
-    },
-    prepareImportedCard(card, { forceSkillTree = true } = {}) {
-      const merged = { ...createEmptyCard(), ...card, localId: card.localId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())) };
-      this.enrichCardWithIndex(merged);
-      merged.skillTreeDraft = normalizeSkillTreeDraft(merged.skillTreeDraft);
-      const hasRealLogic = Array.isArray(merged.logicEntities) && merged.logicEntities.length > 0;
-      const hasTreeDraft = Array.isArray(merged.skillTreeDraft.roots) && merged.skillTreeDraft.roots.length > 0;
-      if (hasRealLogic && (forceSkillTree || !hasTreeDraft)) {
-        merged.skillTreeDraft = buildTreeFromRealLogicEntities(merged.logicEntities, this.phantomConfig.skillLibrary);
-        merged.skillLogicSource = '';
+    prepareImportedCard(card) {
+      const merged = { ...createEmptyCard(), ...card, localId: card.localId || createEmptyCard().localId };
+      const info = this.findCardIndexInfo(merged);
+      if (info) {
+        if (info.NAME_CN) merged.name = info.NAME_CN;
+        if (info.UUID) merged.prefabName = info.UUID;
       }
+      const originalEntities = JSON.parse(JSON.stringify(merged.logicEntities || []));
+      merged.skillTreeDraft = migrateLegacyTreeDraft(merged.skillTreeDraft, originalEntities, this.nodeDef);
+      if (!treeHasContent(merged.skillTreeDraft.roots) && originalEntities.length) {
+        merged.skillTreeDraft = buildTreeFromLogicEntities(originalEntities, this.nodeDef);
+      }
+      const parsed = parseTreeToLogicEntities(merged.skillTreeDraft.roots, this.nodeDef);
+      merged.logicEntities = parsed.length ? parsed : originalEntities;
       return merged;
     },
-    autoLoadRealLogicTreeForCurrentCard(force = false) {
-      if (!this.currentCard) return;
-      const hasRealLogic = Array.isArray(this.currentCard.logicEntities) && this.currentCard.logicEntities.length > 0;
-      if (!hasRealLogic) return;
-      const draft = normalizeSkillTreeDraft(this.currentCard.skillTreeDraft);
-      const hasDraft = Array.isArray(draft.roots) && draft.roots.length > 0;
-      if (force || !hasDraft) {
-        this.currentCard.skillTreeDraft = buildTreeFromRealLogicEntities(this.currentCard.logicEntities, this.phantomConfig.skillLibrary);
-        this.selectedSkillTreeNodeUid = this.currentCard.skillTreeDraft.roots[0]?.uid || '';
+    reloadLogicTree(forceFromEntities = false) {
+      const originalEntities = JSON.parse(JSON.stringify(this.card.logicEntities || []));
+      if (forceFromEntities && originalEntities.length) {
+        this.card.skillTreeDraft = buildTreeFromLogicEntities(originalEntities, this.nodeDef);
+      } else {
+        this.card.skillTreeDraft = migrateLegacyTreeDraft(
+          this.card.skillTreeDraft,
+          originalEntities,
+          this.nodeDef
+        );
+      }
+      if (treeHasContent(this.card.skillTreeDraft.roots)) {
+        this.syncLogicEntitiesFromTree({ recordHistory: true, resetHistory: true });
+      } else {
+        clearHistory(this.logicHistory);
+        this.card.logicEntities = originalEntities;
+      }
+      this.selectedSkillTreeNodeUid = this.skillTreeDraft.roots[0]?.uid || '';
+      this.bumpLogicTree();
+    },
+    syncLogicEntitiesFromTree({ recordHistory = true, resetHistory = false } = {}) {
+      if (this._syncingLogic) return;
+      this._syncingLogic = true;
+      try {
+        const roots = this.skillTreeDraft.roots || [];
+        if (treeHasContent(roots)) {
+          this.card.logicEntities = parseTreeToLogicEntities(roots, this.nodeDef);
+        }
+        if (resetHistory) {
+          clearHistory(this.logicHistory);
+          saveHistorySnapshot(this.logicHistory, roots);
+        } else if (recordHistory) {
+          saveHistorySnapshot(this.logicHistory, roots);
+        }
+      } finally {
+        this._syncingLogic = false;
       }
     },
-    selectCard(localId) {
-      this.currentCardId = localId;
-      this.autoLoadRealLogicTreeForCurrentCard(false);
-      this.activeTab = 'basic';
+    onLogicTreeChanged() {
+      this.syncLogicEntitiesFromTree({ recordHistory: true });
+      this.bumpLogicTree();
     },
-    removeCard(localId) {
-      if (!confirm('确定从当前工程移除这张卡牌？')) return;
-      this.project.cards = this.project.cards.filter(card => card.localId !== localId);
-      this.currentCardId = this.project.cards[0]?.localId || null;
-    },
-    exportProject() {
-      const safeName = (this.project.name || 'phantom_project').replace(/[\/:*?"<>|\s]+/g, '_');
-      downloadJson(`${safeName}.phantom`, this.project);
-    },
-    exportGeneratedCardJson() {
-      const guid = this.currentCard.guid || 'current_card';
-      downloadJson(`${guid}.card.json`, this.currentGameCardJson);
-    },
-    exportGeneratedProjectJson() {
-      const safeName = (this.exportName || 'card_data_1').replace(/[\/:*?"<>|\s]+/g, '_');
-      downloadJson(`${safeName}.json`, this.projectGameCardsJson);
-    },
-    normalizeProject(data) {
-      const project = {
-        name: data.name || '导入的 Phantom 工程',
-        version: data.version || '0.9-field-ability-complete',
-        cards: Array.isArray(data.cards) ? data.cards : [],
-        updatedAt: data.updatedAt || new Date().toISOString()
-      };
-      project.cards = project.cards.map(card => {
-        return this.prepareImportedCard(card, { forceSkillTree: false });
-      });
-      if (!project.cards.length) project.cards.push(createEmptyCard());
-      return project;
+    exportCardJson() {
+      const guid = this.card.guid || 'card';
+      downloadJson(`${guid}.json`, this.gameCardJson);
+      this.showToast('已下载卡牌 JSON');
     },
     async importCardJsonFile(event) {
       const file = event.target.files?.[0];
@@ -339,344 +368,283 @@ createApp({
       if (!file) return;
       try {
         const data = await readJsonFile(file);
-        const { guid, entry } = extractEntryFromImportedJson(data, this.importGuid || this.currentCard.guid);
+        const { guid, entry } = extractEntryFromImportedJson(data, this.importGuid || this.card.guid);
         const imported = cardFormFromGameEntry(guid, entry, createEmptyCard, this.phantomConfig);
-        imported.localId = this.currentCard?.localId || imported.localId;
-        const prepared = this.prepareImportedCard(imported, { forceSkillTree: true });
-        const index = this.project.cards.findIndex(card => card.localId === this.currentCardId);
-        if (index >= 0) this.project.cards.splice(index, 1, prepared);
-        else this.project.cards.push(prepared);
-        this.currentCardId = prepared.localId;
+        imported.localId = this.card.localId;
+        this.card = this.prepareImportedCard(imported);
         this.importGuid = String(guid);
-        this.activeTab = 'basic';
+        this.reloadLogicTree(true);
+        this.setActiveTab('basic');
+        this.showToast(`已导入卡牌 ${guid}`);
       } catch (error) {
-        alert(`卡牌导入失败：${error.message}`);
-      }
-    },
-    async importCardsAsProject(event) {
-      const file = event.target.files?.[0];
-      event.target.value = '';
-      if (!file) return;
-      try {
-        const data = await readJsonFile(file);
-        const keys = Object.keys(data || {}).filter(key => data[key]?.entity?.components);
-        if (!keys.length) throw new Error('未检测到 card_data 格式的卡牌条目');
-        const cards = keys.map(key => this.prepareImportedCard(cardFormFromGameEntry(key, data[key], createEmptyCard, this.phantomConfig), { forceSkillTree: true }));
-        this.project = { name: file.name.replace(/\.json$/i, ''), version: '1.2-imported-card-data', cards, updatedAt: new Date().toISOString() };
-        this.currentCardId = cards[0]?.localId || null;
-        this.activeTab = 'project';
-      } catch (error) {
-        alert(`批量导入失败：${error.message}`);
-      }
-    },
-    async importProjectFile(event) {
-      const file = event.target.files?.[0];
-      event.target.value = '';
-      if (!file) return;
-      try {
-        const data = await readJsonFile(file);
-        if (!data.cards || !Array.isArray(data.cards)) throw new Error('工程文件缺少 cards 数组');
-        this.project = this.normalizeProject(data);
-        this.currentCardId = this.project.cards[0]?.localId || null;
-        this.activeTab = 'project';
-      } catch (error) {
-        alert(`导入失败：${error.message}`);
-      }
-    },
-    selectBundleFile(event) {
-      this.selectedBundleFile = event.target.files?.[0] || null;
-      this.packStatus = this.selectedBundleFile ? `已选择：${this.selectedBundleFile.name}` : '';
-      this.bundleInspectResult = null;
-    },
-    async validateCurrentProject() {
-      if (this.validateBusy) return;
-      try {
-        this.validateBusy = true;
-        this.validationResult = await validatePhantomProject(this.projectGameCardsJson);
-      } catch (error) {
-        this.validationResult = { ok: false, message: error.message, summary: { cards: 0, errors: 1, warnings: 0 }, errors: [{ guid: '-', field: 'validate', message: error.message }], warnings: [] };
-      } finally {
-        this.validateBusy = false;
-      }
-    },
-    async inspectSelectedBundle() {
-      if (this.inspectBusy) return;
-      try {
-        this.inspectBusy = true;
-        this.bundleInspectResult = await inspectPhantomBundle({ bundleFile: this.selectedBundleFile, targetAssetName: this.bundleTargetAssetName });
-      } catch (error) {
-        this.bundleInspectResult = { ok: false, message: error.message, detail: { resources: [] } };
-      } finally {
-        this.inspectBusy = false;
-      }
-    },
-    async selectDiffJsonFile(event) {
-      const file = event.target.files?.[0];
-      event.target.value = '';
-      this.selectedDiffJsonFile = file || null;
-      this.selectedDiffJsonName = file?.name || '';
-      this.originalDiffJson = null;
-      if (!file) return;
-      try {
-        this.originalDiffJson = await readJsonFile(file);
-      } catch (error) {
-        this.selectedDiffJsonName = '';
-        alert(`原始 JSON 读取失败：${error.message}`);
-      }
-    },
-    async runDiffPreview() {
-      if (this.diffBusy) return;
-      try {
-        this.diffBusy = true;
-        this.diffResult = await diffPhantomCards({
-          cardsJson: this.projectGameCardsJson,
-          originalJson: this.originalDiffJson,
-          bundleFile: this.originalDiffJson ? null : this.selectedBundleFile,
-          targetAssetName: this.bundleTargetAssetName
-        });
-      } catch (error) {
-        this.diffResult = { ok: false, message: error.message, diff: { summary: { original_count: 0, modded_count: 0, added: 0, removed: 0, changed: 0 }, added_cards: [], removed_cards: [], changed_cards: [] } };
-      } finally {
-        this.diffBusy = false;
-      }
-    },
-    async packCurrentProjectToBundle() {
-      if (this.packBusy) return;
-      try {
-        this.packBusy = true;
-        this.packStatus = '正在校验工程……';
-        const validation = await validatePhantomProject(this.projectGameCardsJson);
-        this.validationResult = validation;
-        if (!validation.ok) throw new Error('工程校验未通过，请先处理错误后再打包。');
-        this.packStatus = '正在注入并打包，请不要关闭页面……';
-        const { blob, filename } = await packPhantomBundle({
-          bundleFile: this.selectedBundleFile,
-          cardsJson: this.projectGameCardsJson,
-          targetAssetName: this.bundleTargetAssetName,
-          outputName: this.bundleOutputName || this.exportName || 'card_data_1'
-        });
-        downloadBlob(filename, blob);
-        this.packStatus = `打包完成：${filename}`;
-      } catch (error) {
-        this.packStatus = `打包失败：${error.message}`;
-        alert(this.packStatus);
-      } finally {
-        this.packBusy = false;
+        this.showToast(`导入失败：${error.message}`);
       }
     },
     applyCardTypeDefaults() {
-      const baseId = this.currentCard.baseId || '';
-      const faction = this.currentCard.faction || '';
+      const baseId = this.card.baseId || '';
+      const faction = this.card.faction || '';
       const isBoardTemplate = baseId === 'BoardAbility';
       const isTrick = baseId.includes('OneTimeEffect') && !isBoardTemplate;
       const isEnv = baseId.includes('Environment');
       const isFighter = !isTrick && !isEnv && !isBoardTemplate;
       const isZombie = faction === 'Zombies';
-      this.currentCard.hasAttack = isFighter;
-      this.currentCard.hasHealth = isFighter;
-      const flags = new Set(this.currentCard.flags || []);
+      this.card.hasAttack = isFighter;
+      this.card.hasHealth = isFighter;
+      const flags = new Set(this.card.flags || []);
       const setFlag = (name, enabled) => enabled ? flags.add(name) : flags.delete(name);
       setFlag('IsTrick', isTrick);
       setFlag('IsEnvironment', isEnv);
       setFlag('IsSurprise', isZombie && (isTrick || isEnv));
       setFlag('IsBoardAbility', isBoardTemplate);
-      this.currentCard.flags = [...flags];
-    },
-    abilityOptionById(id) {
-      return this.abilityOptionMap[id] || { id, name: id, type: 'unknown' };
+      this.card.flags = [...flags];
+      this.showToast('已同步类型默认值');
     },
     removeSpecialAbility(id) {
-      this.currentCard.specialAbilities = (this.currentCard.specialAbilities || []).filter(item => item !== id);
+      this.card.specialAbilities = (this.card.specialAbilities || []).filter(item => item !== id);
     },
     clearSpecialAbilities() {
-      if (!confirm('确定清空所有基础特殊能力？')) return;
-      this.currentCard.specialAbilities = [];
+      if (!confirm('清空所有基础特殊能力？')) return;
+      this.card.specialAbilities = [];
     },
     clearRootAbilities() {
-      if (!confirm('确定清空所有根目录特殊能力？')) return;
-      this.currentCard.rootSpecialAbilities = [];
+      if (!confirm('清空根目录特殊能力？')) return;
+      this.card.rootSpecialAbilities = [];
     },
     addTriggeredPreset() {
       const preset = this.triggeredAbilityPresets.find(item => item.id === this.newTriggeredAbilityType);
       if (!preset) return;
       if (preset.id === 'Custom') {
-        this.addCustomTriggeredAbility();
+        const g = Number(this.customTriggeredAbility.g);
+        if (!Number.isFinite(g) || g <= 0) {
+          this.showToast('自定义 g 必须大于 0');
+          return;
+        }
+        this.card.triggeredAbilities.push({
+          g,
+          vt: Number(this.customTriggeredAbility.vt) || 0,
+          va: Number(this.customTriggeredAbility.va) || 0
+        });
+        this.customTriggeredAbility = { g: 0, vt: 0, va: 0 };
         return;
       }
-      this.currentCard.triggeredAbilities.push(JSON.parse(JSON.stringify(preset.data)));
-    },
-    addCustomTriggeredAbility() {
-      const g = Number(this.customTriggeredAbility.g);
-      const vt = Number(this.customTriggeredAbility.vt);
-      const va = Number(this.customTriggeredAbility.va);
-      if (!Number.isFinite(g) || g <= 0) {
-        alert('自定义能力 ID(g) 必须是大于 0 的数字。');
-        return;
-      }
-      this.currentCard.triggeredAbilities.push({ g, vt: Number.isFinite(vt) ? vt : 0, va: Number.isFinite(va) ? va : 0 });
-      this.customTriggeredAbility = { g: 0, vt: 0, va: 0 };
+      this.card.triggeredAbilities.push(JSON.parse(JSON.stringify(preset.data)));
     },
     removeTriggeredAbility(index) {
-      this.currentCard.triggeredAbilities.splice(index, 1);
+      this.card.triggeredAbilities.splice(index, 1);
     },
     describeTriggeredAbility(item) {
       if (!item || typeof item !== 'object') return '未知触发能力';
       if (Number(item.g) === 562) return '💥 双重攻击';
-      if (Number(item.g) === 564) return '🎯 先攻 / Overshoot';
-      return `🧩 自定义能力 g=${item.g ?? '-'} vt=${item.vt ?? '-'} va=${item.va ?? '-'}`;
+      if (Number(item.g) === 564) return '🎯 先攻';
+      return `🧩 g=${item.g ?? '-'} vt=${item.vt ?? '-'} va=${item.va ?? '-'}`;
     },
     addSubtype() {
       if (!this.newSubtype.id || !this.newSubtype.name) return;
-      this.options.subtypes.push({ id: Number(this.newSubtype.id), value: Number(this.newSubtype.id), name: this.newSubtype.name });
+      this.options.subtypes.push({
+        id: Number(this.newSubtype.id),
+        value: Number(this.newSubtype.id),
+        name: this.newSubtype.name
+      });
       this.newSubtype = { id: '', name: '' };
+      this.showToast('种族已加入本地列表');
     },
-    addGrantedAbility() {
-      if (!this.newGrantedAbility) return;
-      if (!this.currentCard.grantedAbilities.includes(this.newGrantedAbility)) {
-        this.currentCard.grantedAbilities.push(this.newGrantedAbility);
-      }
-      this.newGrantedAbility = '';
-    },
-    selectSkillNode(node) {
-      this.selectedSkillNode = node;
-    },
+    selectPaletteItem(item) { this.selectedPaletteItem = item; },
     selectSkillTreeNode(uid) {
       this.selectedSkillTreeNodeUid = uid;
+      this.showReplaceMenu = false;
+      if (this.isMobile) this.logicWorkspace = 'inspector';
     },
-    addSelectedSkillNodeAsChild() {
-      if (!this.selectedSkillNode) {
-        alert('请先在左侧技能库选择一个节点。');
+    findInsertParentUid(childNodeId) {
+      if (!this.selectedSkillTreeNodeUid) return null;
+      let uid = this.selectedSkillTreeNodeUid;
+      while (uid) {
+        const { node, parent } = findNodeAndParent(this.skillTreeDraft.roots, uid);
+        if (!node) break;
+        if (canInsertNode(node.node_id, childNodeId, this.nodeDef)) return node.uid;
+        uid = parent?.uid || null;
+      }
+      return null;
+    },
+    addFromPalette(asRoot = false) {
+      const item = this.selectedPaletteItem;
+      if (!item) {
+        this.showToast('请先在组件库选择一个节点');
+        this.logicWorkspace = 'library';
         return;
       }
-      const node = createTreeNodeFromLibraryNode(this.selectedSkillNode);
-      addChildNode(this.currentSkillTreeDraft.roots, this.selectedSkillTreeNodeUid, node);
-      this.selectedSkillTreeNodeUid = node.uid;
-    },
-    addSelectedSkillNodeAsRoot() {
-      if (!this.selectedSkillNode) {
-        alert('请先在左侧技能库选择一个节点。');
-        return;
+      if (item.kind === 'preset' || item.isPreset) {
+        const preset = this.phantomConfig.userPresets?.[item.id];
+        if (!preset) { this.showToast('预设不存在'); return; }
+        const restored = restoreNodeFromSnapshot(preset, this.nodeDef);
+        if (preset.node_id === 'AbilityGroup' || asRoot) {
+          this.skillTreeDraft.roots.push(restored);
+          this.selectedSkillTreeNodeUid = restored.uid;
+        } else {
+          const parentUid = this.findInsertParentUid(preset.node_id);
+          if (!parentUid) { this.showToast('当前选中位置无法插入该预设'); return; }
+          const result = addChildNode(this.skillTreeDraft.roots, parentUid, restored, this.nodeDef);
+          if (!result.ok) { this.showToast(result.error || '插入失败'); return; }
+          this.selectedSkillTreeNodeUid = restored.uid;
+        }
+      } else {
+        const node = createNodeFromDef(item.id, this.nodeDef[item.id] || {});
+        if (asRoot && node.node_id !== 'AbilityGroup') {
+          this.showToast('除技能组外，请选中父节点后插入');
+          return;
+        }
+        const parentUid = asRoot ? null : this.findInsertParentUid(item.id);
+        if (!asRoot && !parentUid) {
+          this.showToast('请在工作区选中合法的父节点');
+          return;
+        }
+        const result = addChildNode(this.skillTreeDraft.roots, parentUid, node, this.nodeDef);
+        if (!result.ok) { this.showToast(result.error || '插入失败'); return; }
+        this.selectedSkillTreeNodeUid = node.uid;
       }
-      const node = createTreeNodeFromLibraryNode(this.selectedSkillNode);
-      addChildNode(this.currentSkillTreeDraft.roots, null, node);
-      this.selectedSkillTreeNodeUid = node.uid;
+      this.onLogicTreeChanged();
+      this.logicWorkspace = 'tree';
+      this.showToast('已添加节点');
+    },
+    addAbilityGroup() {
+      const group = addAbilityGroup(this.skillTreeDraft.roots, this.nodeDef);
+      this.selectedSkillTreeNodeUid = group.uid;
+      this.onLogicTreeChanged();
+      this.logicWorkspace = 'tree';
+      this.showToast('已新建技能组');
     },
     removeSelectedSkillTreeNode() {
       if (!this.selectedSkillTreeNodeUid) return;
-      if (!confirm('删除当前技能节点及其所有子节点？')) return;
-      removeTreeNode(this.currentSkillTreeDraft.roots, this.selectedSkillTreeNodeUid);
+      if (!confirm('删除该节点及所有子节点？')) return;
+      if (!removeTreeNode(this.skillTreeDraft.roots, this.selectedSkillTreeNodeUid)) {
+        this.showToast('该节点不可删除');
+        return;
+      }
       this.selectedSkillTreeNodeUid = '';
+      this.onLogicTreeChanged();
     },
     moveSelectedSkillTreeNode(direction) {
       if (!this.selectedSkillTreeNodeUid) return;
-      moveTreeNode(this.currentSkillTreeDraft.roots, this.selectedSkillTreeNodeUid, direction);
+      moveTreeNode(this.skillTreeDraft.roots, this.selectedSkillTreeNodeUid, direction);
+      this.onLogicTreeChanged();
     },
     duplicateSelectedSkillTreeNode() {
       if (!this.selectedSkillTreeNodeUid) return;
-      const cloned = duplicateTreeNode(this.currentSkillTreeDraft.roots, this.selectedSkillTreeNodeUid);
-      if (cloned) this.selectedSkillTreeNodeUid = cloned.uid;
+      const cloned = duplicateTreeNode(this.skillTreeDraft.roots, this.selectedSkillTreeNodeUid);
+      if (cloned) {
+        this.selectedSkillTreeNodeUid = cloned.uid;
+        this.onLogicTreeChanged();
+      }
     },
     toggleSelectedSkillTreeNodeDisabled() {
       if (!this.selectedSkillTreeNode) return;
       this.selectedSkillTreeNode.disabled = !this.selectedSkillTreeNode.disabled;
+      const toggleChildren = (node, state) => {
+        (node.children || []).forEach(child => {
+          child.disabled = state;
+          toggleChildren(child, state);
+        });
+      };
+      toggleChildren(this.selectedSkillTreeNode, this.selectedSkillTreeNode.disabled);
+      this.onLogicTreeChanged();
     },
     toggleSkillTreeNodeCollapsed(row) {
       if (!row?.node) return;
       row.node.collapsed = !row.node.collapsed;
     },
+    expandAllSkillTree() {
+      const walk = (nodes) => {
+        for (const n of nodes || []) { n.collapsed = false; walk(n.children); }
+      };
+      walk(this.skillTreeDraft.roots);
+    },
+    collapseAllSkillTree() {
+      const walk = (nodes) => {
+        for (const n of nodes || []) { n.collapsed = true; walk(n.children); }
+      };
+      walk(this.skillTreeDraft.roots);
+    },
     clearSkillTreeDraft() {
-      if (!confirm('清空当前技能结构树草稿？')) return;
-      this.currentCard.skillTreeDraft = normalizeSkillTreeDraft({ roots: [] });
+      if (!confirm('清空技能结构树？')) return;
+      this.card.skillTreeDraft = normalizeLogicTreeDraft({ roots: [] });
       this.selectedSkillTreeNodeUid = '';
-    },
-    syncSkillTreeSource() {
-      this.currentCard.skillLogicSource = this.skillTreeDraftJson;
-      alert('已把当前结构树草稿同步到源码。');
-    },
-    applySkillTreeSource() {
-      try {
-        const parsed = JSON.parse(this.currentCard.skillLogicSource || '{}');
-        if (!Array.isArray(parsed.roots)) throw new Error('源码中缺少 roots 数组');
-        this.currentCard.skillTreeDraft = normalizeSkillTreeDraft(parsed);
-        this.selectedSkillTreeNodeUid = this.currentCard.skillTreeDraft.roots[0]?.uid || '';
-        alert('已从源码恢复结构树草稿。');
-      } catch (error) {
-        alert(`结构树源码恢复失败：${error.message}`);
-      }
-    },
-    loadRealLogicEntitiesToTree() {
-      this.currentCard.skillTreeDraft = buildTreeFromRealLogicEntities(this.currentCard.logicEntities || [], this.phantomConfig.skillLibrary);
-      this.selectedSkillTreeNodeUid = this.currentCard.skillTreeDraft.roots[0]?.uid || '';
-      this.activeLogicMode = 'tree_editor';
+      this.onLogicTreeChanged();
+      this.showToast('结构树已清空');
     },
     refreshTreeFromRealLogic() {
-      const count = Array.isArray(this.currentCard.logicEntities) ? this.currentCard.logicEntities.length : 0;
-      if (!count) {
-        alert('当前卡牌没有真实技能结构可读取。');
+      if (!this.realLogicEntityCount) {
+        this.showToast('当前卡牌没有可读取的技能');
         return;
       }
-      const hasDraft = this.currentSkillTreeDraft.roots.length > 0;
-      if (hasDraft && !confirm('这会用当前卡牌的真实技能覆盖结构树草稿，继续？')) return;
-      this.loadRealLogicEntitiesToTree();
-    },
-    saveSkillTreeToRealLogic() {
-      this.writeSkillTreeDraftToRealLogicEntities();
+      if (this.skillTreeDraft.roots.length && !confirm('用卡牌现有技能覆盖结构树？')) return;
+      this.reloadLogicTree(true);
+      this.logicWorkspace = 'tree';
+      this.showToast('已从卡牌读取技能结构');
     },
     insertSkillTemplate(templateId) {
       const template = this.skillTemplatePresets.find(item => item.id === templateId);
       if (!template) return;
-      const draft = createSkillTemplateTree(templateId, this.phantomConfig.skillLibrary);
-      const hasDraft = this.currentSkillTreeDraft.roots.length > 0;
-      const action = hasDraft ? confirm(`将模板“${template.name}”追加到当前结构树？取消则不插入。`) : true;
-      if (!action) return;
-      this.currentSkillTreeDraft.roots.push(...draft.roots);
+      const draft = createSkillTemplateTree(templateId, this.nodeDef);
+      if (this.skillTreeDraft.roots.length && !confirm(`追加模板「${template.name}」？`)) return;
+      this.skillTreeDraft.roots.push(...draft.roots);
       this.selectedSkillTreeNodeUid = draft.roots[0]?.uid || this.selectedSkillTreeNodeUid;
-      this.activeLogicMode = 'tree_editor';
+      this.onLogicTreeChanged();
+      this.logicWorkspace = 'tree';
+      this.showToast(`已插入模板：${template.name}`);
     },
-
-    writeSkillTreeDraftToRealLogicEntities() {
-      if (!this.currentSkillTreeDraft.roots.length) {
-        alert('当前结构树为空，无法写回真实技能。');
-        return;
-      }
-      if (!confirm('将当前结构树草稿转换并覆盖当前卡牌的真实 logicEntities？建议先导出工程备份。')) return;
-      try {
-        const entities = buildRealLogicEntitiesFromTreeDraft(this.currentSkillTreeDraft);
-        this.currentCard.logicEntities = entities;
-        this.copyRealLogicEntitiesToSource();
-        alert(`已写回 ${entities.length} 个真实技能实体。`);
-      } catch (error) {
-        alert(`结构树写回失败：${error.message}`);
-      }
+    updateInspectorParam(key, value) {
+      if (!this.selectedSkillTreeNode) return;
+      onParamUpdated(this.selectedSkillTreeNode, key, value, this.nodeDef);
+      this.onLogicTreeChanged();
     },
-    copyRealLogicEntitiesToSource() {
-      this.currentCard.skillLogicSource = JSON.stringify({
-        format: 'phantom.real_logic_entities.v1',
-        warning: '这是从当前卡牌 EffectEntitiesDescriptor.entities 读取出的真实技能实体源码。直接修改后可显式写回 logicEntities。',
-        entities: this.currentCard.logicEntities || []
-      }, null, 2);
-      this.activeLogicMode = 'source';
+    replaceSelectedNode(newNodeId) {
+      if (!this.selectedSkillTreeNode) return;
+      replaceTreeNode(this.selectedSkillTreeNode, newNodeId, this.nodeDef);
+      this.showReplaceMenu = false;
+      this.onLogicTreeChanged();
+      this.showToast('已更换节点');
     },
-    applyRealLogicEntitiesSource() {
-      try {
-        const parsed = JSON.parse(this.currentCard.skillLogicSource || '{}');
-        const entities = Array.isArray(parsed) ? parsed : parsed.entities;
-        if (!Array.isArray(entities)) throw new Error('源码不是数组，也没有 entities 数组字段');
-        this.currentCard.logicEntities = entities;
-        alert('已把源码写回当前卡牌的 logicEntities。');
-      } catch (error) {
-        alert(`真实技能源码写回失败：${error.message}`);
-      }
+    logicUndo() {
+      const restored = undoHistory(this.logicHistory);
+      if (!restored) return;
+      this.card.skillTreeDraft = {
+        ...this.skillTreeDraft,
+        roots: restored
+      };
+      this.syncLogicEntitiesFromTree({ recordHistory: false });
+      this.bumpLogicTree();
     },
-    treeNodeSummary,
+    logicRedo() {
+      const restored = redoHistory(this.logicHistory);
+      if (!restored) return;
+      this.card.skillTreeDraft = {
+        ...this.skillTreeDraft,
+        roots: restored
+      };
+      this.syncLogicEntitiesFromTree({ recordHistory: false });
+      this.bumpLogicTree();
+    },
+    treeNodeSummary(node) {
+      return treeNodeSummary(node, this.logicLocalization, this.nodeDef);
+    },
+    nodeHasChildrenHint(nodeId) {
+      const defn = this.nodeDef[nodeId] || {};
+      return !!(defn.allowed_children?.length || ['AdditionalTargetQuery', 'FinderPlaceholder', 'QueryPlaceholder'].includes(nodeId));
+    },
     async copyPreview() {
-      await navigator.clipboard.writeText(this.previewJson);
+      try {
+        await navigator.clipboard.writeText(this.previewJson);
+        this.showToast('已复制卡牌 JSON');
+      } catch (_) {
+        this.showToast('复制失败');
+      }
     },
-    async copyProjectPreview() {
-      await navigator.clipboard.writeText(this.projectPreviewJson);
-    },
-    openPreviewTab() {
-      this.activeTab = 'preview_json';
+    async copySkillJson() {
+      try {
+        await navigator.clipboard.writeText(this.realLogicEntitiesJson);
+        this.showToast('已复制技能 JSON');
+      } catch (_) {
+        this.showToast('复制失败');
+      }
     }
   }
 }).mount('#phantom-app');

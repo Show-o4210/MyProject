@@ -1,18 +1,16 @@
-# blueprints/card_sender.py
-import requests
 import json
-import time
+
 from flask import Blueprint, render_template, request, jsonify
+import requests
+
 from extensions import limiter
+from logic_ea_api import (
+    DEFAULT_REQUEST_TIMEOUT,
+    build_pvzh_headers,
+    post_soft_purchase,
+)
 
 card_sender_bp = Blueprint('card_sender', __name__)
-
-# ===================== 常量配置 =====================
-CARD_API_URL = "https://pvz-heroes.awspopcap.com/persistence/v2/inventory/commitSoftPurchase"
-
-CLIENT_ID = "pvzheroes-2015-google-client"
-CLIENT_VERSION = "1.64.6"
-CONTENT_VERSION = "45a337051e72592e53c9bf8a4b590639"
 
 # 所有卡牌 ID
 CARD_IDS = [
@@ -37,38 +35,37 @@ CARD_IDS = [
     677,678,679,680,681,682,683,684,685,686,687,688,691
 ]
 
+
 def build_cards(count: int) -> dict:
-    """构建卡牌字典"""
     return {str(cid): count for cid in CARD_IDS}
+
 
 @card_sender_bp.route('/card-sender')
 def card_sender_page():
-    """渲染卡牌发送器页面"""
-    return render_template('card_sender.html', current_tab='card_sender', card_ids_count=len(CARD_IDS))
+    return render_template(
+        'card_sender.html',
+        current_tab='card_sender',
+        card_ids_count=len(CARD_IDS),
+    )
+
 
 @card_sender_bp.route('/api/send-cards', methods=['POST'])
 @limiter.limit("5 per minute")
 def send_cards():
-    """
-    发送卡牌请求
-    无需登录，直接使用前端传入的 Token 和 Persona ID
-    """
-    # 获取请求参数
+    """发送卡牌请求，无需登录，直接使用前端传入的 Token 和 Persona ID。"""
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "无效的请求数据"}), 400
-    
+
     eadp_token = data.get('token', '').strip()
     persona_id = data.get('persona_id', '').strip()
     card_count = data.get('card_count', 999999)
-    
-    # 参数校验
+
     if not eadp_token:
         return jsonify({"success": False, "error": "EADP-AUTH-TOKEN 不能为空"}), 400
-    
     if not persona_id:
         return jsonify({"success": False, "error": "EADP-PERSONA-ID 不能为空"}), 400
-    
+
     try:
         card_count = int(card_count)
         if card_count <= 0:
@@ -77,54 +74,34 @@ def send_cards():
             return jsonify({"success": False, "error": "每张卡牌数量不能超过 999999"}), 400
     except ValueError:
         return jsonify({"success": False, "error": "卡牌数量必须是有效的数字"}), 400
-    
-    # 生成 UTC 时间戳
-    utc = str(int(time.time() * 1000))
-    
-    # 构建请求
+
     payload = {
         "Sku": "deckRecipe",
         "EventId": None,
         "Cards": build_cards(card_count),
         "ExpectedCost": 10,
-        "KeyName": "default"
+        "KeyName": "default",
     }
-    
-    headers = {
-        "Content-Type": "application/json",
-        "EADP-AUTH-TOKEN": eadp_token,
-        "EADP-PERSONA-ID": persona_id,
-        "X-EADP-Client-Id": CLIENT_ID,
-        "X-Pvzh-UTC": utc,
-        "X-Pvzh-Platform": "Android",
-        "X-Pvzh-Content-Version": CONTENT_VERSION,
-        "X-Pvzh-Client-Version": CLIENT_VERSION
-    }
-    
-    # 发送请求
+
+    headers = build_pvzh_headers(eadp_token, persona_id)
+
     try:
-        response = requests.post(
-            CARD_API_URL, 
-            json=payload, 
-            headers=headers, 
-            timeout=10
-        )
-        
-        # 尝试解析响应
+        response = post_soft_purchase(payload, headers, timeout=DEFAULT_REQUEST_TIMEOUT)
+
         response_text = response.text
         response_json = None
         try:
             response_json = json.loads(response_text)
-        except:
+        except Exception:
             pass
-        
+
         return jsonify({
             "success": response.status_code == 200,
             "status_code": response.status_code,
             "response": response_json if response_json else response_text,
-            "total_cards": len(CARD_IDS) * card_count
+            "total_cards": len(CARD_IDS) * card_count,
         })
-        
+
     except requests.Timeout:
         return jsonify({"success": False, "error": "请求超时，请稍后重试"}), 504
     except requests.ConnectionError:
