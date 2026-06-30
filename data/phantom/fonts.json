@@ -1,0 +1,46 @@
+{
+  "fonts": [
+    {
+      "id": "system-ui",
+      "name": "系统默认字体",
+      "family": "system-ui",
+      "type": "system",
+      "languages": [
+        "zh-CN",
+        "en-US"
+      ],
+      "note": "Web 端默认字体，不需要额外文件。"
+    },
+    {
+      "id": "microsoft-yahei",
+      "name": "微软雅黑",
+      "family": "Microsoft YaHei",
+      "type": "system",
+      "languages": [
+        "zh-CN"
+      ],
+      "note": "Windows 常见中文字体。"
+    },
+    {
+      "id": "segoe-ui",
+      "name": "Segoe UI",
+      "family": "Segoe UI",
+      "type": "system",
+      "languages": [
+        "en-US"
+      ],
+      "note": "Windows 常见英文字体。"
+    },
+    {
+      "id": "custom-font-placeholder",
+      "name": "自定义字体占位",
+      "family": "CustomPhantomFont",
+      "type": "placeholder",
+      "languages": [
+        "zh-CN",
+        "en-US"
+      ],
+      "note": "后续如需卡面预览，可在 static/fonts 中挂载字体文件。"
+    }
+  ]
+}

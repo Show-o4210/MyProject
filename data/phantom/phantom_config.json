@@ -1,0 +1,534 @@
+{
+  "version": "1.3-rarity-index-fix",
+  "stage": "beta-rarity-index-fix",
+  "default_language": "zh-CN",
+  "supported_languages": [
+    "zh-CN",
+    "en-US"
+  ],
+  "default_font": "system-ui",
+  "notes": [
+    "v0.4 已接入 AB 包注入与打包下载：当前工程 card_data 可写入原始 Bundle。",
+    "支持从 card_data JSON 按 GUID 反向导入到当前表单。",
+    "支持导出当前卡牌 JSON、导出当前工程所有卡牌 JSON 与 .phantom 工程。",
+    "v0.5 新增工程校验、AB 包预检、差异预览与手机竖屏 JSON 独立预览 Tab。",
+    "v1.1: 技能逻辑真实结构可读化，支持从 EffectEntitiesDescriptor.entities 展开结构树并显式写回 logicEntities。",
+    "v1.3 修复稀有度 id/value 映射，并接入 data/index.json 卡牌中文名与 UUID 索引。"
+  ],
+  "enums": {
+    "factions": [
+      {
+        "id": "Plants",
+        "value": "Plants",
+        "name": "植物 (Plants)"
+      },
+      {
+        "id": "Zombies",
+        "value": "Zombies",
+        "name": "僵尸 (Zombies)"
+      }
+    ],
+    "baseIds": [
+      {
+        "id": "Base",
+        "value": "Base",
+        "name": "植物 (Base)"
+      },
+      {
+        "id": "BasePlantOneTimeEffect",
+        "value": "BasePlantOneTimeEffect",
+        "name": "植物锦囊 (Plant Trick)"
+      },
+      {
+        "id": "BasePlantEnvironment",
+        "value": "BasePlantEnvironment",
+        "name": "植物环境 (Plant Env)"
+      },
+      {
+        "id": "BaseZombie",
+        "value": "BaseZombie",
+        "name": "僵尸 (BaseZombie)"
+      },
+      {
+        "id": "BaseZombieOneTimeEffect",
+        "value": "BaseZombieOneTimeEffect",
+        "name": "僵尸锦囊 (Zombie Trick)"
+      },
+      {
+        "id": "BaseZombieEnvironment",
+        "value": "BaseZombieEnvironment",
+        "name": "僵尸环境 (Zombie Env)"
+      },
+      {
+        "id": "BoardAbility",
+        "value": "BoardAbility",
+        "name": "场景能力 (关卡机制)"
+      }
+    ],
+    "colors": [
+      {
+        "id": "Guardian",
+        "value": "Guardian",
+        "name": "守卫 (Guardian)"
+      },
+      {
+        "id": "Kabloom",
+        "value": "Kabloom",
+        "name": "爆花 (Kabloom)"
+      },
+      {
+        "id": "Mega-Grow",
+        "value": "Mega-Grow",
+        "name": "猛涨 (Mega-Grow)"
+      },
+      {
+        "id": "Smarty",
+        "value": "Smarty",
+        "name": "聪明 (Smarty)"
+      },
+      {
+        "id": "Solar",
+        "value": "Solar",
+        "name": "光鸣 (Solar)"
+      },
+      {
+        "id": "Hearty",
+        "value": "Hearty",
+        "name": "健壮 (Hearty)"
+      },
+      {
+        "id": "Brainy",
+        "value": "Brainy",
+        "name": "有脑 (Brainy)"
+      },
+      {
+        "id": "Sneaky",
+        "value": "Sneaky",
+        "name": "狡猾 (Sneaky)"
+      },
+      {
+        "id": "Crazy",
+        "value": "Crazy",
+        "name": "疯狂 (Crazy)"
+      },
+      {
+        "id": "Beastly",
+        "value": "Beastly",
+        "name": "猛兽 (Beastly)"
+      }
+    ],
+    "rarities": [
+      {
+        "id": "0",
+        "value": "R1",
+        "name": "罕见 (Uncommon)"
+      },
+      {
+        "id": "1",
+        "value": "R2",
+        "name": "稀有 (Rare)"
+      },
+      {
+        "id": "2",
+        "value": "R3",
+        "name": "超稀有 (SuperRare)"
+      },
+      {
+        "id": "3",
+        "value": "R4",
+        "name": "传说 (Legendary)"
+      },
+      {
+        "id": "4",
+        "value": "R0",
+        "name": "基础卡 (Common)"
+      },
+      {
+        "id": "5",
+        "value": "Event",
+        "name": "活动卡 (Event)"
+      }
+    ],
+    "sets": [
+      {
+        "id": "Gold",
+        "value": "Gold",
+        "name": "高级包 (Premium/Gold)"
+      },
+      {
+        "id": "Galactic",
+        "value": "Galactic",
+        "name": "银河包 (Galactic)"
+      },
+      {
+        "id": "Colossal",
+        "value": "Colossal",
+        "name": "巨大包 (Colossal)"
+      },
+      {
+        "id": "Triassic",
+        "value": "Triassic",
+        "name": "三叠纪 (Triassic)"
+      },
+      {
+        "id": "Event",
+        "value": "Event",
+        "name": "活动卡 (Event)"
+      },
+      {
+        "id": "Token",
+        "value": "Token",
+        "name": "衍生物/不可合成 (Token)"
+      }
+    ],
+    "subtypes": [
+      {
+        "id": 0,
+        "value": 0,
+        "name": "豌豆 (Peashooter)"
+      },
+      {
+        "id": 1,
+        "value": 1,
+        "name": "莓果 (Berry)"
+      },
+      {
+        "id": 2,
+        "value": 2,
+        "name": "豆子 (Bean)"
+      },
+      {
+        "id": 3,
+        "value": 3,
+        "name": "花朵 (Flower)"
+      },
+      {
+        "id": 4,
+        "value": 4,
+        "name": "蘑菇 (Mushroom)"
+      },
+      {
+        "id": 5,
+        "value": 5,
+        "name": "坚果 (Nut)"
+      },
+      {
+        "id": 6,
+        "value": 6,
+        "name": "运动员 (Sports)"
+      },
+      {
+        "id": 7,
+        "value": 7,
+        "name": "科学家 (Science)"
+      },
+      {
+        "id": 8,
+        "value": 8,
+        "name": "跳舞 (Dancing)"
+      },
+      {
+        "id": 9,
+        "value": 9,
+        "name": "小鬼 (Imp)"
+      },
+      {
+        "id": 10,
+        "value": 10,
+        "name": "宠物 (Pet)"
+      },
+      {
+        "id": 11,
+        "value": 11,
+        "name": "巨尸 (Gargantuar)"
+      },
+      {
+        "id": 12,
+        "value": 12,
+        "name": "海盗 (Pirate)"
+      },
+      {
+        "id": 13,
+        "value": 13,
+        "name": "松果 (Pinecone)"
+      },
+      {
+        "id": 15,
+        "value": 15,
+        "name": "胡须 (Mustache)"
+      },
+      {
+        "id": 16,
+        "value": 16,
+        "name": "派对 (Party)"
+      },
+      {
+        "id": 18,
+        "value": 18,
+        "name": "美食家 (Gourmet)"
+      },
+      {
+        "id": 19,
+        "value": 19,
+        "name": "历史 (History)"
+      },
+      {
+        "id": 20,
+        "value": 20,
+        "name": "木桶 (Barrel)"
+      },
+      {
+        "id": 21,
+        "value": 21,
+        "name": "种子 (Seed)"
+      },
+      {
+        "id": 22,
+        "value": 22,
+        "name": "动物 (Animal)"
+      },
+      {
+        "id": 23,
+        "value": 23,
+        "name": "仙人掌 (Cactus)"
+      },
+      {
+        "id": 24,
+        "value": 24,
+        "name": "玉米 (Corn)"
+      },
+      {
+        "id": 25,
+        "value": 25,
+        "name": "巨龙 (Dragon)"
+      },
+      {
+        "id": 26,
+        "value": 26,
+        "name": "捕蝇草 (Flytrap)"
+      },
+      {
+        "id": 27,
+        "value": 27,
+        "name": "水果 (Fruit)"
+      },
+      {
+        "id": 28,
+        "value": 28,
+        "name": "绿叶 (Leafy)"
+      },
+      {
+        "id": 29,
+        "value": 29,
+        "name": "苔藓 (Moss)"
+      },
+      {
+        "id": 31,
+        "value": 31,
+        "name": "根茎 (Root)"
+      },
+      {
+        "id": 32,
+        "value": 32,
+        "name": "窝瓜 (Squash)"
+      },
+      {
+        "id": 33,
+        "value": 33,
+        "name": "树木 (Tree)"
+      },
+      {
+        "id": 35,
+        "value": 35,
+        "name": "钟表 (Clock)"
+      },
+      {
+        "id": 37,
+        "value": 37,
+        "name": "职业 (Professional)"
+      },
+      {
+        "id": 39,
+        "value": 39,
+        "name": "怪物 (Monster)"
+      },
+      {
+        "id": 40,
+        "value": 40,
+        "name": "香蕉 (Banana)"
+      },
+      {
+        "id": 41,
+        "value": 41,
+        "name": "哑剧 (Mime)"
+      },
+      {
+        "id": 42,
+        "value": 42,
+        "name": "休切尔(柴Q)"
+      }
+    ],
+    "specialAbilities": [
+      {
+        "id": "Multishot",
+        "name": "🎯 攻击三线 (Multishot)",
+        "type": "bool"
+      },
+      {
+        "id": "AttacksInAllLanes",
+        "name": "🌊 攻击全线 (AttacksInAllLanes)",
+        "type": "bool"
+      },
+      {
+        "id": "SplashDamage",
+        "name": "💥 溅射伤害 (Splash Damage)",
+        "type": "int",
+        "default": 1,
+        "label": "伤害值"
+      },
+      {
+        "id": "Aquatic",
+        "name": "🐠 两栖 (Aquatic)",
+        "type": "bool"
+      },
+      {
+        "id": "Teamup",
+        "name": "🤝 组队 (Team-up)",
+        "type": "teamup_combo",
+        "options": {
+          "默认 (可被覆盖)": false,
+          "召唤在前排 (CreateInFront)": true
+        }
+      },
+      {
+        "id": "Truestrike",
+        "name": "⚡ 必中/防被格挡 (Truestrike)",
+        "type": "bool"
+      },
+      {
+        "id": "Strikethrough",
+        "name": "🗡️ 穿透 (Strikethrough)",
+        "type": "bool"
+      },
+      {
+        "id": "Armor",
+        "name": "🛡️ 装甲 (Armor)",
+        "type": "int",
+        "default": 1,
+        "label": "护甲值"
+      },
+      {
+        "id": "Untrickable",
+        "name": "🚫 锦囊免疫 (Untrickable)",
+        "type": "combo",
+        "options": {
+          "免疫植物锦囊": 1,
+          "免疫僵尸锦囊": 2
+        }
+      },
+      {
+        "id": "AttackOverride",
+        "name": "❤️ 血量攻击 (AttackOverride)",
+        "type": "bool"
+      },
+      {
+        "id": "Deadly",
+        "name": "☠️ 致命 (Deadly)",
+        "type": "bool"
+      },
+      {
+        "id": "PlaysFaceDown",
+        "name": "🪦 墓碑 (Gravestone)",
+        "type": "bool"
+      },
+      {
+        "id": "Frenzy",
+        "name": "🔥 狂热 (Frenzy)",
+        "type": "bool"
+      }
+    ],
+    "rootAbilityPresets": [
+      {
+        "id": "Ambush",
+        "name": "克制英雄"
+      },
+      {
+        "id": "Armor",
+        "name": "装甲"
+      },
+      {
+        "id": "AttackOverride",
+        "name": "血量攻击"
+      },
+      {
+        "id": "Deadly",
+        "name": "致命"
+      },
+      {
+        "id": "Frenzy",
+        "name": "狂热"
+      },
+      {
+        "id": "Overshoot",
+        "name": "先攻"
+      },
+      {
+        "id": "Repeater",
+        "name": "双重攻击"
+      },
+      {
+        "id": "Strikethrough",
+        "name": "穿透"
+      },
+      {
+        "id": "Truestrike",
+        "name": "必中"
+      },
+      {
+        "id": "Unique",
+        "name": "特殊"
+      },
+      {
+        "id": "Untrickable",
+        "name": "锦囊免疫"
+      }
+    ],
+    "flags": [
+      {
+        "id": "IgnoreDeckLimit",
+        "value": "IgnoreDeckLimit",
+        "name": "IgnoreDeckLimit"
+      },
+      {
+        "id": "IsPower",
+        "value": "IsPower",
+        "name": "IsPower"
+      },
+      {
+        "id": "IsPrimaryPower",
+        "value": "IsPrimaryPower",
+        "name": "IsPrimaryPower"
+      },
+      {
+        "id": "IsTrick",
+        "value": "IsTrick",
+        "name": "IsTrick"
+      },
+      {
+        "id": "IsSurprise",
+        "value": "IsSurprise",
+        "name": "IsSurprise"
+      },
+      {
+        "id": "IsEnvironment",
+        "value": "IsEnvironment",
+        "name": "IsEnvironment"
+      },
+      {
+        "id": "IsBoardAbility",
+        "value": "IsBoardAbility",
+        "name": "IsBoardAbility"
+      }
+    ]
+  }
+}

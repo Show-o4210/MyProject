@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}卡牌发送器 - PVZH Mod 工具箱{% endblock %}
+
+{% block content %}
+<div id="card-sender-app" class="px-4 sm:px-6 lg:px-8 py-8 md:py-10 max-w-5xl mx-auto" v-cloak>
+
+    <section class="mb-6 md:mb-8">
+        <div class="rounded-[2rem] bg-white border border-slate-200 shadow-sm overflow-hidden">
+            <div class="relative p-5 md:p-8">
+                <div class="absolute -top-20 -right-20 w-56 h-56 bg-blue-100 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
+
+                <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                    <div>
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-4 border border-blue-100">
+                            <span class="material-symbols-rounded text-[16px]">send</span>
+                            Account Tool
+                        </div>
+
+                        <h1 class="text-2xl md:text-4xl font-extrabold text-slate-950 tracking-tight mb-3">
+                            卡牌发送器
+                        </h1>
+
+                        <p class="text-sm md:text-base text-slate-500 leading-relaxed max-w-2xl">
+                            输入 EADP Token 与 Persona ID，向指定 PVZH 账号批量发送卡牌。
+                        </p>
+                    </div>
+
+                    <div class="hidden md:flex w-16 h-16 rounded-3xl bg-blue-600 text-white items-center justify-center shadow-sm">
+                        <span class="material-symbols-rounded text-[34px]">send</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <div class="lg:col-span-8">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 md:p-6">
+
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-extrabold text-slate-900 flex items-center">
+                        <span class="material-symbols-rounded text-blue-500 mr-2">tune</span>
+                        请求参数
+                    </h2>
+
+                    <span class="text-xs font-bold text-slate-400 bg-slate-50 border border-slate-100 px-3 py-1 rounded-full">
+                        无需登录
+                    </span>
+                </div>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">
+                            EADP-AUTH-TOKEN
+                            <span class="text-red-500">*</span>
+                        </label>
+
+                        <input
+                            type="text"
+                            v-model.trim="form.token"
+                            placeholder="输入你的 EADP-AUTH-TOKEN"
+                            autocomplete="off"
+                            spellcheck="false"
+                            class="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition font-mono text-sm bg-slate-50 focus:bg-white"
+                        >
+
+                        <p class="text-xs text-slate-400 mt-2">
+                            Token 仅用于本次请求，不在页面内持久保存。
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">
+                            EADP-PERSONA-ID
+                            <span class="text-red-500">*</span>
+                        </label>
+
+                        <input
+                            type="text"
+                            v-model.trim="form.persona_id"
+                            placeholder="输入你的 EADP-PERSONA-ID"
+                            autocomplete="off"
+                            spellcheck="false"
+                            class="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition font-mono text-sm bg-slate-50 focus:bg-white"
+                        >
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">
+                            每张卡牌数量
+                        </label>
+
+                        <input
+                            type="number"
+                            v-model.number="form.card_count"
+                            min="1"
+                            max="999999"
+                            class="w-full px-4 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition bg-slate-50 focus:bg-white"
+                        >
+
+                        <p class="text-xs text-slate-400 mt-2">
+                            当前预计发送
+                            <strong class="text-blue-600" v-text="totalCards.toLocaleString()"></strong>
+                            张卡牌。
+                        </p>
+                    </div>
+
+                    <button
+                        @click="sendRequest"
+                        :disabled="loading"
+                        class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-extrabold py-3.5 px-6 rounded-2xl transition active:scale-[0.99] shadow-sm"
+                    >
+                        <span v-if="!loading" class="flex items-center justify-center">
+                            <span class="material-symbols-rounded mr-2 text-lg">send</span>
+                            发送请求
+                        </span>
+
+                        <span v-else class="flex items-center justify-center">
+                            <svg class="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            发送中...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <aside class="lg:col-span-4 space-y-5">
+            <div class="bg-amber-50 border border-amber-100 rounded-3xl p-5">
+                <div class="flex items-start">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mr-3 shrink-0">
+                        <span class="material-symbols-rounded text-[22px]">warning</span>
+                    </div>
+
+                    <div class="text-sm text-amber-800">
+                        <h3 class="font-extrabold mb-2">注意事项</h3>
+                        <ul class="list-disc list-inside space-y-1 leading-relaxed">
+                            <li>每分钟最多发送 <strong>5 次</strong>请求</li>
+                            <li>账号内需要有 10 钻石</li>
+                            <li>卡牌会直接添加到账号</li>
+                            <li>仅供学习交流，请勿滥用</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+                <h3 class="font-extrabold text-slate-900 mb-3 flex items-center">
+                    <span class="material-symbols-rounded text-blue-500 mr-2">info</span>
+                    当前配置
+                </h3>
+
+                <div class="space-y-3 text-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500">卡牌 ID 数量</span>
+                        <span class="font-bold text-slate-900" v-text="cardIdsCount"></span>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500">每卡数量</span>
+                        <span class="font-bold text-slate-900" v-text="safeCardCount.toLocaleString()"></span>
+                    </div>
+
+                    <div class="h-px bg-slate-100"></div>
+
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500">预计总量</span>
+                        <span class="font-extrabold text-blue-600" v-text="totalCards.toLocaleString()"></span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </section>
+
+    <section v-if="error" class="mt-6 bg-red-50 border border-red-200 rounded-3xl p-5">
+        <div class="flex items-start">
+            <div class="w-10 h-10 rounded-2xl bg-red-100 text-red-700 flex items-center justify-center mr-3 shrink-0">
+                <span class="material-symbols-rounded">error</span>
+            </div>
+
+            <div>
+                <h3 class="font-extrabold text-red-800 mb-1">请求失败</h3>
+                <p class="text-sm text-red-700 leading-relaxed" v-text="error"></p>
+            </div>
+        </div>
+    </section>
+
+    <section v-if="result" class="mt-6 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="border-b border-slate-100 px-5 md:px-6 py-4 bg-slate-50 flex items-center justify-between gap-3">
+            <div class="flex items-center">
+                <span class="material-symbols-rounded mr-2 text-slate-600 text-lg">code_blocks</span>
+                <h3 class="font-extrabold text-slate-800">响应结果</h3>
+            </div>
+
+            <div
+                class="px-3 py-1 rounded-full text-xs font-extrabold"
+                :class="result.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+            >
+                <span v-text="result.success ? '成功' : '失败'"></span>
+                <span v-if="result.status_code"> · 状态码 <span v-text="result.status_code"></span></span>
+            </div>
+        </div>
+
+        <div class="p-5 md:p-6">
+            <div v-if="result.total_cards" class="mb-4 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                <span class="text-sm font-bold text-blue-700">
+                    已发送 <span v-text="result.total_cards.toLocaleString()"></span> 张卡牌
+                </span>
+            </div>
+
+            <pre class="bg-slate-950 text-green-400 p-4 rounded-2xl overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto" v-text="formattedResponse"></pre>
+        </div>
+    </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% raw %}
+<script>
+    const { createApp, ref, computed } = Vue;
+
+    createApp({
+        setup() {
+            const form = ref({
+                token: '',
+                persona_id: '',
+                card_count: 999999
+            });
+
+            const loading = ref(false);
+            const result = ref(null);
+            const error = ref(null);
+
+            const cardIdsCount = 632;
+
+            const safeCardCount = computed(() => {
+                const count = Number(form.value.card_count || 0);
+                return Number.isFinite(count) && count > 0 ? count : 0;
+            });
+
+            const totalCards = computed(() => {
+                return safeCardCount.value * cardIdsCount;
+            });
+
+            const formattedResponse = computed(() => {
+                if (!result.value) return '';
+
+                if (typeof result.value.response === 'object') {
+                    return JSON.stringify(result.value.response, null, 2);
+                }
+
+                if (result.value.response) {
+                    return String(result.value.response);
+                }
+
+                return JSON.stringify(result.value, null, 2);
+            });
+
+            const validateForm = () => {
+                if (!form.value.token) {
+                    return '请填写 EADP-AUTH-TOKEN';
+                }
+
+                if (!form.value.persona_id) {
+                    return '请填写 EADP-PERSONA-ID';
+                }
+
+                if (!Number.isFinite(Number(form.value.card_count))) {
+                    return '卡牌数量必须是有效数字';
+                }
+
+                if (form.value.card_count <= 0) {
+                    return '卡牌数量必须大于 0';
+                }
+
+                if (form.value.card_count > 999999) {
+                    return '卡牌数量不能超过 999999';
+                }
+
+                return null;
+            };
+
+            const parseErrorMessage = (status, data) => {
+                if (status === 429) {
+                    return '请求过于频繁，请稍后再试（每分钟最多 5 次）';
+                }
+
+                if (status === 401 || status === 403) {
+                    return data?.error || '请求被拒绝。请检查 Token、Persona ID 是否正确，或后端是否仍保留旧登录验证。';
+                }
+
+                if (data?.error) {
+                    return data.error;
+                }
+
+                if (data?.message) {
+                    return data.message;
+                }
+
+                return `请求失败（状态码: ${status}）`;
+            };
+
+            const sendRequest = async () => {
+                result.value = null;
+                error.value = null;
+
+                const validationError = validateForm();
+                if (validationError) {
+                    error.value = validationError;
+                    return;
+                }
+
+                loading.value = true;
+
+                try {
+                    const response = await fetch('/api/send-cards', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            token: form.value.token,
+                            persona_id: form.value.persona_id,
+                            card_count: form.value.card_count
+                        })
+                    });
+
+                    let data = null;
+
+                    try {
+                        data = await response.json();
+                    } catch (jsonError) {
+                        data = {
+                            success: false,
+                            error: '后端返回了非 JSON 响应'
+                        };
+                    }
+
+                    if (response.ok && data && data.success !== undefined) {
+                        result.value = data;
+
+                        if (!data.success) {
+                            error.value = parseErrorMessage(response.status, data);
+                        }
+
+                        return;
+                    }
+
+                    error.value = parseErrorMessage(response.status, data);
+                    result.value = data || {
+                        success: false,
+                        status_code: response.status,
+                        response: null
+                    };
+                } catch (err) {
+                    error.value = `网络错误：${err.message}`;
+                } finally {
+                    loading.value = false;
+                }
+            };
+
+            return {
+                form,
+                loading,
+                result,
+                error,
+                cardIdsCount,
+                safeCardCount,
+                totalCards,
+                formattedResponse,
+                sendRequest
+            };
+        }
+    }).mount('#card-sender-app');
+</script>
+{% endraw %}
+{% endblock %}

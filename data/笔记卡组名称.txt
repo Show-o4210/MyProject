@@ -1,0 +1,177 @@
+【卡组ID】
+
+
+（急冻魔）
+Deck_Brainfreeze_G1			急冻魔（宇宙）
+Deck_Brainfreeze_RDinosaur	急冻魔（恐龙）
+Deck_Brainfreeze_R1			急冻魔（一星）
+Deck_Brainfreeze_R2			急冻魔（二星）
+Deck_Brainfreeze_R3			急冻魔（三星）
+
+
+（霸王大嘴花）
+Deck_Chompzilla_G1			霸王大嘴花（宇宙）
+Deck_Chompzilla_RDinosaur	霸王大嘴花（恐龙）
+Deck_Chompzilla_R1			霸王大嘴花（一星）
+Deck_Chompzilla_R2			霸王大嘴花（二星）
+Deck_Chompzilla_R3			霸王大嘴花（三星）
+
+
+（香橼猎手）
+Deck_Citron_G1			香橼猎手（宇宙）
+Deck_Citron_RDinosaur	香橼猎手（恐龙）
+Deck_Citron_R1			香橼猎手（一星）
+Deck_Citron_R2			香橼猎手（二星）
+Deck_Citron_R3			香橼猎手（三星）
+
+
+（霹雳舞王）
+Deck_ElectricBoogaloo_G1			霹雳舞王（宇宙）
+Deck_ElectricBoogaloo_RDinosaur		霹雳舞王（恐龙）
+Deck_ElectricBoogaloo_R1			霹雳舞王（一星）
+Deck_ElectricBoogaloo_R2			霹雳舞王（二星）
+Deck_ElectricBoogaloo_R3			霹雳舞王（三星）
+
+
+（拳王菜）
+Deck_GrassKnuckles_G1			拳王菜（宇宙）
+Deck_GrassKnuckles_RDinosaur	拳王菜（恐龙）
+Deck_GrassKnuckles_R1			拳王菜（一星）
+Deck_GrassKnuckles_R2			拳王菜（二星）
+Deck_GrassKnuckles_R3			拳王菜（三星）
+
+
+（绿影侠）
+Deck_GreenShadow_G1			绿影侠（宇宙）
+Deck_GreenShadow_RDinosaur	绿影侠（恐龙）
+Deck_GreenShadow_R1			绿影侠（一星）
+Deck_GreenShadow_R2			绿影侠（二星）
+Deck_GreenShadow_R3			绿影侠（三星）
+
+
+（至尊大王）
+Deck_HugeGigantacu_G1			至尊大王（宇宙）
+Deck_HugeGigantacu_RDinosaur	至尊大王（恐龙）
+Deck_HugeGigantacu_R1			至尊大王（一星）
+Deck_HugeGigantacu_R2			至尊大王（二星）
+Deck_HugeGigantacu_R3			至尊大王（三星）
+
+
+（不死女妖）
+Deck_Immorticia_G1			不死女妖（宇宙）
+Deck_Immorticia_RDinosaur	不死女妖（恐龙）
+Deck_Immorticia_R1			不死女妖（一星）
+Deck_Immorticia_R2			不死女妖（二星）
+Deck_Immorticia_R3			不死女妖（三星）
+
+
+（无穷小子）
+Deck_Impfinity_G1			无穷小子（宇宙）
+Deck_Impfinity_RDinosaur	无穷小子（恐龙）
+Deck_Impfinity_R1			无穷小子（一星）
+Deck_Impfinity_R2			无穷小子（二星）
+Deck_Impfinity_R3			无穷小子（三星）
+
+
+（海妖）
+Deck_Neptuna_G1			海妖（宇宙）
+Deck_Neptuna_RDinosaur	海妖（恐龙）
+Deck_Neptuna_R1			海妖（一星）
+Deck_Neptuna_R2			海妖（二星）
+Deck_Neptuna_R3			海妖（三星）
+
+
+（暗夜菇）
+Deck_NightCap_G1			暗夜菇（宇宙）
+Deck_NightCap_RDinosaur		暗夜菇（恐龙）
+Deck_NightCap_R1			暗夜菇（一星）
+Deck_NightCap_R2			暗夜菇（二星）
+Deck_NightCap_R3			暗夜菇（三星）
+
+
+（教授）
+Deck_ProfBrainstorm_G1			教授（宇宙）
+Deck_ProfBrainstorm_RDinosaur	教授（恐龙）
+Deck_ProfBrainstorm_R1			教授（一星）
+Deck_ProfBrainstorm_R2			教授（二星）
+Deck_ProfBrainstorm_R3			教授（三星）
+
+
+（玫瑰）
+Deck_Rose_G1			玫瑰（宇宙）
+Deck_Rose_RDinosaur		玫瑰（恐龙）
+Deck_Rose_R1			玫瑰（一星）
+Deck_Rose_R2			玫瑰（二星）
+Deck_Rose_R3			玫瑰（三星）
+
+
+（锈铁侠）
+Deck_Rustbolt_G1			锈铁侠（宇宙）
+Deck_Rustbolt_RDinosaur		锈铁侠（恐龙）
+Deck_Rustbolt_R1			锈铁侠（一星）
+Deck_Rustbolt_R2			锈铁侠（二星）
+Deck_Rustbolt_R3			锈铁侠（三星）
+
+
+（火爆队长）
+Deck_Scorchwood_G1			火爆队长（宇宙）
+Deck_Scorchwood_RDinosaur	火爆队长（恐龙）
+Deck_Scorchwood_R1			火爆队长（一星）
+Deck_Scorchwood_R2			火爆队长（二星）
+Deck_Scorchwood_R3			火爆队长（三星）
+
+
+（耀斑花）
+Deck_SolarFlare_G1			耀斑花（宇宙）
+Deck_SolarFlare_RDinosaur	耀斑花（恐龙）
+Deck_SolarFlare_R1			耀斑花（一星）
+Deck_SolarFlare_R2			耀斑花（二星）
+Deck_SolarFlare_R3			耀斑花（三星）
+
+
+（贝塔胡萝卜蒂娜）
+Deck_BetaCarrotina_G1			贝塔胡萝卜蒂娜（宇宙）
+Deck_BetaCarrotina_RDinosaur	贝塔胡萝卜蒂娜（恐龙）
+Deck_BetaCarrotina_R1			贝塔胡萝卜蒂娜（一星）
+Deck_BetaCarrotina_R2			贝塔胡萝卜蒂娜（二星）
+Deck_BetaCarrotina_R3			贝塔胡萝卜蒂娜（三星）
+
+
+（土豆仔）
+Deck_Spudow_G1			土豆仔（宇宙）
+Deck_Spudow_RDinosaur	土豆仔（恐龙）
+Deck_Spudow_R1			土豆仔（一星）
+Deck_Spudow_R2			土豆仔（二星）
+Deck_Spudow_R3			土豆仔（三星）
+
+
+（超尸）
+Deck_SuperBrainz_G1			超尸（宇宙）
+Deck_SuperBrainz_RDinosaur	超尸（恐龙）
+Deck_SuperBrainz_R1			超尸（一星）
+Deck_SuperBrainz_R2			超尸（二星）
+Deck_SuperBrainz_R3			超尸（三星）
+
+
+（摔跤狂）
+Deck_TheSmash_G1			摔跤狂（宇宙）
+Deck_TheSmash_RDinosaur		摔跤狂（恐龙）
+Deck_TheSmash_R1			摔跤狂（一星）
+Deck_TheSmash_R2			摔跤狂（二星）
+Deck_TheSmash_R3			摔跤狂（三星）
+
+
+（坚果骑士）
+Deck_WallKnight_G1			坚果骑士（宇宙）
+Deck_WallKnight_RDinosaur	坚果骑士（恐龙）
+Deck_WallKnight_R1			坚果骑士（一星）
+Deck_WallKnight_R2			坚果骑士（二星）
+Deck_WallKnight_R3			坚果骑士（三星）
+
+
+（Z机甲）
+Deck_ZMech_G1			Z机甲（宇宙）
+Deck_ZMech_RDinosaur	Z机甲（恐龙）
+Deck_ZMech_R1			Z机甲（一星）
+Deck_ZMech_R2			Z机甲（二星）
+Deck_ZMech_R3			Z机甲（三星）

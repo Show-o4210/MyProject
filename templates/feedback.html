@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}意见反馈 - PVZH Mod 工具箱{% endblock %}
+
+{% block content %}
+<div id="feedback-app" class="px-4 sm:px-6 lg:px-8 py-8 md:py-12 max-w-3xl mx-auto" v-cloak>
+    
+    {% raw %}
+    <div class="text-center mb-10">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50 text-blue-600 mb-4">
+            <span class="material-symbols-rounded text-[32px]">rate_review</span>
+        </div>
+        <h1 class="text-2xl md:text-4xl font-extrabold text-slate-950 mb-3">意见反馈</h1>
+        <p class="text-sm md:text-base text-slate-500">
+            遇到问题了？或者有让工具变得更好的建议？
+        </p>
+    </div>
+
+    <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm relative overflow-hidden">
+        
+        <div v-if="status.show" 
+             :class="status.success ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'"
+             class="px-5 py-4 rounded-2xl border text-sm font-bold flex items-center gap-2 mb-6 transition-all">
+            <span class="material-symbols-rounded text-[22px]">{{ status.success ? 'check_circle' : 'error' }}</span>
+            {{ status.message }}
+        </div>
+
+        <div class="space-y-6">
+            <div>
+                <label class="block text-sm font-bold text-slate-900 mb-2">反馈类型</label>
+                <div class="grid grid-cols-3 gap-3">
+                    <label v-for="type in types" :key="type.value" class="relative cursor-pointer group">
+                        <input type="radio" :value="type.value" v-model="form.type" class="peer sr-only" />
+                        <div class="px-2 py-3 rounded-2xl border-2 text-center text-sm font-bold transition-all
+                                    peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700
+                                    border-slate-200 text-slate-500 hover:border-blue-200 flex flex-col items-center gap-1">
+                            <span class="text-lg">{{ type.icon }}</span>
+                            {{ type.label }}
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-bold text-slate-900 mb-2">
+                    详细描述 <span class="text-red-500">*</span>
+                </label>
+                <textarea v-model="form.content" rows="5" 
+                          placeholder="如果遇到Bug，请尽量描述清楚您的操作步骤。若是功能建议，请描述您期望达到的效果..."
+                          class="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 text-sm focus:border-blue-500 focus:ring-0 outline-none transition-colors resize-none bg-slate-50 focus:bg-white"></textarea>
+                <div class="text-right mt-1.5 text-xs text-slate-400">
+                    {{ form.content.length }} / 500
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-bold text-slate-900 mb-2">联系方式 <span class="text-slate-400 font-normal">(选填)</span></label>
+                <input type="text" v-model="form.contact" placeholder="QQ / 邮箱 / 或者别的联系方式，方便对此进行感谢与回复" 
+                       class="w-full px-5 py-3 rounded-2xl border-2 border-slate-200 text-sm focus:border-blue-500 focus:ring-0 outline-none transition-colors bg-slate-50 focus:bg-white" />
+            </div>
+
+            <button @click="submit" :disabled="isSubmitting"
+                    class="w-full py-4 rounded-2xl text-base font-extrabold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-lg flex items-center justify-center gap-2 mt-4">
+                <span v-if="isSubmitting" class="material-symbols-rounded animate-spin text-[20px]">progress_activity</span>
+                <span v-else class="material-symbols-rounded text-[20px]">send</span>
+                {{ isSubmitting ? '正在发送中...' : '提交反馈' }}
+            </button>
+        </div>
+    </div>
+    
+    <div class="text-center mt-8">
+        <a href="/" class="text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors inline-flex items-center gap-1">
+            <span class="material-symbols-rounded text-[18px]">arrow_back</span>
+            返回首页
+        </a>
+    </div>
+    {% endraw %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof Vue === 'undefined') return;
+
+        const { createApp, ref } = Vue;
+
+        createApp({
+            setup() {
+                const isSubmitting = ref(false);
+                const status = ref({ show: false, success: true, message: '' });
+                
+                const types = ref([
+                    { label: '提交 Bug', value: 'bug', icon: '🐛' },
+                    { label: '功能建议', value: 'feature', icon: '💡' },
+                    { label: '其他留言', value: 'other', icon: '💬' }
+                ]);
+                
+                const form = ref({
+                    type: 'bug',
+                    content: '',
+                    contact: ''
+                });
+
+                const submit = async () => {
+                    if (!form.value.content.trim()) {
+                        status.value = { show: true, success: false, message: '请填写详细描述内容哦！' };
+                        return;
+                    }
+                    if (form.value.content.length > 500) {
+                        status.value = { show: true, success: false, message: '描述内容不能超过500字。' };
+                        return;
+                    }
+
+                    isSubmitting.value = true;
+                    status.value.show = false;
+
+                    try {
+                        const response = await fetch('/api/feedback/submit', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(form.value)
+                        });
+
+                        const resData = await response.json().catch(() => ({}));
+
+                        if (response.ok) {
+                            status.value = { show: true, success: true, message: '提交成功！非常感谢您的反馈。' };
+                            // 清空表单
+                            form.value.content = '';
+                            form.value.contact = '';
+                        } else {
+                            status.value = { show: true, success: false, message: resData.error || '提交失败，请稍后再试。' };
+                        }
+                    } catch (error) {
+                        status.value = { show: true, success: false, message: '网络请求异常，请检查连接。' };
+                    } finally {
+                        isSubmitting.value = false;
+                    }
+                };
+
+                return { types, form, isSubmitting, status, submit };
+            }
+        }).mount('#feedback-app');
+    });
+</script>
+{% endblock %}
