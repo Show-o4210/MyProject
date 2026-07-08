@@ -28,13 +28,15 @@ init_limiter(app)
 scheduler = APScheduler()
 
 
+import os
+
 def keep_awake():
     """自唤醒任务：在北京时间 08:00 - 00:00 之间发送请求。"""
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     hour = now.hour
 
     if 8 <= hour < 24:
-        url = "https://pvz-h-tools.onrender.com/"
+        url = os.environ.get("SELF_PING_URL", "https://pvz-h-tools.onrender.com/")
         try:
             response = requests.get(url, timeout=10)
             print(f"[{now}] Self-ping status: {response.status_code}")
@@ -67,6 +69,10 @@ app.register_blueprint(unity_bp)
 app.register_blueprint(level_editor_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(phantom_bp)
+
+@app.route("/health")
+def health():
+    return {"status": "ok"}, 200
 
 if __name__ == '__main__':
     import os

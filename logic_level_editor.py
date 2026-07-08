@@ -104,7 +104,7 @@ class LevelEditorLogic:
                         raise ValueError(f"解析 JSON 失败: {e}")
         raise ValueError(f"在 AB 包中未找到关卡: {level_id}")
 
-    def pack_level_config(self, level_id, config_dict):
+    def pack_level_config(self, level_id, config_dict, output_path=None):
         """将 JSON 写入并生成新的 AB 包"""
         if not self.check_ab_exists():
             raise FileNotFoundError("找不到底包文件！")
@@ -124,7 +124,8 @@ class LevelEditorLogic:
         if not found:
             raise ValueError(f"未在 AB 包中找到关卡 '{level_id}'！")
         
-        with open(self.output_ab_path, "wb") as f:
+        target_path = output_path or self.output_ab_path
+        with open(target_path, "wb") as f:
             f.write(env.file.save())
             
-        return self.output_ab_path
+        return target_path

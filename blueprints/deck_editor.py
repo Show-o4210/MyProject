@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, jsonify, request, send_file
 import json
 from logic_data import data_manager
 from logic_unity import unity_processor
+from extensions import acquire_unity_lock, release_unity_lock
 
 deck_editor_bp = Blueprint('deck_editor', __name__)
 
@@ -24,8 +25,13 @@ def get_init_data():
 
 @deck_editor_bp.route('/api/quick_export', methods=['POST'])
 def quick_export():
+    lock_response = acquire_unity_lock(json_response=True)
+    if lock_response:
+        return lock_response
+
     deck_json_str = request.form.get('deck_json')
     if not deck_json_str:
+        release_unity_lock()
         return jsonify({"status": "error", "msg": "未检测到本地修改"}), 400
     try:
         mods = json.loads(deck_json_str)
@@ -33,3 +39,5 @@ def quick_export():
         return send_file(zip_stream, mimetype='application/zip', as_attachment=True, download_name="PVZH_Decks_Mod.zip")
     except Exception as e:
         return jsonify({"status": "error", "msg": f"打包失败: {e}"}), 500
+    finally:
+        release_unity_lock()

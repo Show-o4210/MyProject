@@ -11,9 +11,13 @@ class UnityProcessor:
     def __init__(self):
         # 核心源文件：必须手动放入根目录的 data/ 文件夹下
         self.bundle_names = ["recipe_decks_1", "recipe_definitions_1"]
+        self._cached_extracted_data = None
 
     def extract_all_to_memory(self):
         """初始化时：提取笔记中包含的卡组 JSON 供前端使用"""
+        if self._cached_extracted_data is not None:
+            return self._cached_extracted_data
+
         all_extracted_data = {}
         base_dir = os.path.dirname(os.path.abspath(__file__))
         valid_ids = data_manager.valid_eng_ids
@@ -36,6 +40,7 @@ class UnityProcessor:
                         except: continue
             except Exception as e:
                 print(f"解析 {b_name} 失败: {e}")
+        self._cached_extracted_data = all_extracted_data
         return all_extracted_data
 
     def repack_from_server_data(self, mods_dict):

@@ -1,0 +1,11 @@
+# render.yaml
+services:
+  - type: web
+    name: pvz-h-tools
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 --max-requests 50 --max-requests-jitter 10
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.3"
