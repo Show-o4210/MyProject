@@ -3,9 +3,8 @@
 {% block title %}意见反馈 - PVZH Mod 工具箱{% endblock %}
 
 {% block content %}
-<div id="feedback-app" class="px-4 sm:px-6 lg:px-8 py-8 md:py-12 max-w-3xl mx-auto" v-cloak>
-    
-    {% raw %}
+<div id="feedback-app" class="px-4 sm:px-6 lg:px-8 py-8 md:py-12 max-w-3xl mx-auto">
+
     <div class="text-center mb-10">
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50 text-blue-600 mb-4">
             <span class="material-symbols-rounded text-[32px]">rate_review</span>
@@ -17,132 +16,186 @@
     </div>
 
     <div class="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm relative overflow-hidden">
-        
-        <div v-if="status.show" 
-             :class="status.success ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'"
-             class="px-5 py-4 rounded-2xl border text-sm font-bold flex items-center gap-2 mb-6 transition-all">
-            <span class="material-symbols-rounded text-[22px]">{{ status.success ? 'check_circle' : 'error' }}</span>
-            {{ status.message }}
+
+        <div id="status-box"
+             class="hidden px-5 py-4 rounded-2xl border text-sm font-bold flex items-center gap-2 mb-6 transition-all">
+            <span id="status-icon" class="material-symbols-rounded text-[22px]"></span>
+            <span id="status-message"></span>
         </div>
 
-        <div class="space-y-6">
+        <form id="feedback-form" class="space-y-6" novalidate>
             <div>
                 <label class="block text-sm font-bold text-slate-900 mb-2">反馈类型</label>
                 <div class="grid grid-cols-3 gap-3">
-                    <label v-for="type in types" :key="type.value" class="relative cursor-pointer group">
-                        <input type="radio" :value="type.value" v-model="form.type" class="peer sr-only" />
+                    <label class="relative cursor-pointer group">
+                        <input type="radio" name="type" value="bug" class="peer sr-only" checked />
                         <div class="px-2 py-3 rounded-2xl border-2 text-center text-sm font-bold transition-all
                                     peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700
                                     border-slate-200 text-slate-500 hover:border-blue-200 flex flex-col items-center gap-1">
-                            <span class="text-lg">{{ type.icon }}</span>
-                            {{ type.label }}
+                            <span class="text-lg">🐛</span>
+                            提交 Bug
+                        </div>
+                    </label>
+                    <label class="relative cursor-pointer group">
+                        <input type="radio" name="type" value="feature" class="peer sr-only" />
+                        <div class="px-2 py-3 rounded-2xl border-2 text-center text-sm font-bold transition-all
+                                    peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700
+                                    border-slate-200 text-slate-500 hover:border-blue-200 flex flex-col items-center gap-1">
+                            <span class="text-lg">💡</span>
+                            功能建议
+                        </div>
+                    </label>
+                    <label class="relative cursor-pointer group">
+                        <input type="radio" name="type" value="other" class="peer sr-only" />
+                        <div class="px-2 py-3 rounded-2xl border-2 text-center text-sm font-bold transition-all
+                                    peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700
+                                    border-slate-200 text-slate-500 hover:border-blue-200 flex flex-col items-center gap-1">
+                            <span class="text-lg">💬</span>
+                            其他留言
                         </div>
                     </label>
                 </div>
             </div>
 
             <div>
-                <label class="block text-sm font-bold text-slate-900 mb-2">
+                <label for="content" class="block text-sm font-bold text-slate-900 mb-2">
                     详细描述 <span class="text-red-500">*</span>
                 </label>
-                <textarea v-model="form.content" rows="5" 
+                <textarea id="content" name="content" rows="5" maxlength="500" required
                           placeholder="如果遇到Bug，请尽量描述清楚您的操作步骤。若是功能建议，请描述您期望达到的效果..."
                           class="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 text-sm focus:border-blue-500 focus:ring-0 outline-none transition-colors resize-none bg-slate-50 focus:bg-white"></textarea>
                 <div class="text-right mt-1.5 text-xs text-slate-400">
-                    {{ form.content.length }} / 500
+                    <span id="content-count">0</span> / 500
                 </div>
             </div>
 
             <div>
-                <label class="block text-sm font-bold text-slate-900 mb-2">联系方式 <span class="text-slate-400 font-normal">(选填)</span></label>
-                <input type="text" v-model="form.contact" placeholder="QQ / 邮箱 / 或者别的联系方式，方便对此进行感谢与回复" 
+                <label for="contact" class="block text-sm font-bold text-slate-900 mb-2">
+                    联系方式 <span class="text-slate-400 font-normal">(选填)</span>
+                </label>
+                <input id="contact" type="text" name="contact" maxlength="100"
+                       placeholder="QQ / 邮箱 / 或者别的联系方式，方便对此进行感谢与回复"
                        class="w-full px-5 py-3 rounded-2xl border-2 border-slate-200 text-sm focus:border-blue-500 focus:ring-0 outline-none transition-colors bg-slate-50 focus:bg-white" />
             </div>
 
-            <button @click="submit" :disabled="isSubmitting"
+            <button id="submit-btn" type="submit"
                     class="w-full py-4 rounded-2xl text-base font-extrabold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-lg flex items-center justify-center gap-2 mt-4">
-                <span v-if="isSubmitting" class="material-symbols-rounded animate-spin text-[20px]">progress_activity</span>
-                <span v-else class="material-symbols-rounded text-[20px]">send</span>
-                {{ isSubmitting ? '正在发送中...' : '提交反馈' }}
+                <span id="submit-icon" class="material-symbols-rounded text-[20px]">send</span>
+                <span id="submit-text">提交反馈</span>
             </button>
-        </div>
+        </form>
     </div>
-    
+
     <div class="text-center mt-8">
         <a href="/" class="text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors inline-flex items-center gap-1">
             <span class="material-symbols-rounded text-[18px]">arrow_back</span>
             返回首页
         </a>
     </div>
-    {% endraw %}
 
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof Vue === 'undefined') return;
+(function () {
+    const form = document.getElementById('feedback-form');
+    const contentEl = document.getElementById('content');
+    const contactEl = document.getElementById('contact');
+    const countEl = document.getElementById('content-count');
+    const statusBox = document.getElementById('status-box');
+    const statusIcon = document.getElementById('status-icon');
+    const statusMessage = document.getElementById('status-message');
+    const submitBtn = document.getElementById('submit-btn');
+    const submitIcon = document.getElementById('submit-icon');
+    const submitText = document.getElementById('submit-text');
 
-        const { createApp, ref } = Vue;
+    const MAX_CONTENT = 500;
 
-        createApp({
-            setup() {
-                const isSubmitting = ref(false);
-                const status = ref({ show: false, success: true, message: '' });
-                
-                const types = ref([
-                    { label: '提交 Bug', value: 'bug', icon: '🐛' },
-                    { label: '功能建议', value: 'feature', icon: '💡' },
-                    { label: '其他留言', value: 'other', icon: '💬' }
-                ]);
-                
-                const form = ref({
-                    type: 'bug',
-                    content: '',
-                    contact: ''
-                });
+    function setStatus(success, message) {
+        statusBox.classList.remove(
+            'hidden',
+            'bg-green-50', 'text-green-700', 'border-green-200',
+            'bg-red-50', 'text-red-700', 'border-red-200'
+        );
+        if (success) {
+            statusBox.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
+            statusIcon.textContent = 'check_circle';
+        } else {
+            statusBox.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+            statusIcon.textContent = 'error';
+        }
+        statusMessage.textContent = message;
+        statusBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 
-                const submit = async () => {
-                    if (!form.value.content.trim()) {
-                        status.value = { show: true, success: false, message: '请填写详细描述内容哦！' };
-                        return;
-                    }
-                    if (form.value.content.length > 500) {
-                        status.value = { show: true, success: false, message: '描述内容不能超过500字。' };
-                        return;
-                    }
+    function hideStatus() {
+        statusBox.classList.add('hidden');
+    }
 
-                    isSubmitting.value = true;
-                    status.value.show = false;
+    function setSubmitting(busy) {
+        submitBtn.disabled = busy;
+        submitIcon.textContent = busy ? 'progress_activity' : 'send';
+        submitIcon.classList.toggle('animate-spin', busy);
+        submitText.textContent = busy ? '正在发送中...' : '提交反馈';
+    }
 
-                    try {
-                        const response = await fetch('/api/feedback/submit', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(form.value)
-                        });
+    function selectedType() {
+        const checked = form.querySelector('input[name="type"]:checked');
+        return checked ? checked.value : 'other';
+    }
 
-                        const resData = await response.json().catch(() => ({}));
-
-                        if (response.ok) {
-                            status.value = { show: true, success: true, message: '提交成功！非常感谢您的反馈。' };
-                            // 清空表单
-                            form.value.content = '';
-                            form.value.contact = '';
-                        } else {
-                            status.value = { show: true, success: false, message: resData.error || '提交失败，请稍后再试。' };
-                        }
-                    } catch (error) {
-                        status.value = { show: true, success: false, message: '网络请求异常，请检查连接。' };
-                    } finally {
-                        isSubmitting.value = false;
-                    }
-                };
-
-                return { types, form, isSubmitting, status, submit };
-            }
-        }).mount('#feedback-app');
+    contentEl.addEventListener('input', function () {
+        countEl.textContent = String(contentEl.value.length);
     });
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const content = contentEl.value.trim();
+        const contact = contactEl.value.trim();
+
+        if (!content) {
+            setStatus(false, '请填写详细描述内容哦！');
+            return;
+        }
+        if (content.length > MAX_CONTENT) {
+            setStatus(false, '描述内容不能超过500字。');
+            return;
+        }
+
+        hideStatus();
+        setSubmitting(true);
+
+        try {
+            const response = await fetch('/api/feedback/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({
+                    type: selectedType(),
+                    content: content,
+                    contact: contact,
+                }),
+            });
+
+            const resData = await response.json().catch(function () { return {}; });
+            const ok = response.ok && (resData.ok === true || resData.status === 'success');
+            const errMsg = resData.error || resData.message || '提交失败，请稍后再试。';
+
+            if (ok) {
+                setStatus(true, resData.message || '提交成功！非常感谢您的反馈。');
+                contentEl.value = '';
+                contactEl.value = '';
+                countEl.textContent = '0';
+            } else {
+                setStatus(false, errMsg);
+            }
+        } catch (err) {
+            setStatus(false, '网络请求异常，请检查连接。');
+        } finally {
+            setSubmitting(false);
+        }
+    });
+})();
 </script>
 {% endblock %}

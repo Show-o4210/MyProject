@@ -1,5 +1,7 @@
 # PVZH Mod 工具箱 (PVZ Heroes Mod Tools)
 
+**最后一次更新时间： 2026-7-9 3:52**
+
 这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心以及用户反馈等功能。
 
 该项目已针对 Render 免费套餐进行了优化部署配置（例如加入串行处理锁、内存清理与自唤醒逻辑）。
@@ -36,8 +38,10 @@ graph TD
     BP_Sender --> Logic_EA[logic_ea_api.py EA PopCap接口]
     BP_Buyer --> Logic_EA
     
-    %% 安全与数据库
-    BP_Feed --> DB[database.py Supabase客户端]
+    %% 反馈业务与数据库
+    BP_Feed --> Svc_Feed[services/feedback.py 反馈业务]
+    Svc_Feed --> DB[database.py Supabase客户端]
+    Svc_Feed --> Sec
     Sec --> DB
     
     %% 底层数据与公用工具
@@ -62,7 +66,7 @@ graph TD
 ```
 MyProject/
 ├── app.py                      # 应用主入口，注册蓝图，配置 Flask-APScheduler 定时自唤醒任务
-├── config.py                   # 全局配置类，加载环境变量，设置最大文件上传限制 (20MB)
+├── config.py                   # 全局配置类，加载环境变量，设置最大文件上传限制 (150MB)
 ├── database.py                 # Supabase 客户端懒加载封装，避免启动时强依赖
 ├── security.py                 # 安全拦截拦截器，提供黑名单 IP 封禁、提交接口的“影子封禁”、安全日志写入
 ├── extensions.py               # 限流扩展，使用 Flask-Limiter 对接口请求频率进行硬限制
@@ -73,7 +77,7 @@ MyProject/
 ├── blueprints/                 # 路由及蓝图实现目录
 │   ├── home.py                 # 首页及主导航路由，展示 news.json 中的公告和更新日志
 │   ├── downloads.py            # 下载中心，管理 downloads.json 中的 Mod 资源及下载计数跳转
-│   ├── feedback.py             # 意见反馈接口，将用户的设备信息及反馈内容存入 Supabase
+│   ├── feedback.py             # 意见反馈路由（薄层：HTTP 解析 / 限流 / 统一 JSON 响应）
 │   ├── deck_editor.py          # 卡组编辑器接口，支持前端初始化载入和自定义修改后的一键打包下载
 │   ├── level_editor.py         # 关卡编辑器接口，支持读取 AB 关卡配置列表、提取 JSON 以及回填打包
 │   ├── phantom.py              # 幻影卡牌工坊主页及 API
@@ -81,6 +85,10 @@ MyProject/
 │   ├── card_sender.py          # 卡牌发送 API，通过模拟 EA 协议直接向绑定账户注入全卡牌
 │   ├── pack_buyer.py           # 自定义卡包购买 API，支持在网页端购买指定的卡包 SKU (读取 name_id_cost.txt)
 │   └── unity.py                # 通用 Unity 包管理工具，支持在线对 Unity AB 包进行深入解析、解包和补丁回填
+├── services/                   # 业务服务层（与蓝图解耦的可复用逻辑）
+│   └── feedback.py             # 反馈校验、payload 组装、写入 Supabase feedbacks 表
+├── sql/                        # 数据库 schema / 运维脚本
+│   └── feedbacks.sql           # Supabase feedbacks 表重建脚本（含 RLS 与 GRANT）
 ├── data/                       # 核心静态数据与 Unity 底包目录
 │   ├── index.json              # 全站卡牌的基础映射索引 (GUID, UUID, NAME_CN, TEXTURE_NAME)
 │   ├── data_assets_36          # 官方关卡关配置底包 (Unity AssetBundle)
@@ -90,9 +98,7 @@ MyProject/
 │   ├── downloads.json          # 下载中心的 Mod 工具配置表
 │   ├── news.json               # 首页的通知和版本更新公告
 │   ├── name_id_cost.txt        # 官方卡包 SKU 及其钻石售价对照表
-│   ├── 笔记卡组名称.txt         # 英雄卡组与对应内部 ID 映射描述
-│   ├── card_data_1             # (无用历史数据，可清理) 历史卡牌数据
-│   └── card_data_1.json        # (无用历史数据，可清理) 历史卡牌 JSON 格式
+│   └── 笔记卡组名称.txt         # 英雄卡组与对应内部 ID 映射描述
 ├── static/                     # 前端静态资源目录 (CSS, JS, 图片, 幻影工坊资源)
 ├── templates/                  # Jinja2 模板目录
 │   ├── base.html               # 页面基类模板，包含顶部导航和全局依赖样式引入
@@ -103,7 +109,7 @@ MyProject/
 │   ├── card_sender.html        # 一键送卡交互页面
 │   ├── pack_buyer.html         # 在线买卡包交互页面
 │   ├── phantom.html            # 幻影工坊制作页面
-│   ├── feedback.html           # 意见反馈页面
+│   ├── feedback.html           # 意见反馈页面（原生 form + fetch，不依赖 Vue）
 │   └── download_detail.html    # 资源下载详情页面
 ├── utils/                      # 通用工具函数目录
 │   ├── card_index.py           # 统一读取 index.json 的卡牌信息，并转换为对应模块的专用格式
@@ -118,39 +124,89 @@ MyProject/
 ## 🛠️ 核心业务逻辑说明
 
 ### 1. Unity 资源回填与打包机制 (`logic_unity.py` / `logic_level_editor.py`)
+
 - **解包**：使用 `UnityPy.load()` 载入 AssetBundle 文件，提取 `MonoBehaviour` 或 `TextAsset` 的 typetree 信息。
-- **转换**：将 typetree 字典经过 [utils/json_clean.py](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/utils/json_clean.py) 转换为前端更易读取和展示的 JSON 格式。
+- **转换**：将 typetree 字典经过 `utils/json_clean.py` 转换为前端更易读取和展示的 JSON 格式。
 - **回填**：当用户修改数据并导出时，系统使用内存底包作为模板，替换更新 `CardGuid`、`NumCopies` 等参数后，调用 `obj.save_typetree()` 保存修改，最后以 `.zip` 压缩包或重构后的 `data_assets_36` 文件提供下载。
 
 ### 2. EA API 代理流程 (`logic_ea_api.py`)
+
 - **授权方式**：用户在网页端填写 `EADP-AUTH-TOKEN` 和 `EADP-PERSONA-ID`，系统无缝代理直接发包。
 - **发送逻辑**：构建带时间戳的伪造客户端请求头，向 PopCap 远程服务器的 `commitSoftPurchase` 接口发送对应的 `Sku`（例如购买卡包的 SKU 或发送特定全卡牌的 `deckRecipe` 协议包）。
 
 ### 3. 全局安全及日志审计 (`security.py`)
-- **流量限制**：接入 `Flask-Limiter` 限流策略，防止恶意的 API 扫描或频繁的邮件提交攻击。
-- **黑名单拦截**：在 `before_request` 钩子中，获取客户端 IP (兼容 Cloudflare 的 `CF-Connecting-IP` 与 `X-Forwarded-For`)，命中黑名单则直接予以 403 阻断或重定向至假 404 页面。
-- **影子封禁 (Shadow Ban)**：对于恶意留言/反馈，系统不进行硬拦截，而是返回 `{"ok": True, "message": "submitted"}` 的伪造成功响应，其实际内容不会写入 Supabase。
-- **记录审计**：触发高危动作的安全事件会自动上传至 Supabase `security_logs` 表，支持通过 `/security/stats` 统计路由（需 `X-Admin-Token`）进行后台审计。
+
+- **流量限制**：接入 `Flask-Limiter` 限流策略，防止恶意的 API 扫描或频繁提交攻击。
+- **真实访客 IP**：`get_visitor_info()` / `visitor_ip_key()` 统一解析 IP（优先 `CF-Connecting-IP`，其次 `X-Forwarded-For`，最后 `remote_addr`），反馈限流与安全拦截共用同一套 key，避免在 Render 反代后全站共享限流桶。
+- **黑名单拦截**：在 `before_request` 钩子中命中黑名单时，敏感接口 403、提交类接口影子封禁、普通页面伪装 404。
+- **影子封禁 (Shadow Ban)**：对恶意留言/反馈返回与正常成功一致的契约 `{"ok": true, "message": "提交成功"}`，实际不进入业务写入。
+- **记录审计**：高危事件写入 Supabase `security_logs`，可通过 `/security/stats`（Header：`X-Admin-Token`）查看当日抽样。
+
+### 4. 意见反馈模块 (`blueprints/feedback.py` + `services/feedback.py`)
+
+**路由**
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/feedback` | 反馈页 |
+| POST | `/api/feedback/submit` | 提交反馈（限流：每 IP **3 次/小时**） |
+
+**分层**
+
+- 蓝图：解析 JSON、限流、统一响应；不直接拼业务 payload。
+- `services/feedback.py`：类型白名单（`bug` / `feature` / `other`）、内容长度校验（内容 ≤500、联系方式 ≤100）、组装 `ua_info`、写入 `feedbacks` 表。
+
+**统一 API 契约**
+
+```json
+// 成功 200
+{ "ok": true, "message": "提交成功" }
+
+// 校验失败 400
+{ "ok": false, "error": "...", "code": "VALIDATION_ERROR" }
+
+// 写入失败 500
+{ "ok": false, "error": "服务器开小差了，请稍后再试", "code": "STORAGE_ERROR" }
+
+// 限流 429（extensions 全局 handler，含 error 字段）
+{ "ok": false, "error": "操作太频繁啦！...", "code": "RATE_LIMITED", ... }
+```
+
+**前端**：`templates/feedback.html` 使用原生 HTML form + `fetch`，不依赖 Vue CDN；按 `ok` / `error` / `message` 展示结果。
+
+**Supabase 建表**：在 Dashboard → SQL Editor 中执行仓库内 [`sql/feedbacks.sql`](sql/feedbacks.sql)（会 `DROP` 旧表后重建）。权限策略：
+
+- `anon` / `authenticated`：仅允许 ****INSERT**（`status` 必须为 `pending` 2026-7-9 3:52）**
+- 不对 anon 开放 **SELECT**，避免反馈列表被公开拉取
+- Dashboard / `service_role` 可完整管理
+
+表字段：`id`, `type`, `content`, `contact`, `ua_info` (jsonb), `status`, `created_at`。
+
+后端 `.env` 中 `SUPABASE_KEY` 使用 **anon key** 即可（与 INSERT 策略匹配）。
 
 ---
 
 ## 🚀 本地开发与快速启动
 
 ### 准备工作
+
 请确保本地已安装 Python 3.9+ 环境。
 
 1. **克隆或拷贝项目到本地**，打开命令行进入项目根目录：
+
    ```bash
    cd MyProject
    ```
 
 2. **安装项目所需依赖**：
+
    ```bash
    pip install -r requirements.txt
    ```
 
 3. **配置环境变量**：
-   在项目根目录下创建一个 `.env` 文件，并根据你的 Supabase 账户填写对应的配置：
+   在项目根目录下创建 `.env`（可参考 `.env.example`），填写 Supabase 等配置：
+
    ```ini
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_KEY=your-supabase-anon-key
@@ -162,13 +218,17 @@ MyProject/
    SECURITY_BLOCKED_IPS=1.2.3.4,5.6.7.8
    ```
 
-4. **启动服务**：
-   - 双击根目录下的 [开始.bat](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/%E5%BC%80%E5%A7%8B.bat)；
+4. **（首次 / 重建）初始化反馈表**：
+   在 Supabase SQL Editor 执行 `sql/feedbacks.sql`。会删除并重建 `public.feedbacks` 及 RLS；若有旧数据请先导出。
+
+5. **启动服务**：
+   - 双击根目录下的 `开始.bat`；
    - 或者使用命令行直接运行：
+
      ```bash
      python app.py
      ```
-   
+
    默认本地服务将运行在 `http://127.0.0.1:5001` 上。
 
 ---
@@ -178,13 +238,14 @@ MyProject/
 针对 **Render Free Tier (免费套餐)** 的限制，本项目在代码中加入了以下设计：
 
 1. **Unity 处理串行锁 (UNITY_TASK_LOCK)**：
-   在 [blueprints/unity.py](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/blueprints/unity.py) 中，大体积 AssetBundle 的并发解包可能直接打爆 512MB 的内存限额导致服务重启。因此引入了线程锁机制，当有任务在处理时，后续请求会被拦截并返回 `HTTP 429` 提示重试。
-   
+   在 `blueprints/unity.py` 中，大体积 AssetBundle 的并发解包可能直接打爆 512MB 的内存限额导致服务重启。因此引入了线程锁机制，当有任务在处理时，后续请求会被拦截并返回 `HTTP 429` 提示重试。
+
 2. **临时目录自动清理**：
    Unity 解包过程中产生的临时缓存会保存在临时目录中，系统在每次请求时会调用清理函数 `cleanup_old_temp`，主动删除创建时间超过 30 分钟的缓存垃圾，防范磁盘空间耗尽问题。
 
 3. **Render 专属 Web 启动命令 (建议使用 Gunicorn)**：
    在线上建议配置启动命令锁定单 worker 运行，避免多进程绕过内存锁：
+
    ```bash
    gunicorn --workers 1 --threads 2 --timeout 120 app:app
    ```
@@ -196,27 +257,42 @@ MyProject/
 为了使项目在线上（特别是 Render 512MB 内存限制的免费套餐下）更加稳定、高效，且保持一致的美观交互，我们进行了以下深度优化：
 
 ### 1. 🛡️ 统一并发锁控制 (`extensions.py` / `blueprints/`)
+
 * 将原本局部定义的 `UNITY_TASK_LOCK` 移至统一的 `extensions.py` 中。
-* 在卡组打包接口（`/api/quick_export`）以及关卡打包/提取接口（`/api/editor/ab/*`）中全数引入该串行处理锁，彻底杜绝了多模块并发调用 `UnityPy` 加载大包导致服务器发生 OOM 内存溢出崩溃。
+- 在卡组打包接口（`/api/quick_export`）以及关卡打包/提取接口（`/api/editor/ab/*`）中全数引入该串行处理锁，彻底杜绝了多模块并发调用 `UnityPy` 加载大包导致服务器发生 OOM 内存溢出崩溃。
 
 ### 2. 🗂️ 零碰撞动态临时工作区
+
 * 废弃了原先写死且易发生请求碰撞的 `out/data_assets_36` 静态路径，改用 Python `tempfile.mkdtemp()` 动态分配隔离工作区。
-* 利用 Flask 的 `after_this_request` 回调钩子，在打包好的 AB 压缩包成功 stream 下载给用户后，于后台安全、彻底地清理这些动态分配的临时缓存文件夹，实现了零磁盘残留和高并发安全。
+- 利用 Flask 的 `after_this_request` 回调钩子，在打包好的 AB 压缩包成功 stream 下载给用户后，于后台安全、彻底地清理这些动态分配的临时缓存文件夹，实现了零磁盘残留和高并发安全。
 
 ### 3. 🎨 界面母版化与统一化重构 (`deck_editor.html` / `phantom.html`)
+
 * **母版继承**：将原本作为独立单页开发的“卡组工坊 Pro”和“幻影卡牌工坊”全部重构并继承自 `base.html`，完美接入全站的主导航头和统一页脚。
-* **移动端响应式升级**：对“幻影工坊”在小屏幕下的排版进行了重构，隐藏了会与母版全站底栏发生 Z-Index 冲突的内置底栏，并将原先隐藏的左侧边栏 `.sidebar` 改造为**顶部可横向滑动的水平滚动导航条**，完美解决了移动端下的点击失效与重叠 Bug。
-* **数据字段纠偏**：完全还原了幻影工坊底层的 Vue 属性绑定，避免了因引用未定义变量导致的 `TypeError` 卡死，并纠正了后端接口参数命名偏差（如 `message` 与 `msg`）。
+- **移动端响应式升级**：对“幻影工坊”在小屏幕下的排版进行了重构，隐藏了会与母版全站底栏发生 Z-Index 冲突的内置底栏，并将原先隐藏的左侧边栏 `.sidebar` 改造为**顶部可横向滑动的水平滚动导航条**，完美解决了移动端下的点击失效与重叠 Bug。
+- **数据字段纠偏**：完全还原了幻影工坊底层的 Vue 属性绑定，避免了因引用未定义变量导致的 `TypeError` 卡死，并纠正了后端接口参数命名偏差（如 `message` 与 `msg`）。
 
 ### 4. ⚡ 数据加载缓存化 (`logic_unity.py`)
+
 * 对卡牌数据库解包得到的静态底包元数据应用了内存缓存技术（`_cached_extracted_data`），在单次进程生命周期内仅在首次加载时解析一次，此后刷新页面均能秒级响应。
 
 ### 5. 📦 大文件上传限制放宽 (`config.py`)
+
 * 将 `Config.MAX_CONTENT_LENGTH` 上限由 `20MB` 放宽至 `150MB`，从而完美兼容 100MB+ 体积的官方及第三方大型 Mod 关卡包的上传和处理。
 
 ### 6. 🌐 根除 favicon.ico 404 警告 (`base.html`)
+
 * 统一在 `base.html` 头部嵌入了基于高性能 SVG Data URL 格式的 **📦 网站 Favicon 图标**，不仅美化了浏览器标签页，还完美杜绝了控制台中的 404 资源缺失警告。
 
 ### 7. 🧹 物理清理无用历史资产
+
 * 彻底清除了 `data/` 下无引用的 `card_data_1` 原始底包文件和 `card_data_1.json` 废弃配置，为项目仓库减负约 10MB 空间。
 
+### 8. 💬 意见反馈模块重构（契约 / 分层 / Supabase 权限）
+
+* **分层**：路由迁至薄蓝图 + `services/feedback.py`，校验与写库与 HTTP 层解耦。
+- **契约统一**：成功 / 失败 / 限流 / 影子封禁均使用 `ok` + `error`/`message` 字段，前端不再出现“限流却显示通用失败”的错位。
+- **限流 key**：反馈接口使用 `visitor_ip_key()`，与安全模块真实 IP 一致。
+- **类型白名单**：仅接受 `bug` / `feature` / `other`；非法 JSON 用 `silent` 解析，返回 400 而非 500。
+- **前端降级**：反馈页改为原生 form + fetch，去掉对 Vue CDN 的强依赖，CDN 失败时页面仍可用。
+- **数据库**：提供 `sql/feedbacks.sql` 一键重建表结构、CHECK 约束、索引、RLS 与 GRANT（anon 仅 INSERT）。

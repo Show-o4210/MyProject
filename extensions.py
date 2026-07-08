@@ -20,16 +20,19 @@ def init_limiter(app):
     
     @app.errorhandler(TooManyRequests)
     def ratelimit_handler(e):
-        error_msg = f"操作太频繁啦！为了系统安全，请稍等后再试。"
-        
+        error_msg = "操作太频繁啦！为了系统安全，请稍等后再试。"
+
         if request.is_json or (request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html):
             return jsonify({
+                "ok": False,
+                "error": error_msg,
                 "status": "error",
                 "message": error_msg,
-                "retry_after": e.description if hasattr(e, 'description') else 60
+                "code": "RATE_LIMITED",
+                "retry_after": e.description if hasattr(e, "description") else 60,
             }), 429
-            
-        return render_template('error.html', msg=error_msg), 429
+
+        return render_template("error.html", msg=error_msg), 429
 
 import threading
 

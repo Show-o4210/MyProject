@@ -198,10 +198,10 @@ def transform_json_tree(tree, mode='expand', process_strategy='auto'):
 
 def guess_export_modes(type_name):
     if type_name in IMAGE_TYPES:
-        return ["png", "raw"]
+        return ["png"]
     if type_name in JSON_LIKE_TYPES or type_name in LIGHT_EDITABLE_TYPES:
-        return ["json", "csv", "raw"]
-    return ["raw"]
+        return ["json", "csv"]
+    return []
 
 
 def get_object_display_name(obj):
@@ -264,18 +264,18 @@ def inspect_env(env):
 
         if type_name in ["Texture2D", "Sprite"]:
             item["editable"] = True
-            item["export_modes"] = ["png", "raw"]
+            item["export_modes"] = ["png"]
 
         else:
             try:
                 tree = obj.read_typetree()
                 if tree:
                     item["editable"] = True
-                    item["export_modes"] = ["json", "csv", "raw"]
+                    item["export_modes"] = ["json", "csv"]
                 else:
-                    item["export_modes"] = ["raw"]
+                    item["export_modes"] = []
             except Exception:
-                item["export_modes"] = ["raw"]
+                item["export_modes"] = []
 
         objects.append(item)
 
@@ -502,36 +502,37 @@ def get_unpack_policy():
 
     selected_types = request.form.getlist('types')
     include_images = parse_bool_form('include_images', False)
-    fallback_raw = parse_bool_form('fallback_raw', False)
     include_index = parse_bool_form('include_index', True)
+
+    # RAW 导出入口已下线，统一走 JSON/CSV/PNG 安全通道
+    if target_format not in {'json', 'csv'}:
+        target_format = 'json'
 
     if preset == 'recommended':
         selected_types = DEFAULT_RECOMMENDED_TYPES
         target_format = 'json'
         include_images = False
-        fallback_raw = False
         include_index = True
     elif preset == 'patch':
         selected_types = DEFAULT_PATCH_TYPES
         target_format = 'json'
         include_images = False
-        fallback_raw = False
         include_index = True
     elif preset == 'images':
         selected_types = DEFAULT_IMAGE_TYPES
         target_format = 'json'
         include_images = True
-        fallback_raw = False
         include_index = True
     elif preset == 'advanced':
         if not selected_types:
             selected_types = DEFAULT_RECOMMENDED_TYPES
-    elif preset == 'raw':
-        target_format = 'raw'
-        fallback_raw = True
+    else:
+        # 兼容旧前端仍提交 raw 等未知 preset
+        preset = 'recommended'
+        selected_types = DEFAULT_RECOMMENDED_TYPES
+        target_format = 'json'
+        include_images = False
         include_index = True
-        if not selected_types:
-            selected_types = ['__all__']
 
     return {
         "preset": preset,
@@ -539,7 +540,6 @@ def get_unpack_policy():
         "process_mode": process_mode,
         "selected_types": selected_types,
         "include_images": include_images,
-        "fallback_raw": fallback_raw,
         "include_index": include_index,
     }
 
@@ -560,13 +560,6 @@ def export_image_object(obj, zf, workdir, index_data):
     image_path = os.path.join(workdir, f"image_{obj.path_id}.png")
     data.image.save(image_path, 'PNG')
     zf.write(image_path, file_name)
-    index_data[str(obj.path_id)] = file_name
-
-
-def export_raw_object(obj, zf, index_data):
-    raw_data = obj.get_raw_data()
-    file_name = f"Raw/{obj.type.name}_{obj.path_id}.dat"
-    zf.writestr(file_name, raw_data)
     index_data[str(obj.path_id)] = file_name
 
 
@@ -675,34 +668,17 @@ def unpack():
                         if policy["include_images"]:
                             export_image_object(obj, zf, workdir, index_data)
                             exported_count += 1
-                        elif policy["target_format"] == 'raw':
-                            export_raw_object(obj, zf, index_data)
-                            exported_count += 1
                         else:
                             skipped_count += 1
                         continue
 
-                    if policy["target_format"] == 'raw':
-                        export_raw_object(obj, zf, index_data)
-                        exported_count += 1
-                        continue
-
                     if export_typetree_object(obj, zf, index_data, policy):
-                        exported_count += 1
-                    elif policy["fallback_raw"]:
-                        export_raw_object(obj, zf, index_data)
                         exported_count += 1
                     else:
                         skipped_count += 1
 
                 except Exception:
                     failed_count += 1
-                    if policy["fallback_raw"]:
-                        try:
-                            export_raw_object(obj, zf, index_data)
-                            exported_count += 1
-                        except Exception:
-                            pass
 
             if policy["include_index"]:
                 zf.writestr("_index.json", json.dumps(index_data, indent=4, ensure_ascii=False))
@@ -712,7 +688,6 @@ def unpack():
                 "format": policy["target_format"],
                 "selected_types": policy["selected_types"],
                 "include_images": policy["include_images"],
-                "fallback_raw": policy["fallback_raw"],
                 "exported_count": exported_count,
                 "skipped_count": skipped_count,
                 "failed_count": failed_count
@@ -720,7 +695,7 @@ def unpack():
 
         if exported_count == 0:
             shutil.rmtree(workdir, ignore_errors=True)
-            return render_template('error.html', msg="没有导出任何对象。请切换为高级自定义，选择更多对象类型，或开启 RAW 兜底。"), 400
+            return render_template('error.html', msg="没有导出任何对象。请切换为高级自定义，或选择更多对象类型。"), 400
 
         register_cleanup(workdir)
         return send_file(
@@ -816,20 +791,21 @@ def repack():
         env = UnityPy.load(orig_path)
 
         with zipfile.ZipFile(zip_path, 'r') as zf:
-            # 正式合成前使用完整预检，避免快速预检漏掉损坏 JSON / PNG。
-            validate_report = validate_patch_against_bundle(
-                env,
-                zf,
-                process_mode=process_mode,
-                validate_level='full',
-                repack_mode=repack_mode
-            )
+            # 预检改为可选手动：仅当前端显式要求时才阻断；默认直接尝试回填。
+            if parse_bool_form('require_validate', False):
+                validate_report = validate_patch_against_bundle(
+                    env,
+                    zf,
+                    process_mode=process_mode,
+                    validate_level='full',
+                    repack_mode=repack_mode
+                )
 
-            if not validate_report["ok"]:
-                return render_template(
-                    'error.html',
-                    msg=f"预检未通过，已中止打包。错误数：{validate_report['summary']['errors']}。请先回到页面执行完整预检查看详情。"
-                ), 400
+                if not validate_report["ok"]:
+                    return render_template(
+                        'error.html',
+                        msg=f"预检未通过，已中止打包。错误数：{validate_report['summary']['errors']}。请先回到页面执行预检查看详情。"
+                    ), 400
 
             zip_file_map, fallback_map, index_data, _ = build_zip_patch_maps(zf)
             modified_files_count = 0

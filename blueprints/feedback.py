@@ -2,53 +2,37 @@ import logging
 
 from flask import Blueprint, request, jsonify, render_template
 
-from database import get_supabase
 from extensions import limiter
-from security import get_visitor_info
+from security import visitor_ip_key
+from services.feedback import (
+    create_feedback,
+    FeedbackValidationError,
+    FeedbackStorageError,
+)
 
-feedback_bp = Blueprint('feedback', __name__)
+feedback_bp = Blueprint("feedback", __name__)
+logger = logging.getLogger(__name__)
 
 
-@feedback_bp.route('/feedback')
+@feedback_bp.route("/feedback")
 def feedback_page():
-    return render_template('feedback.html')
+    return render_template("feedback.html")
 
 
-@feedback_bp.route('/api/feedback/submit', methods=['POST'])
-@limiter.limit("3 per hour")
+@feedback_bp.route("/api/feedback/submit", methods=["POST"])
+@limiter.limit("3 per hour", key_func=visitor_ip_key)
 def submit_feedback():
-    data = request.get_json()
-
-    if not data:
-        return jsonify({'error': '请求体不能为空'}), 400
-
-    fb_type = data.get('type', 'other')
-    content = data.get('content', '').strip()
-    contact = data.get('contact', '').strip()
-
-    if not content:
-        return jsonify({'error': '反馈内容不能为空'}), 400
-    if len(content) > 500:
-        return jsonify({'error': '反馈内容不能超过500字'}), 400
-    if len(contact) > 100:
-        return jsonify({'error': '联系方式过长'}), 400
-
-    client_ip, user_agent = get_visitor_info()
-
-    payload = {
-        'type': fb_type,
-        'content': content,
-        'contact': contact,
-        'ua_info': {
-            'user_agent': user_agent,
-            'ip': client_ip,
-        },
-        'status': 'pending',
-    }
+    data = request.get_json(silent=True)
 
     try:
-        get_supabase().table('feedbacks').insert(payload).execute()
-        return jsonify({'message': '提交成功', 'status': 'success'}), 200
+        create_feedback(data)
+        return jsonify({"ok": True, "message": "提交成功"}), 200
+    except FeedbackValidationError as e:
+        return jsonify({"ok": False, "error": e.message, "code": "VALIDATION_ERROR"}), 400
+    except FeedbackStorageError as e:
+        return jsonify({"ok": False, "error": e.message, "code": "STORAGE_ERROR"}), 500
     except Exception as e:
-        logging.error(f"意见反馈写入数据库失败: {str(e)}")
-        return jsonify({'error': '服务器开小差了，请稍后再试'}), 500
+        logger.error("意见反馈未预期异常: %s: %s", type(e).__name__, e)
+        return jsonify(
+            {"ok": False, "error": "服务器开小差了，请稍后再试", "code": "INTERNAL_ERROR"}
+        ), 500

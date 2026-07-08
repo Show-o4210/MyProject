@@ -134,6 +134,15 @@ def get_visitor_info():
     return ip, user_agent
 
 
+def visitor_ip_key():
+    """
+    Flask-Limiter 用的 key：与 get_visitor_info 同一套真实访客 IP。
+    避免在 Render / 反向代理后所有人共享 remote_addr。
+    """
+    ip, _ = get_visitor_info()
+    return ip or "unknown"
+
+
 def detect_suspicious_ua(user_agent):
     """UA 只作为辅助检测，不作为单独封禁依据。"""
     for key, config in SUSPICIOUS_UA_PATTERNS.items():
@@ -192,11 +201,11 @@ def log_security_event(ip, user_agent, reason, severity="medium", blocked=True):
 def fake_success_response():
     """
     影子封禁响应：让对方以为提交成功。
-    前端如果期望 ok:true，这里通常不会报错。
+    与正常反馈成功契约对齐：{ ok: true, message: "..." }
     """
     return make_response(jsonify({
         "ok": True,
-        "message": "submitted"
+        "message": "提交成功"
     }), 200)
 
 

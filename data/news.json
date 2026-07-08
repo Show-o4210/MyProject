@@ -3,26 +3,41 @@
         {
             "id": 1,
             "title": "工具免费开放 · 欢迎支持维护",
-            "version": "3.2",
-            "updated_at": "2026-06-29",
+            "version": "3.3",
+            "updated_at": "2026-07-09",
             "content": "本项目由个人业余时间维护，部署在 Render 免费实例上，核心功能不会上付费墙。若工具帮到了你，欢迎关注作者 B 站（导航栏可直达）或在首页扫码支持。\n\n注意：长时间不访问后首次唤醒可能有 30–50 秒延迟。有 Bug 或好点子欢迎走反馈中心！",
             "type": "important"
         }
     ],
     "changelogs": [
         {
-            "date": "2026-06-29",
+            "date": "2026-07-09",
             "tag": "最新",
+            "title": "反馈中心重构 & 工具链路精简",
+            "details": [
+                "重构意见反馈：统一成功/失败/限流 API 契约，前后端错误提示对齐",
+                "反馈业务抽到 <code>services/feedback.py</code>，路由变薄；类型白名单 + 真实访客 IP 限流",
+                "反馈页改为原生表单提交，不再强依赖 Vue CDN；影子封禁响应与正常成功一致",
+                "提供 <code>sql/feedbacks.sql</code>，可在 Supabase 一键重建表结构、RLS 与 INSERT-only 权限",
+                "Unity 工具下线 RAW 导出通道，统一走 JSON / CSV / PNG 安全路径，降低误用与内存风险",
+                "卡组工坊简化分享/导入入口，突出浏览器暂存与一键打包下载",
+                "同步更新 README：架构图、目录说明与反馈模块文档"
+            ],
+            "is_expanded": true
+        },
+        {
+            "date": "2026-06-29",
+            "tag": "重构",
             "title": "工程大重构 & 运营更新",
             "details": [
                 "清理全部废弃代码（旧登录/论坛/幻影 AB 封包等），项目结构大幅瘦身",
                 "提取 EA API、JSON 清洗、Phantom 工具函数等共享模块，减少重复逻辑",
                 "修复 Phantom 配置 API、卡包购买鉴权、Supabase 懒加载等启动与运行时问题",
                 "卡牌索引统一为 <code>data/index.json</code>，卡组工坊 / 关卡编辑器 / 幻影工坊共用一份数据",
-                "完善项目文档 <code>结构.md</code>，与当前代码结构对齐",
+                "完善项目文档，与当前代码结构对齐",
                 "新增赞助提示弹窗（可勾选「不再提醒」），首页补充 B 站关注入口"
             ],
-            "is_expanded": true
+            "is_expanded": false
         },
         {
             "date": "2026-06-28",
@@ -41,7 +56,7 @@
             "details": [
                 "修复了登录限制没完全移除的bug"
             ],
-            "is_expanded": true
+            "is_expanded": false
         },
         {
             "date": "2026-06-06",
@@ -52,7 +67,7 @@
                 "对一些反馈内容进行优化",
                 "对主页GUI进行调整"
             ],
-            "is_expanded": true
+            "is_expanded": false
         },
         {
             "date": "2026-06-03",
@@ -62,7 +77,7 @@
                 "加入了幻影引擎",
                 "对一些反馈内容进行优化"
             ],
-            "is_expanded": true
+            "is_expanded": false
         },
         {
             "date": "2026-05-26",
@@ -104,7 +119,6 @@
             "title": "增加了幻影引擎",
             "details": [
                 "目前仍然是开发阶段，功能性几乎为0"
-                
             ],
             "is_expanded": false
         },
@@ -115,7 +129,6 @@
             "details": [
                 "unity工具会更适配手机",
                 "登录现在更舒服了"
-                
             ],
             "is_expanded": false
         },
@@ -125,7 +138,6 @@
             "title": "下载中心上线",
             "details": [
                 "增加了下载中心，提供工具和资源的下载链接"
-                
             ],
             "is_expanded": false
         },
