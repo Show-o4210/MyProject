@@ -5,36 +5,139 @@
 {% block content %}
 <div id="lobby-app" class="px-4 sm:px-6 lg:px-8 py-8 md:py-12" v-cloak>
 
+    <style>
+        /* 针对移动端竖屏（Portrait）的深度视觉优化 */
+        @media (max-width: 640px) and (orientation: portrait) {
+            #lobby-app {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+                padding-top: 1rem !important;
+                padding-bottom: 1.5rem !important;
+            }
+
+            /* 辅助工具网格由 2 列调整为 1 列，并转换为精致的横向扁平卡片 */
+            .tool-grid {
+                grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+                gap: 0.5rem !important;
+            }
+            .tool-grid a {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                gap: 0.75rem !important;
+                padding: 0.75rem !important;
+                border-radius: 1rem !important;
+            }
+            .tool-grid a > div:first-child {
+                margin-bottom: 0 !important;
+                flex-shrink: 0 !important;
+                width: 2.25rem !important;
+                height: 2.25rem !important;
+                border-radius: 0.75rem !important;
+            }
+            .tool-grid a > div:first-child span {
+                font-size: 1.25rem !important;
+            }
+            .tool-info {
+                text-align: left !important;
+            }
+            .tool-info h3 {
+                margin-bottom: 0.125rem !important;
+                font-size: 0.875rem !important;
+            }
+            .tool-info p {
+                font-size: 0.75rem !important;
+                line-height: 1.05rem !important;
+            }
+
+            /* 赞赏卡片布局优化：图文横向并排，大幅度压缩纵向空间 */
+            .sponsor-card {
+                border-radius: 1.5rem !important;
+                padding: 1.25rem !important;
+            }
+            .sponsor-card .sponsor-header {
+                margin-bottom: 0.75rem !important;
+            }
+            .sponsor-card .sponsor-body {
+                flex-direction: row !important;
+                align-items: center !important;
+                gap: 1rem !important;
+            }
+            .sponsor-card .sponsor-info {
+                flex: 1 !important;
+            }
+            .sponsor-card .sponsor-info p {
+                margin-bottom: 0.75rem !important;
+                font-size: 0.75rem !important;
+                line-height: 1.1rem !important;
+            }
+            .sponsor-card .sponsor-btn {
+                padding: 0.5rem 0.75rem !important;
+                font-size: 0.75rem !important;
+                border-radius: 0.75rem !important;
+            }
+            .sponsor-card .qrcode-container {
+                width: 6.25rem !important;
+                height: 6.25rem !important;
+                padding: 0.375rem !important;
+                margin: 0 !important;
+                flex-shrink: 0 !important;
+                border-radius: 0.75rem !important;
+            }
+            .sponsor-card .qrcode-img {
+                width: 5.5rem !important;
+                height: 5.5rem !important;
+                border-radius: 0.5rem !important;
+            }
+
+            /* 更新日志卡片紧凑排版 */
+            .log-list-container {
+                gap: 0.625rem !important;
+            }
+            .log-card {
+                padding: 0.875rem !important;
+                border-radius: 1.25rem !important;
+            }
+            .log-card h3 {
+                font-size: 0.875rem !important;
+            }
+            .log-card .log-details-list {
+                padding: 0.75rem !important;
+                border-radius: 0.75rem !important;
+                font-size: 0.75rem !important;
+            }
+        }
+    </style>
     {% raw %}
-    <section v-if="announcements.length" class="mb-8 md:mb-10">
+    <section v-if="announcements.length" class="mb-4 md:mb-10">
         <div class="flex flex-wrap gap-4">
             <div v-for="ann in announcements" :key="ann.id"
-                class="flex-1 min-w-[280px] bg-white/90 backdrop-blur-sm rounded-3xl p-5 md:p-6 border border-brand-100/80 shadow-soft relative overflow-hidden group hover:shadow-soft-lg hover:border-brand-200 transition-all duration-300">
-                <div class="absolute -right-8 -top-8 opacity-[0.07] pointer-events-none text-brand-600 group-hover:opacity-[0.12] transition-opacity">
+                class="announcement-card flex-1 min-w-[280px] bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-3xl p-4 md:p-6 border border-brand-100/80 shadow-soft relative overflow-hidden group hover:shadow-soft-lg hover:border-brand-200 transition-all duration-300">
+                <div class="hidden md:block absolute -right-8 -top-8 opacity-[0.07] pointer-events-none text-brand-600 group-hover:opacity-[0.12] transition-opacity">
                     <span class="material-symbols-rounded text-[9rem]">campaign</span>
                 </div>
 
                 <div class="relative z-10">
-                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-50 text-brand-700 text-[11px] font-bold mb-3 border border-brand-100">
-                        <span class="material-symbols-rounded text-[14px]">campaign</span>
+                    <div class="inline-flex items-center gap-1.5 px-2 py-0.5 md:px-2.5 md:py-1 rounded-full bg-brand-50 text-brand-700 text-[10px] md:text-[11px] font-bold mb-2 md:mb-3 border border-brand-100">
+                        <span class="material-symbols-rounded text-[12px] md:text-[14px]">campaign</span>
                         公告
                     </div>
 
-                    <div class="flex items-center gap-2 text-[10px] text-slate-400 font-mono mb-2">
-                        <span v-if="ann.version" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">
+                    <div class="flex items-center gap-2 text-[9px] md:text-[10px] text-slate-400 font-mono mb-1.5 md:mb-2">
+                        <span v-if="ann.version" class="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">
                             v{{ ann.version }}
                         </span>
                         <span v-if="ann.updated_at" class="flex items-center gap-1">
-                            <span class="material-symbols-rounded text-[12px]">schedule</span>
+                            <span class="material-symbols-rounded text-[10px] md:text-[12px]">schedule</span>
                             {{ ann.updated_at }}
                         </span>
                     </div>
 
-                    <h2 class="text-base md:text-lg font-extrabold text-slate-900 mb-2 tracking-tight">
+                    <h2 class="text-sm md:text-lg font-extrabold text-slate-900 mb-1 md:mb-2 tracking-tight">
                         {{ ann.title }}
                     </h2>
 
-                    <p class="text-sm leading-relaxed text-slate-500 whitespace-pre-wrap">
+                    <p class="text-xs md:text-sm leading-relaxed text-slate-500 whitespace-pre-wrap">
                         {{ ann.content }}
                     </p>
                 </div>
@@ -43,34 +146,43 @@
     </section>
     {% endraw %}
 
-    <section class="mb-10 md:mb-12">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
-            <a href="/unity" class="group lg:col-span-8 rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white shadow-soft-lg overflow-hidden relative border border-slate-700/50 hover:shadow-glow hover:-translate-y-1 transition-all duration-300">
+    <section class="mb-6 md:mb-12">
+        <div class="grid grid-cols-2 md:grid-cols-12 gap-4 md:gap-6">
+            <a href="/unity" class="group bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white rounded-2xl md:rounded-[2rem] border border-slate-700/50 p-4 md:p-10 lg:p-12 md:min-h-[320px] md:col-span-8 flex flex-col justify-between hover:shadow-glow hover:-translate-y-1 transition-all duration-300">
                 <div class="absolute inset-0 pointer-events-none">
                     <div class="absolute -top-20 -right-20 w-72 h-72 bg-brand-500/25 rounded-full blur-3xl group-hover:bg-brand-500/35 transition-colors duration-500"></div>
                     <div class="absolute -bottom-20 -left-20 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl"></div>
-                    <div class="absolute right-6 bottom-6 opacity-[0.08] group-hover:opacity-[0.15] transition-opacity duration-300">
+                    <div class="hidden md:block absolute right-6 bottom-6 opacity-[0.08] group-hover:opacity-[0.15] transition-opacity duration-300">
                         <span class="material-symbols-rounded text-[140px]">inventory_2</span>
                     </div>
                 </div>
 
-                <div class="relative z-10 p-6 md:p-10 lg:p-12 min-h-[280px] md:min-h-[320px] flex flex-col justify-between">
+                <div class="relative z-10 flex flex-col justify-between h-full">
                     <div>
-                        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-brand-100 text-xs font-bold mb-5 border border-white/10 backdrop-blur-md">
+                        <!-- Mobile Icon wrapper -->
+                        <div class="md:hidden w-10 h-10 rounded-xl bg-white/10 text-brand-100 flex items-center justify-center mb-2.5">
+                            <span class="material-symbols-rounded text-[22px]">inventory_2</span>
+                        </div>
+
+                        <!-- Desktop Badge -->
+                        <div class="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-brand-100 text-xs font-bold mb-5 border border-white/10 backdrop-blur-md">
                             <span class="material-symbols-rounded text-[15px]">bolt</span>
                             主功能 · Universal AssetBundle Tool
                         </div>
 
-                        <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-4 leading-[1.1]">
+                        <h1 class="text-base md:text-5xl font-extrabold tracking-tight mb-1 md:mb-4 leading-[1.1]">
                             AB 工作台
                         </h1>
 
-                        <p class="text-sm md:text-base text-slate-300/90 leading-relaxed max-w-xl">
+                        <p class="hidden md:block text-sm md:text-base text-slate-300/90 leading-relaxed max-w-xl">
                             通用 AssetBundle 检查、解包、预检与回填工具。面向资源分析、JSON/RAW/PNG 导出、轻量回填与 Mod 数据验证的核心工作台。
+                        </p>
+                        <p class="md:hidden text-[11px] text-slate-400 leading-normal">
+                            AB包提取、解包与回填验证。
                         </p>
                     </div>
 
-                    <div class="mt-8 flex flex-wrap gap-2">
+                    <div class="hidden md:flex mt-8 flex-wrap gap-2">
                         <span class="px-3 py-1.5 rounded-full bg-white/8 border border-white/10 text-xs font-semibold text-slate-300 backdrop-blur-sm">Bundle Inspect</span>
                         <span class="px-3 py-1.5 rounded-full bg-white/8 border border-white/10 text-xs font-semibold text-slate-300 backdrop-blur-sm">Unpack</span>
                         <span class="px-3 py-1.5 rounded-full bg-white/8 border border-white/10 text-xs font-semibold text-slate-300 backdrop-blur-sm">Validate</span>
@@ -79,15 +191,16 @@
                 </div>
             </a>
 
-            <a href="/phantom" class="group lg:col-span-4 bg-white/90 backdrop-blur-sm rounded-[2rem] border border-slate-200/80 p-6 md:p-8 shadow-soft hover:shadow-soft-lg hover:border-brand-200 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between min-h-[280px] md:min-h-0">
+            <a href="/phantom" class="group bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-[2rem] border border-slate-200/80 p-4 md:p-8 shadow-soft hover:shadow-soft-lg hover:border-brand-200 hover:-translate-y-1 transition-all duration-300 md:col-span-4 flex flex-col justify-between md:min-h-0">
                 <div>
-                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center mb-5 group-hover:from-brand-600 group-hover:to-brand-700 group-hover:text-white group-hover:shadow-glow transition-all duration-300">
-                        <span class="material-symbols-rounded text-[26px]">auto_fix_high</span>
+                    <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center mb-2.5 md:mb-5 group-hover:from-brand-600 group-hover:to-brand-700 group-hover:text-white group-hover:shadow-glow transition-all duration-300">
+                        <span class="material-symbols-rounded text-[22px] md:text-[26px]">auto_fix_high</span>
                     </div>
-                    <h2 class="text-xl md:text-2xl font-extrabold text-slate-900 mb-2 tracking-tight">幻影引擎</h2>
-                    <p class="text-sm text-slate-500 leading-relaxed">卡牌数据编辑、技能结构树、JSON 保留与 card_data 注入。</p>
+                    <h2 class="text-base md:text-2xl font-extrabold text-slate-900 mb-1 md:mb-2 tracking-tight">幻影引擎</h2>
+                    <p class="hidden md:block text-sm text-slate-500 leading-relaxed">卡牌数据编辑、技能结构树、JSON 保留与 card_data 注入。</p>
+                    <p class="md:hidden text-[11px] text-slate-500 leading-normal">数据编辑与 JSON 注入。</p>
                 </div>
-                <div class="mt-6 inline-flex items-center text-sm font-bold text-brand-600 group-hover:gap-2 transition-all">
+                <div class="hidden md:inline-flex mt-6 items-center text-sm font-bold text-brand-600 group-hover:gap-2 transition-all">
                     进入编辑器
                     <span class="material-symbols-rounded text-[18px] ml-1 group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
                 </div>
@@ -114,60 +227,72 @@
                     </a>
                 </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+                <div class="tool-grid grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
                     <a href="/deck-editor" class="group bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-3xl border border-slate-200/80 p-4 md:p-5 shadow-soft hover:shadow-soft-lg hover:border-brand-200 transition-all duration-300 hover:-translate-y-0.5">
                         <div class="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3 md:mb-4 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow transition-all duration-300">
                             <span class="material-symbols-rounded text-[22px]">style</span>
                         </div>
-                        <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">卡组编辑器</h3>
-                        <p class="text-xs text-slate-500 leading-relaxed">编辑卡组配置并生成可用数据。</p>
+                        <div class="tool-info">
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">卡组编辑器</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">编辑卡组配置并生成可用数据。</p>
+                        </div>
                     </a>
 
                     <a href="/card-sender" class="group bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-3xl border border-slate-200/80 p-4 md:p-5 shadow-soft hover:shadow-soft-lg hover:border-brand-200 transition-all duration-300 hover:-translate-y-0.5">
                         <div class="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3 md:mb-4 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow transition-all duration-300">
                             <span class="material-symbols-rounded text-[22px]">send</span>
                         </div>
-                        <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">卡牌发送器</h3>
-                        <p class="text-xs text-slate-500 leading-relaxed">按账号与数量批量发送卡牌。</p>
+                        <div class="tool-info">
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">卡牌发送器</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">按账号与数量批量发送卡牌。</p>
+                        </div>
                     </a>
 
                     <a href="/pack-buyer" class="group bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-3xl border border-slate-200/80 p-4 md:p-5 shadow-soft hover:shadow-soft-lg hover:border-brand-200 transition-all duration-300 hover:-translate-y-0.5">
                         <div class="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3 md:mb-4 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow transition-all duration-300">
                             <span class="material-symbols-rounded text-[22px]">shopping_cart</span>
                         </div>
-                        <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">卡包购买器</h3>
-                        <p class="text-xs text-slate-500 leading-relaxed">浏览并执行卡包购买操作。</p>
+                        <div class="tool-info">
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">卡包购买器</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">浏览并执行卡包购买操作。</p>
+                        </div>
                     </a>
 
                     <a href="/downloads" class="group bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-3xl border border-slate-200/80 p-4 md:p-5 shadow-soft hover:shadow-soft-lg hover:border-brand-200 transition-all duration-300 hover:-translate-y-0.5">
                         <div class="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3 md:mb-4 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow transition-all duration-300">
                             <span class="material-symbols-rounded text-[22px]">download</span>
                         </div>
-                        <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">下载中心</h3>
-                        <p class="text-xs text-slate-500 leading-relaxed">集中下载工具、补丁与参考文件。</p>
+                        <div class="tool-info">
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">下载中心</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">集中下载工具、补丁与参考文件。</p>
+                        </div>
                     </a>
 
                     <a href="/editor" class="group bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-3xl border border-slate-200/80 p-4 md:p-5 shadow-soft hover:shadow-soft-lg hover:border-brand-200 transition-all duration-300 hover:-translate-y-0.5">
                         <div class="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3 md:mb-4 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow transition-all duration-300">
                             <span class="material-symbols-rounded text-[22px]">dashboard_customize</span>
                         </div>
-                        <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">关卡编辑器</h3>
-                        <p class="text-xs text-slate-500 leading-relaxed">提取修改 AB 包，自定义人机与场景事件。</p>
+                        <div class="tool-info">
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">关卡编辑器</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">提取修改 AB 包，自定义人机与场景事件。</p>
+                        </div>
                     </a>
 
                     <a href="/feedback" class="group bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-3xl border border-slate-200/80 p-4 md:p-5 shadow-soft hover:shadow-soft-lg hover:border-brand-200 transition-all duration-300 hover:-translate-y-0.5">
                         <div class="w-10 h-10 md:w-11 md:h-11 rounded-xl md:rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3 md:mb-4 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow transition-all duration-300">
                             <span class="material-symbols-rounded text-[22px]">forum</span>
                         </div>
-                        <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">反馈中心</h3>
-                        <p class="text-xs text-slate-500 leading-relaxed">提交 Bug、建议和测试结果。</p>
+                        <div class="tool-info">
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">反馈中心</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">提交 Bug、建议和测试结果。</p>
+                        </div>
                     </a>
                 </div>
             </div>
 
             <aside class="lg:col-span-4">
-                <div class="bg-white/90 backdrop-blur-sm rounded-3xl p-5 md:p-6 border border-slate-200/80 shadow-soft hover:shadow-soft-lg hover:border-amber-200 hover:-translate-y-0.5 transition-all duration-300 h-full group">
-                    <div class="flex items-center gap-3 mb-5">
+                <div class="sponsor-card bg-white/90 backdrop-blur-sm rounded-3xl p-5 md:p-6 border border-slate-200/80 shadow-soft hover:shadow-soft-lg hover:border-amber-200 hover:-translate-y-0.5 transition-all duration-300 h-full group">
+                    <div class="sponsor-header flex items-center gap-3 mb-5">
                         <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 text-amber-600 flex items-center justify-center group-hover:from-amber-500 group-hover:to-orange-500 group-hover:text-white transition-all duration-300">
                             <span class="material-symbols-rounded text-[22px]">coffee</span>
                         </div>
@@ -176,21 +301,22 @@
                         </div>
                     </div>
 
-                    <p class="text-xs text-slate-500 leading-relaxed mb-4">
-                        工具免费开放，扫码或关注 B 站都是对维护的支持。未来赞助用户会优先体验到更稳定、更顺手的版本。
-                    </p>
-
-                    <div class="flex flex-col items-center gap-4">
-                        <div class="relative rounded-2xl p-3 bg-gradient-to-br from-amber-50 to-rose-50 border border-amber-100/60 group-hover:scale-[1.02] transition-transform duration-300">
+                    <div class="sponsor-body flex flex-col gap-4">
+                        <div class="sponsor-info">
+                            <p class="text-xs text-slate-500 leading-relaxed mb-4">
+                                工具免费开放，扫码或关注 B 站都是对维护的支持。未来赞助用户会优先体验到更稳定、更顺手的版本。
+                            </p>
+                            <a href="https://space.bilibili.com/1578548705" target="_blank" rel="noopener noreferrer"
+                               class="sponsor-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-[#00a1d6] hover:bg-[#0090c0] shadow-soft transition-all active:scale-[0.98] w-full justify-center">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.172 2.757L10.414 6h3.171l3.243-3.243a1 1 0 0 1 1.414 1.414L14.586 7H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3.414L5.757 4.172A1 1 0 0 1 7.172 2.757zM6 9v10h12V9H6zm2.5 2.5a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1zm7 0a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1z"/></svg>
+                                关注作者 B 站
+                            </a>
+                        </div>
+                        <div class="qrcode-container relative rounded-2xl p-3 bg-gradient-to-br from-amber-50 to-rose-50 border border-amber-100/60 group-hover:scale-[1.02] transition-transform duration-300 self-center">
                             <img src="{{ url_for('static', filename='images/index/thank.png') }}"
                                 alt="赞赏码"
-                                class="w-44 h-44 md:w-48 md:h-48 object-contain rounded-xl bg-white shadow-soft">
+                                class="qrcode-img w-44 h-44 md:w-48 md:h-48 object-contain rounded-xl bg-white shadow-soft">
                         </div>
-                        <a href="https://space.bilibili.com/1578548705" target="_blank" rel="noopener noreferrer"
-                           class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-[#00a1d6] hover:bg-[#0090c0] shadow-soft transition-all active:scale-[0.98] w-full justify-center">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.172 2.757L10.414 6h3.171l3.243-3.243a1 1 0 0 1 1.414 1.414L14.586 7H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3.414L5.757 4.172A1 1 0 0 1 7.172 2.757zM6 9v10h12V9H6zm2.5 2.5a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1zm7 0a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1z"/></svg>
-                            关注作者 B 站
-                        </a>
                     </div>
                 </div>
             </aside>
@@ -217,9 +343,9 @@
             </button>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div class="log-list-container grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             <div v-for="(log, index) in displayLogs" :key="index"
-                 class="bg-white/90 backdrop-blur-sm rounded-3xl p-5 border border-slate-200/80 shadow-soft hover:shadow-soft-lg hover:border-slate-300 transition-all duration-300">
+                 class="log-card bg-white/90 backdrop-blur-sm rounded-3xl p-5 border border-slate-200/80 shadow-soft hover:shadow-soft-lg hover:border-slate-300 transition-all duration-300">
                 <div class="flex items-start justify-between gap-3 mb-1 cursor-pointer group" @click="log.is_expanded = !log.is_expanded">
                     <div>
                         <div class="text-[11px] font-bold mb-1.5" :class="log.tag === '最新' ? 'text-brand-600' : 'text-slate-400'">
@@ -236,7 +362,7 @@
                 </div>
 
                 <div v-show="log.is_expanded" class="mt-3 overflow-hidden">
-                    <ul class="text-xs text-slate-500 space-y-1.5 list-disc list-inside bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                    <ul class="log-details-list text-xs text-slate-500 space-y-1.5 list-disc list-inside bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
                         <li v-for="detail in log.details" :key="detail" v-html="detail"></li>
                     </ul>
                 </div>

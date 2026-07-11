@@ -1,8 +1,8 @@
 # PVZH Mod 工具箱 (PVZ Heroes Mod Tools)
 
-**最后一次更新时间： 2026-7-9 3:52**
+**最后一次更新时间： 2026-7-12**
 
-这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心以及用户反馈等功能。
+这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心（分区 + 作品包）以及用户反馈等功能。
 
 该项目已针对 Render 免费套餐进行了优化部署配置（例如加入串行处理锁、内存清理与自唤醒逻辑）。
 
@@ -56,7 +56,7 @@ graph TD
     Logic_Level -.-> Data_Assets[data/data_assets_36 关卡底包]
     BP_Buyer -.-> Data_NameId[data/name_id_cost.txt 卡包配置]
     BP_Home -.-> Data_News[data/news.json 新闻公告]
-    BP_Down -.-> Data_Down[data/downloads.json 下载列表]
+    BP_Down -.-> Data_Down[data/downloads.json 下载目录]
 ```
 
 ---
@@ -76,7 +76,7 @@ MyProject/
 ├── logic_unity.py              # 卡组打包业务逻辑，使用 UnityPy 修改底包中卡牌数量并重新生成 zip
 ├── blueprints/                 # 路由及蓝图实现目录
 │   ├── home.py                 # 首页及主导航路由，展示 news.json 中的公告和更新日志
-│   ├── downloads.py            # 下载中心，管理 downloads.json 中的 Mod 资源及下载计数跳转
+│   ├── downloads.py            # 下载中心：分区目录、single/bundle 与子文件下载
 │   ├── feedback.py             # 意见反馈路由（薄层：HTTP 解析 / 限流 / 统一 JSON 响应）
 │   ├── deck_editor.py          # 卡组编辑器接口，支持前端初始化载入和自定义修改后的一键打包下载
 │   ├── level_editor.py         # 关卡编辑器接口，支持读取 AB 关卡配置列表、提取 JSON 以及回填打包
@@ -95,10 +95,15 @@ MyProject/
 │   ├── recipe_decks_1          # 官方卡组配置底包 1 (Unity MonoBehaviour)
 │   ├── recipe_definitions_1    # 官方卡组配置底包 2 (Unity MonoBehaviour)
 │   ├── decks.json              # 关卡编辑器使用的预置卡组库
-│   ├── downloads.json          # 下载中心的 Mod 工具配置表
+│   ├── downloads.json          # 下载中心分区目录（sections → items，支持 single / bundle）
 │   ├── news.json               # 首页的通知和版本更新公告
 │   ├── name_id_cost.txt        # 官方卡包 SKU 及其钻石售价对照表
 │   └── 笔记卡组名称.txt         # 英雄卡组与对应内部 ID 映射描述
+├── docs/                       # 设计与进度文档
+│   ├── downloads-refactor-log.md   # 下载中心重构进度对照
+│   └── downloads-bundle-plan.md    # 作品包（Bundle）方案与阶段说明
+├── scripts/                    # 运维 / 校验脚本
+│   └── validate_downloads.py   # 校验 downloads.json 结构与约定
 ├── static/                     # 前端静态资源目录 (CSS, JS, 图片, 幻影工坊资源)
 ├── templates/                  # Jinja2 模板目录
 │   ├── base.html               # 页面基类模板，包含顶部导航和全局依赖样式引入
@@ -106,11 +111,12 @@ MyProject/
 │   ├── deck_editor.html        # 卡组编辑器页面 (Vue3 + Tailwind)
 │   ├── level_editor.html       # 关卡编辑器页面 (Vue3 + UI 交互)
 │   ├── tab_unity.html          # 通用 Unity 解析与解包调试页面
+│   ├── tab_downloads.html      # 下载中心列表（分区 Tab + 卡片）
 │   ├── card_sender.html        # 一键送卡交互页面
 │   ├── pack_buyer.html         # 在线买卡包交互页面
 │   ├── phantom.html            # 幻影工坊制作页面
 │   ├── feedback.html           # 意见反馈页面（原生 form + fetch，不依赖 Vue）
-│   └── download_detail.html    # 资源下载详情页面
+│   └── download_detail.html    # 下载详情（single / bundle 文件列表）
 ├── utils/                      # 通用工具函数目录
 │   ├── card_index.py           # 统一读取 index.json 的卡牌信息，并转换为对应模块的专用格式
 │   ├── json_clean.py           # JSON 字符串防御清洗，去除控制字符及 BOM 头，兼容中文符号
@@ -183,6 +189,50 @@ MyProject/
 表字段：`id`, `type`, `content`, `contact`, `ua_info` (jsonb), `status`, `created_at`。
 
 后端 `.env` 中 `SUPABASE_KEY` 使用 **anon key** 即可（与 INSERT 策略匹配）。
+
+### 5. 下载中心 (`blueprints/downloads.py` + `data/downloads.json`)
+
+下载中心按 **用途分区**，条目支持 **单文件** 与 **作品包（合集）** 两种形态，适合 Mod 多文件 / 分卷分发，而不做成通用网盘。
+
+**分区（`sections`）**
+
+| id | 名称 | 定位 |
+|----|------|------|
+| `mods` | Mod 内容 | 面向游玩/体验的成品（卡包、英雄改动、关卡包等） |
+| `tools` | 工具与资源 | 面向制作/运维（辅助软件、替换工具、底包、素材） |
+
+**条目形态**
+
+| kind | 含义 | 下载方式 |
+|------|------|----------|
+| `single` | 一个条目一个直链（`url`） | `/api/download/<item_id>` |
+| `bundle` | 作品包，一层 `files[]` 子文件 | 子文件：`/api/download/<item_id>/<file_id>`；推荐项可用条目级 API |
+
+**路由**
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/downloads` | 列表；`?section=mods\|tools` 切换 Tab（默认 `mods`） |
+| GET | `/downloads/<item_id>` | 详情；若 `item_id` 为分区 id 则跳到对应 Tab |
+| GET | `/api/download/<item_id>` | 默认目标 302（`url` / `recommended` 子文件 / 唯一 file）；限流 |
+| GET | `/api/download/<item_id>/<file_id>` | 子文件 302；限流 |
+
+**数据约定（摘要）**
+
+- JSON：`sections[].items[]`；运行时分区列表键名为 `entries`（避免 Jinja 与 `dict.items` 冲突）。
+- bundle 仅允许 **一层** `files`；`recommended: true` 的子文件作为「下载推荐项」默认入口。
+- 可选：`series_id` / `series_name` / `series_order` 同系列互链；`images[]` 首张作列表封面。
+- 存储命名建议：`workshop-downloads/{mods|tools}/{item_id}/{file_id}.ext`。
+
+**校验与文档**
+
+```bash
+python scripts/validate_downloads.py
+```
+
+设计与进度对照：[`docs/downloads-refactor-log.md`](docs/downloads-refactor-log.md)、[`docs/downloads-bundle-plan.md`](docs/downloads-bundle-plan.md)。
+
+**维护提示**：上架内容主要改 `data/downloads.json`；勿在模板里写 `section.items`，应使用 `section.entries`。
 
 ---
 
@@ -258,41 +308,61 @@ MyProject/
 
 ### 1. 🛡️ 统一并发锁控制 (`extensions.py` / `blueprints/`)
 
-* 将原本局部定义的 `UNITY_TASK_LOCK` 移至统一的 `extensions.py` 中。
+- 将原本局部定义的 `UNITY_TASK_LOCK` 移至统一的 `extensions.py` 中。
+
 - 在卡组打包接口（`/api/quick_export`）以及关卡打包/提取接口（`/api/editor/ab/*`）中全数引入该串行处理锁，彻底杜绝了多模块并发调用 `UnityPy` 加载大包导致服务器发生 OOM 内存溢出崩溃。
 
 ### 2. 🗂️ 零碰撞动态临时工作区
 
-* 废弃了原先写死且易发生请求碰撞的 `out/data_assets_36` 静态路径，改用 Python `tempfile.mkdtemp()` 动态分配隔离工作区。
+- 废弃了原先写死且易发生请求碰撞的 `out/data_assets_36` 静态路径，改用 Python `tempfile.mkdtemp()` 动态分配隔离工作区。
+
 - 利用 Flask 的 `after_this_request` 回调钩子，在打包好的 AB 压缩包成功 stream 下载给用户后，于后台安全、彻底地清理这些动态分配的临时缓存文件夹，实现了零磁盘残留和高并发安全。
 
 ### 3. 🎨 界面母版化与统一化重构 (`deck_editor.html` / `phantom.html`)
 
-* **母版继承**：将原本作为独立单页开发的“卡组工坊 Pro”和“幻影卡牌工坊”全部重构并继承自 `base.html`，完美接入全站的主导航头和统一页脚。
+- **母版继承**：将原本作为独立单页开发的“卡组工坊 Pro”和“幻影卡牌工坊”全部重构并继承自 `base.html`，完美接入全站的主导航头和统一页脚。
+
 - **移动端响应式升级**：对“幻影工坊”在小屏幕下的排版进行了重构，隐藏了会与母版全站底栏发生 Z-Index 冲突的内置底栏，并将原先隐藏的左侧边栏 `.sidebar` 改造为**顶部可横向滑动的水平滚动导航条**，完美解决了移动端下的点击失效与重叠 Bug。
 - **数据字段纠偏**：完全还原了幻影工坊底层的 Vue 属性绑定，避免了因引用未定义变量导致的 `TypeError` 卡死，并纠正了后端接口参数命名偏差（如 `message` 与 `msg`）。
 
 ### 4. ⚡ 数据加载缓存化 (`logic_unity.py`)
 
-* 对卡牌数据库解包得到的静态底包元数据应用了内存缓存技术（`_cached_extracted_data`），在单次进程生命周期内仅在首次加载时解析一次，此后刷新页面均能秒级响应。
+- 对卡牌数据库解包得到的静态底包元数据应用了内存缓存技术（`_cached_extracted_data`），在单次进程生命周期内仅在首次加载时解析一次，此后刷新页面均能秒级响应。
 
 ### 5. 📦 大文件上传限制放宽 (`config.py`)
 
-* 将 `Config.MAX_CONTENT_LENGTH` 上限由 `20MB` 放宽至 `150MB`，从而完美兼容 100MB+ 体积的官方及第三方大型 Mod 关卡包的上传和处理。
+- 将 `Config.MAX_CONTENT_LENGTH` 上限由 `20MB` 放宽至 `150MB`，从而完美兼容 100MB+ 体积的官方及第三方大型 Mod 关卡包的上传和处理。
 
 ### 6. 🌐 根除 favicon.ico 404 警告 (`base.html`)
 
-* 统一在 `base.html` 头部嵌入了基于高性能 SVG Data URL 格式的 **📦 网站 Favicon 图标**，不仅美化了浏览器标签页，还完美杜绝了控制台中的 404 资源缺失警告。
+- 统一在 `base.html` 头部嵌入了基于高性能 SVG Data URL 格式的 **📦 网站 Favicon 图标**，不仅美化了浏览器标签页，还完美杜绝了控制台中的 404 资源缺失警告。
 
 ### 7. 🧹 物理清理无用历史资产
 
-* 彻底清除了 `data/` 下无引用的 `card_data_1` 原始底包文件和 `card_data_1.json` 废弃配置，为项目仓库减负约 10MB 空间。
+- 彻底清除了 `data/` 下无引用的 `card_data_1` 原始底包文件和 `card_data_1.json` 废弃配置，为项目仓库减负约 10MB 空间。
 
 ### 8. 💬 意见反馈模块重构（契约 / 分层 / Supabase 权限）
 
-* **分层**：路由迁至薄蓝图 + `services/feedback.py`，校验与写库与 HTTP 层解耦。
+- **分层**：路由迁至薄蓝图 + `services/feedback.py`，校验与写库与 HTTP 层解耦。
+
 - **契约统一**：成功 / 失败 / 限流 / 影子封禁均使用 `ok` + `error`/`message` 字段，前端不再出现“限流却显示通用失败”的错位。
 - **限流 key**：反馈接口使用 `visitor_ip_key()`，与安全模块真实 IP 一致。
 - **类型白名单**：仅接受 `bug` / `feature` / `other`；非法 JSON 用 `silent` 解析，返回 400 而非 500。
 - **前端降级**：反馈页改为原生 form + fetch，去掉对 Vue CDN 的强依赖，CDN 失败时页面仍可用。
 - **数据库**：提供 `sql/feedbacks.sql` 一键重建表结构、CHECK 约束、索引、RLS 与 GRANT（anon 仅 INSERT）。
+
+### 9. 📥 下载中心重构（分区 + 作品包）
+
+- **分区**：`Mod 内容` / `工具与资源`，列表 Tab 切换，短链 `/downloads/mods`、`/downloads/tools`。
+
+- **形态**：`single` 单文件与 `bundle` 作品包（一层子文件列表，支持推荐项与分卷下载）。
+- **体验**：列表封面、合集角标、系列互链、文件级 notes、本地下载计数。
+- **运维**：`scripts/validate_downloads.py` 校验目录结构；细节见 `docs/` 下下载中心文档。
+
+### 10. 📱 移动端竖屏深度体验优化
+
+- **响应式重构**：针对移动端竖屏（宽度 <= 640px 且竖屏状态）进行了深度视觉与布局重构。在保持横屏和 PC 端大卡片高级感的同时，彻底解决了小屏下卡片堆叠过长、内容遮挡等问题。
+- **核心组件小卡片化**：将首页原有的 `AB 工作台` 与 `幻影引擎` 两个核心大卡片，在小屏下自适应重排为**并排双列的精致小磁贴**，字号、内边距和圆角合理缩小，同时为 `AB 工作台` 注入微缩的应用图标，有效节约了首屏约 80% 的纵向高度。
+- **公告卡片精简化**：保留公告卡片的原生设计，但物理缩减了边距 `p-4`，字号按层级缩放，并隐藏了移动端非必要的背景大浮动图标，使得公告占用面积减少约 40%，首屏信息密度显著提升。
+- **扁平化横向列表**：为首页辅助工具网格（如卡组编辑器、关卡编辑器等 6 大工具）引入了横向扁平化弹性布局（`Flex Row`），图标靠左文字靠右，避免了多列排版文字严重折行导致的杂乱感，大幅提升了移动端的点按便捷性与浏览质感。
+- **赞助卡片图文并排**：优化了“让我吃点垃圾”赞助区域的排版，在竖屏下自动切换为图文并排布局（左侧文案与按钮，右侧微缩赞赏码），避免了单栏长图文排版导致的过度下滑。

@@ -1,76 +1,136 @@
 {
-  "tools": [
+  "sections": [
     {
-      "id": "pvzh-DIY",
-      "name": "PVZH卡牌DIY v2.0",
-      "description": "自制卡工具，由 qhsj 定制制作，用于 PVZH 卡牌内容编辑与 DIY 制作。",
-      "details": "PVZH卡牌DIY v2.0 是一个面向自制卡制作的辅助工具，提供了一套模板和编辑功能。\n\n该工具更偏向简单的创作用途。",
-      "usage": [
-        "分为了编辑界面和资源界面两部分，编辑界面用于卡牌内容的编辑，资源界面用于管理和替换游戏资源。",
-        "在编辑界面中，可以选择不同的卡牌模板，输入卡牌名称、描述、属性等信息，生成自制卡图片。",
-        "在资源界面中，可以选择需要替换的资源文件，可按照工具提示进行替换操作。",
-        "内置了蓝色字体和贴图文本的编辑功能，适合用于制作具有特殊效果的卡牌。"
-      ],
-      "notes": [
-        "该工具由 qhsj 定制制作，请多关注原作者。",
-        "建议在测试环境中使用，不要直接覆盖重要数据。",
-        "如果工具无法正常运行，可以尝试更换安卓版本或模拟器环境。"
-      ],
-      "version": "2.0",
-      "tag": "APK",
+      "id": "mods",
+      "name": "Mod 内容",
+      "description": "面向游玩与体验的成品 Mod：自制卡包、英雄改动、关卡包、贴图合集等。",
       "icon": "extension",
-      "size": "37 MB",
-      "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/DIY.apk",
-      "updated_at": "2026-04-19",
-      "images": [
-        "/static/images/download/自制卡.png"
+      "empty_title": "暂无 Mod 作品",
+      "empty_hint": "Mod 分区已就绪。后续将在此展示可安装的成品内容。",
+      "items": [
+        {
+          "id": "MyMod",
+          "kind": "bundle",
+          "name": "休切尔的Mod贴图箱",
+          "description": "这里存放我个人的一些改了贴图的作品",
+          "details": "这里存放了我制作的一些有趣的内容",
+          "usage": [
+            "下载zip包解压",
+            "将解压后的内容移动到游戏目录 - /storage/emulated/0/Android/data/com.ea.gp.pvzheroes/files/cache/bundles/files/autotagged/ - 中进行替换",
+            "进入游戏即可生效",
+            "若有闪退，请检查替换位置是否正确，或者在其他设备中尝试"
+          ],
+          "notes": [
+            "你可以随意二次创作，但务必保留我的署名"
+          ],
+          "version": "v1",
+          "tag": "贴图",
+          "icon": "folder_zip",
+          "size": "多文件",
+          "updated_at": "2026-07-12",
+          "series_id": "",
+          "series_order": 1,
+          "images": [],
+          "files": [
+            {
+              "id": "full",
+              "name": "完整包（推荐）",
+              "description": "全部内容",
+              "size": "2 KB",
+              "tag": "ZIP",
+              "recommended": true,
+              "updated_at": "2026-07-12",
+              "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/heroes.zip",
+              "notes": []
+            }
+          ]
+        }
       ]
     },
     {
-      "id": "pvzh-v3",
-      "name": "PVZH一键替换v3.0",
-      "description": "一键替换文件工具，用于快速替换 PVZH 刷卡文件。如果无法运行，可以尝试在虚拟机中运行。",
-      "details": "PVZH一键替换v3.0 是一个偏向自动化处理的刷卡文件替换工具，适合用于减少手动复制、覆盖、定位路径等重复操作。",
-      "usage": [
-        "下载 APK 文件并安装。",
-        "如果无法正常运行，请尝试在虚拟机或其他安卓环境中运行。"
-      ],
-      "notes": [
-        "替换前建议备份原始文件。",
-        "如果出现闪退或无效，优先检查文件版本是否匹配。"
-      ],
-      "version": "3.0",
-      "tag": "APK",
-      "icon": "swap_horiz",
-      "size": "10 MB",
-      "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/v3.apk",
-      "updated_at": "2026-04-19",
-      "images": [
-        "/static/images/download/一键替换.png"
+      "id": "tools",
+      "name": "工具与资源",
+      "description": "面向制作与运维的辅助软件、替换工具、底包与素材文件。",
+      "icon": "build",
+      "empty_title": "暂无工具与资源",
+      "empty_hint": "工具与资源列表为空，请稍后再来。",
+      "items": [
+        {
+          "id": "pvzh-DIY",
+          "kind": "single",
+          "name": "PVZH卡牌DIY v2.0",
+          "description": "自制卡工具，由 qhsj 定制制作，用于 PVZH 卡牌内容编辑与 DIY 制作。",
+          "details": "PVZH卡牌DIY v2.0 是一个面向自制卡制作的辅助工具，提供了一套模板和编辑功能。\n\n该工具更偏向简单的创作用途。",
+          "usage": [
+            "分为了编辑界面和资源界面两部分，编辑界面用于卡牌内容的编辑，资源界面用于管理和替换游戏资源。",
+            "在编辑界面中，可以选择不同的卡牌模板，输入卡牌名称、描述、属性等信息，生成自制卡图片。",
+            "在资源界面中，可以选择需要替换的资源文件，可按照工具提示进行替换操作。",
+            "内置了蓝色字体和贴图文本的编辑功能，适合用于制作具有特殊效果的卡牌。"
+          ],
+          "notes": [
+            "该工具由 qhsj 定制制作，请多关注原作者。",
+            "建议在测试环境中使用，不要直接覆盖重要数据。",
+            "如果工具无法正常运行，可以尝试更换安卓版本或模拟器环境。"
+          ],
+          "version": "2.0",
+          "tag": "APK",
+          "icon": "extension",
+          "size": "37 MB",
+          "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/DIY.apk",
+          "updated_at": "2026-04-19",
+          "images": [
+            "/static/images/download/自制卡.png"
+          ]
+        },
+        {
+          "id": "pvzh-v3",
+          "kind": "single",
+          "name": "PVZH一键替换v3.0",
+          "description": "一键替换文件工具，用于快速替换 PVZH 刷卡文件。如果无法运行，可以尝试在虚拟机中运行。",
+          "details": "PVZH一键替换v3.0 是一个偏向自动化处理的刷卡文件替换工具，适合用于减少手动复制、覆盖、定位路径等重复操作。",
+          "usage": [
+            "下载 APK 文件并安装。",
+            "如果无法正常运行，请尝试在虚拟机或其他安卓环境中运行。"
+          ],
+          "notes": [
+            "替换前建议备份原始文件。",
+            "如果出现闪退或无效，优先检查文件版本是否匹配。"
+          ],
+          "version": "3.0",
+          "tag": "APK",
+          "icon": "swap_horiz",
+          "size": "10 MB",
+          "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/v3.apk",
+          "updated_at": "2026-04-19",
+          "images": [
+            "/static/images/download/一键替换.png"
+          ]
+        },
+        {
+          "id": "pvzh-heroes",
+          "kind": "single",
+          "name": "刷英雄文件",
+          "description": "刷英雄文件工具包，主要用于英雄相关内容处理，具体使用方法请参考视频教程。",
+          "details": "刷英雄文件",
+          "usage": [
+            "下载 ZIP 文件并解压。",
+            "查看压缩包内的文件结构。",
+            "根据视频教程将文件放入指定位置。",
+            "启动游戏并检查英雄内容是否生效。"
+          ],
+          "notes": [
+            "需要Root权限才能正常使用。",
+            "没有Root尝试虚拟机或者安装包注入等方法。"
+          ],
+          "version": "1.0",
+          "tag": "ZIP",
+          "icon": "folder_zip",
+          "size": "2 KB",
+          "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/heroes.zip",
+          "updated_at": "2026-04-19",
+          "images": []
+        }
       ]
-    },
-    {
-      "id": "pvzh-heroes",
-      "name": "刷英雄文件",
-      "description": "刷英雄文件工具包，主要用于英雄相关内容处理，具体使用方法请参考视频教程。",
-      "details": "刷英雄文件",
-      "usage": [
-        "下载 ZIP 文件并解压。",
-        "查看压缩包内的文件结构。",
-        "根据视频教程将文件放入指定位置。",
-        "启动游戏并检查英雄内容是否生效。"
-      ],
-      "notes": [
-        "需要Root权限才能正常使用。",
-        "没有Root尝试虚拟机或者安装包注入等方法。"
-      ],
-      "version": "1.0",
-      "tag": "ZIP",
-      "icon": "folder_zip",
-      "size": "2 KB",
-      "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/heroes.zip",
-      "updated_at": "2026-04-19",
-      "images": []
     }
   ]
 }

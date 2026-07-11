@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}资源下载 - PVZH Mod 工具箱{% endblock %}
+{% block title %}下载中心 - PVZH Mod 工具箱{% endblock %}
 
 {% block content %}
 <div class="px-4 sm:px-6 lg:px-8 py-8 md:py-10">
 
-    <section class="mb-8">
+    {# 页头 #}
+    <section class="mb-6 md:mb-8">
         <div class="rounded-[2rem] bg-white border border-slate-200 shadow-sm overflow-hidden">
             <div class="relative p-5 md:p-8">
                 <div class="absolute -top-20 -right-20 w-56 h-56 bg-blue-100 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
@@ -13,86 +14,170 @@
                 <div class="relative z-10">
                     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-4 border border-blue-100">
                         <span class="material-symbols-rounded text-[16px]">download</span>
-                        Resource Center
+                        Download Center
                     </div>
 
                     <h1 class="text-2xl md:text-4xl font-extrabold text-slate-950 tracking-tight mb-3">
-                        资源下载
+                        下载中心
                     </h1>
 
                     <p class="text-sm md:text-base text-slate-500 leading-relaxed max-w-2xl">
-                        下载 PVZH Mod 开发相关工具、补丁、辅助文件与参考资源。点击详情可查看说明、使用步骤和注意事项。
+                        分区浏览 PVZH 相关内容：成品 Mod 与制作/运维用的工具资源。合集作品支持进入后按文件单独下载。
                     </p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
-        {% for tool in tools %}
-        <article class="bg-white rounded-3xl shadow-sm hover:shadow-lg border border-slate-200 transition-all duration-300 overflow-hidden flex flex-col hover:-translate-y-0.5">
-
-            <div class="p-5 flex-grow">
-                <div class="flex items-start justify-between gap-3 mb-4">
-                    <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                        <span class="material-symbols-rounded text-[24px]">
-                            {% if tool.icon %}{{ tool.icon }}{% else %}inventory_2{% endif %}
-                        </span>
-                    </div>
-
-                    {% if tool.tag %}
-                    <span class="bg-blue-50 text-blue-600 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap border border-blue-100">
-                        {{ tool.tag }}
+    {# 分区 Tab — 使用 entries 而非 items，避免 Jinja 撞上 dict.items #}
+    {% if sections %}
+    <section class="mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+            <div class="inline-flex p-1 rounded-2xl bg-slate-100/90 border border-slate-200/80 gap-1 w-full sm:w-auto overflow-x-auto">
+                {% for section in sections %}
+                <a href="{{ url_for('downloads.index', section=section.id) }}"
+                   class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition
+                          {% if section.id == active_section_id %}
+                          bg-white text-blue-700 shadow-sm border border-slate-200/80
+                          {% else %}
+                          text-slate-500 hover:text-slate-800 hover:bg-white/60 border border-transparent
+                          {% endif %}">
+                    <span class="material-symbols-rounded text-[18px]">
+                        {{ section.icon }}
                     </span>
-                    {% endif %}
-                </div>
-
-                <h2 class="text-base md:text-lg font-extrabold text-slate-950 mb-2">
-                    {{ tool.name }}
-                </h2>
-
-                <p class="text-slate-500 text-sm leading-relaxed mb-5">
-                    {{ tool.description }}
-                </p>
-
-                <div class="flex flex-wrap gap-3 text-xs text-slate-400 font-semibold mt-auto">
-                    <span class="flex items-center gap-1">
-                        <span class="material-symbols-rounded text-[16px]">tag</span>
-                        {{ tool.version }}
+                    {{ section.name }}
+                    <span class="text-[11px] font-extrabold px-1.5 py-0.5 rounded-md
+                          {% if section.id == active_section_id %}bg-blue-50 text-blue-600{% else %}bg-slate-200/70 text-slate-500{% endif %}">
+                        {{ section.entries|length }}
                     </span>
-
-                    <span class="flex items-center gap-1">
-                        <span class="material-symbols-rounded text-[16px]">folder</span>
-                        {{ tool.size }}
-                    </span>
-
-                    <span class="flex items-center gap-1">
-                        <span class="material-symbols-rounded text-[16px]">update</span>
-                        {{ tool.updated_at }}
-                    </span>
-                </div>
-            </div>
-
-            <div class="bg-slate-50 px-5 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
-                <span class="text-xs font-bold text-slate-500 flex items-center gap-1">
-                    <span class="material-symbols-rounded text-[16px]">article</span>
-                    说明页
-                </span>
-
-                <a href="/downloads/{{ tool.id }}"
-                   class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-2xl transition active:scale-95">
-                    查看详情
-                    <span class="material-symbols-rounded text-[18px] ml-1">arrow_forward</span>
                 </a>
+                {% endfor %}
             </div>
-        </article>
-        {% else %}
-        <div class="col-span-full text-center py-16 bg-white rounded-3xl border border-slate-200">
-            <span class="material-symbols-rounded text-6xl text-slate-300 mb-4 block">inventory_2</span>
-            <h3 class="text-lg font-bold text-slate-900">暂时没有可用资源</h3>
-            <p class="text-slate-500 mt-1 text-sm">资源列表为空，请稍后再来。</p>
+
+            {% if active_section and active_section.description %}
+            <p class="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-xl sm:text-right">
+                {{ active_section.description }}
+            </p>
+            {% endif %}
         </div>
-        {% endfor %}
+    </section>
+    {% endif %}
+
+    {# 当前分区列表 #}
+    <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+        {% if active_section and active_section.entries %}
+            {% for tool in active_section.entries %}
+            <article class="bg-white rounded-3xl shadow-sm hover:shadow-lg border border-slate-200 transition-all duration-300 overflow-hidden flex flex-col hover:-translate-y-0.5">
+
+                {% if tool.cover %}
+                <div class="relative h-36 sm:h-40 bg-slate-100 overflow-hidden">
+                    <img src="{{ tool.cover }}"
+                         alt="{{ tool.name }}"
+                         class="w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent pointer-events-none"></div>
+                    <div class="absolute top-3 right-3 flex flex-wrap justify-end gap-1.5">
+                        {% if tool.kind == 'bundle' %}
+                        <span class="bg-violet-600/95 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm">合集</span>
+                        {% endif %}
+                        {% if tool.tag %}
+                        <span class="bg-white/95 text-slate-700 text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm border border-white/80">{{ tool.tag }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="p-5 flex-grow">
+                    {% if not tool.cover %}
+                    <div class="flex items-start justify-between gap-3 mb-4">
+                        <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                            <span class="material-symbols-rounded text-[24px]">
+                                {% if tool.icon %}{{ tool.icon }}{% elif tool.kind == 'bundle' %}folder_zip{% else %}inventory_2{% endif %}
+                            </span>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-end gap-1.5">
+                            {% if tool.kind == 'bundle' %}
+                            <span class="bg-violet-50 text-violet-700 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap border border-violet-100">
+                                合集
+                            </span>
+                            {% endif %}
+                            {% if tool.tag %}
+                            <span class="bg-blue-50 text-blue-600 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap border border-blue-100">
+                                {{ tool.tag }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <h2 class="text-base md:text-lg font-extrabold text-slate-950 mb-2">
+                        {{ tool.name }}
+                    </h2>
+
+                    <p class="text-slate-500 text-sm leading-relaxed mb-5">
+                        {{ tool.description }}
+                    </p>
+
+                    <div class="flex flex-wrap gap-3 text-xs text-slate-400 font-semibold mt-auto">
+                        {% if tool.kind == 'bundle' %}
+                        <span class="flex items-center gap-1 text-violet-500">
+                            <span class="material-symbols-rounded text-[16px]">folder_open</span>
+                            {{ tool.file_count }} 个文件
+                        </span>
+                        {% endif %}
+
+                        {% if tool.version %}
+                        <span class="flex items-center gap-1">
+                            <span class="material-symbols-rounded text-[16px]">tag</span>
+                            {{ tool.version }}
+                        </span>
+                        {% endif %}
+
+                        {% if tool.size %}
+                        <span class="flex items-center gap-1">
+                            <span class="material-symbols-rounded text-[16px]">folder</span>
+                            {{ tool.size }}
+                        </span>
+                        {% endif %}
+
+                        {% if tool.updated_at %}
+                        <span class="flex items-center gap-1">
+                            <span class="material-symbols-rounded text-[16px]">update</span>
+                            {{ tool.updated_at }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 px-5 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                    <span class="text-xs font-bold text-slate-500 flex items-center gap-1">
+                        <span class="material-symbols-rounded text-[16px]">
+                            {% if tool.kind == 'bundle' %}folder_open{% else %}article{% endif %}
+                        </span>
+                        {% if tool.kind == 'bundle' %}打开合集{% else %}说明页{% endif %}
+                    </span>
+
+                    <a href="{{ url_for('downloads.detail', item_id=tool.id) }}"
+                       class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-2xl transition active:scale-95">
+                        查看详情
+                        <span class="material-symbols-rounded text-[18px] ml-1">arrow_forward</span>
+                    </a>
+                </div>
+            </article>
+            {% endfor %}
+        {% else %}
+            <div class="col-span-full text-center py-16 bg-white rounded-3xl border border-slate-200 border-dashed">
+                <span class="material-symbols-rounded text-6xl text-slate-300 mb-4 block">
+                    {% if active_section and active_section.icon %}{{ active_section.icon }}{% else %}inventory_2{% endif %}
+                </span>
+                <h3 class="text-lg font-bold text-slate-900">
+                    {% if active_section %}{{ active_section.empty_title }}{% else %}暂时没有可用内容{% endif %}
+                </h3>
+                <p class="text-slate-500 mt-1 text-sm max-w-md mx-auto">
+                    {% if active_section %}{{ active_section.empty_hint }}{% else %}下载目录为空，请稍后再来。{% endif %}
+                </p>
+            </div>
+        {% endif %}
     </section>
 </div>
 {% endblock %}
