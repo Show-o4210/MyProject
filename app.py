@@ -25,10 +25,17 @@ init_security_handlers(app)
 init_limiter(app)
 
 # --- 唤醒逻辑开始 ---
+# 说明：Render free tier 会休眠；进程内定时请求公网 URL 保活。
+# 必须打 /health（已在 security 白名单），并带专用 UA/Token，
+# 否则出站 IP（如 74.220.49.7）会被当成“脚本 UA”写入安全日志。
 scheduler = APScheduler()
 
-
 import os
+
+# 与 security.py 中 SELF_PING_UA / X-Self-Ping-Token 约定一致
+SELF_PING_UA = "PVZH-KeepAlive/1.0"
+DEFAULT_SELF_PING_URL = "https://pvz-h-tools.onrender.com/health"
+
 
 def keep_awake():
     """自唤醒任务：在北京时间 08:00 - 00:00 之间发送请求。"""
@@ -36,10 +43,14 @@ def keep_awake():
     hour = now.hour
 
     if 8 <= hour < 24:
-        url = os.environ.get("SELF_PING_URL", "https://pvz-h-tools.onrender.com/")
+        url = os.environ.get("SELF_PING_URL", DEFAULT_SELF_PING_URL)
+        headers = {"User-Agent": SELF_PING_UA}
+        token = os.environ.get("SELF_PING_TOKEN", "").strip()
+        if token:
+            headers["X-Self-Ping-Token"] = token
         try:
-            response = requests.get(url, timeout=10)
-            print(f"[{now}] Self-ping status: {response.status_code}")
+            response = requests.get(url, headers=headers, timeout=10)
+            print(f"[{now}] Self-ping status: {response.status_code} url={url}")
         except Exception as e:
             print(f"[{now}] Self-ping failed: {e}")
 

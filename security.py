@@ -4,6 +4,7 @@ from database import get_supabase
 import datetime
 import os
 import re
+import time
 
 """
 网站安全拦截模块
@@ -18,6 +19,7 @@ import re
 3. 对留言/反馈等提交类接口采用“影子封禁”：返回成功，但实际不进入业务逻辑。
 4. 对后台、统计、上传等敏感接口硬拦截。
 5. 所有命中都写入 security_logs，方便你后续取证。
+6. 进程内自唤醒（KeepAlive）不得被当成外部脚本攻击。
 """
 
 # =========================
@@ -38,6 +40,18 @@ EXTRA_BLOCKED_IPS = {
 }
 
 BLOCKED_IPS = DEFAULT_BLOCKED_IPS | EXTRA_BLOCKED_IPS
+
+# 可信 IP（不参与脚本 UA 告警 / 不封禁）：可选
+# 例：Render 出站自唤醒 IP 曾是 74.220.49.7，但云厂商 IP 会变，优先靠 UA/Token
+TRUSTED_IPS = {
+    ip.strip()
+    for ip in os.getenv("SECURITY_TRUSTED_IPS", "").split(",")
+    if ip.strip()
+}
+
+# 与 app.py keep_awake 约定一致
+SELF_PING_UA_PREFIX = "PVZH-KeepAlive/"
+SELF_PING_TOKEN = os.getenv("SELF_PING_TOKEN", "").strip()
 
 # 提交类接口：命中封禁时返回“假成功”，避免对方知道自己被拦截
 # 你可以按实际蓝图路径继续补充
@@ -89,6 +103,14 @@ SUSPICIOUS_UA_PATTERNS = {
         "severity": "medium",
     },
 }
+
+# 同一 IP+reason 的“仅记录”事件最小间隔（秒），避免自唤醒/扫描刷爆日志与 Supabase
+LOG_DEDUP_SECONDS = int(os.getenv("SECURITY_LOG_DEDUP_SECONDS", "300"))
+_recent_log_keys: dict[str, float] = {}
+
+# Supabase 权限失败时降噪：连续失败时降低打印频率
+_supabase_log_fail_count = 0
+_supabase_log_last_warn = 0.0
 
 
 # =========================
@@ -143,6 +165,23 @@ def visitor_ip_key():
     return ip or "unknown"
 
 
+def is_self_ping_request(user_agent: str) -> bool:
+    """
+    识别进程内自唤醒请求。
+
+    判定（任一即可）：
+    1. UA 以 PVZH-KeepAlive/ 开头（app.py 默认）
+    2. Header X-Self-Ping-Token 与环境变量 SELF_PING_TOKEN 一致（可选加固）
+    """
+    if user_agent and user_agent.startswith(SELF_PING_UA_PREFIX):
+        return True
+    if SELF_PING_TOKEN:
+        token = request.headers.get("X-Self-Ping-Token", "").strip()
+        if token and token == SELF_PING_TOKEN:
+            return True
+    return False
+
+
 def detect_suspicious_ua(user_agent):
     """UA 只作为辅助检测，不作为单独封禁依据。"""
     for key, config in SUSPICIOUS_UA_PATTERNS.items():
@@ -176,25 +215,78 @@ def contains_abuse_text(text):
     return False
 
 
+def _should_skip_dedup_log(ip: str, reason: str, blocked: bool) -> bool:
+    """拦截事件不去重；仅记录事件按 IP+reason 节流。"""
+    if blocked:
+        return False
+    now = time.time()
+    key = f"{ip}|{reason}"
+    last = _recent_log_keys.get(key)
+    if last is not None and (now - last) < LOG_DEDUP_SECONDS:
+        return True
+    _recent_log_keys[key] = now
+    # 简单清理，避免字典无限增长
+    if len(_recent_log_keys) > 2000:
+        cutoff = now - LOG_DEDUP_SECONDS
+        stale = [k for k, t in _recent_log_keys.items() if t < cutoff]
+        for k in stale:
+            _recent_log_keys.pop(k, None)
+    return False
+
+
+def _format_supabase_error(err) -> str:
+    """把 postgrest/APIError 收成可读短文，便于判断是表权限还是配置问题。"""
+    msg = str(err)
+    # postgrest 常返回 dict 形态
+    if "permission denied" in msg or "42501" in msg:
+        return (
+            f"{msg} | 表权限/RLS 问题：请在 Supabase SQL Editor 执行 sql/security_logs.sql；"
+            "确认 SUPABASE_KEY 为 anon key 且表已 GRANT INSERT TO anon"
+        )
+    if "Could not find the table" in msg or "PGRST205" in msg or "does not exist" in msg:
+        return f"{msg} | 表不存在：请执行 sql/security_logs.sql 建表"
+    if "JWT" in msg or "Invalid API key" in msg or "401" in msg:
+        return f"{msg} | Render/环境变量问题：检查 SUPABASE_URL 与 SUPABASE_KEY"
+    return msg
+
+
 def log_security_event(ip, user_agent, reason, severity="medium", blocked=True):
     """记录安全事件到 Supabase。表不存在或字段不匹配时只打印，不影响网站运行。"""
+    global _supabase_log_fail_count, _supabase_log_last_warn
+
+    if _should_skip_dedup_log(ip, reason, blocked):
+        return None
+
     try:
         data = {
             "ip": ip,
-            "user_agent": user_agent,
-            "reason": reason,
-            "severity": severity,
-            "request_path": request.path,
-            "request_method": request.method,
+            "user_agent": (user_agent or "")[:2000],
+            "reason": (reason or "")[:500],
+            "severity": severity if severity in {"low", "medium", "high", "critical"} else "medium",
+            "request_path": (request.path or "")[:2000],
+            "request_method": (request.method or "")[:16],
             "timestamp": utc_now_iso(),
             "blocked": blocked,
         }
         result = get_supabase().table("security_logs").insert(data).execute()
+        _supabase_log_fail_count = 0
         print(f"[SECURITY] {'BLOCKED' if blocked else 'LOGGED'} {ip} {request.method} {request.path} - {reason}")
         return result
     except Exception as e:
-        print(f"[SECURITY] Failed to log to Supabase: {e}")
-        print(f"[SECURITY] Event fallback: ip={ip}, method={request.method}, path={request.path}, reason={reason}")
+        _supabase_log_fail_count += 1
+        now = time.time()
+        # 权限错误会刷屏：前 3 次全打，之后每 10 分钟最多 1 次摘要
+        should_print = (
+            _supabase_log_fail_count <= 3
+            or (now - _supabase_log_last_warn) >= 600
+        )
+        if should_print:
+            _supabase_log_last_warn = now
+            print(f"[SECURITY] Failed to log to Supabase: {_format_supabase_error(e)}")
+            print(
+                f"[SECURITY] Event fallback: ip={ip}, method={request.method}, "
+                f"path={request.path}, reason={reason}, fail_count={_supabase_log_fail_count}"
+            )
         return None
 
 
@@ -230,6 +322,10 @@ def security_check():
     path = request.path
     method = request.method.upper()
 
+    # 0. 自唤醒 / 可信 IP：跳过后续检查，避免把 Render 出站保活当成攻击
+    if is_self_ping_request(user_agent) or ip in TRUSTED_IPS:
+        return None
+
     # 1. 明确封禁 IP：本次事件首要策略
     if ip in BLOCKED_IPS:
         reason = "blocked_ip: known abusive visitor"
@@ -248,7 +344,7 @@ def security_check():
         log_security_event(ip, user_agent, reason + " / hidden_404", severity="high", blocked=True)
         return not_found_response()
 
-    # 2. 辅助记录：脚本 UA / 空 UA，不直接封
+    # 2. 辅助记录：脚本 UA / 空 UA，不直接封（敏感路径除外）
     ua_key, ua_config = detect_suspicious_ua(user_agent)
     if ua_config:
         # 对敏感接口提高强度
@@ -256,6 +352,7 @@ def security_check():
             log_security_event(ip, user_agent, ua_config["description"], severity=ua_config["severity"], blocked=True)
             return forbidden_response()
         else:
+            # 仅记录；已做去重，避免脚本探针每分钟刷库
             log_security_event(ip, user_agent, ua_config["description"], severity=ua_config["severity"], blocked=False)
 
     # 3. 内容辱骂检测：只对提交类请求检查
@@ -296,6 +393,9 @@ def init_security_handlers(app):
 
         请求时带 Header：
             X-Admin-Token: 你自己的随机强密码
+
+        说明：默认 sql/security_logs.sql 只给 anon INSERT。
+        SELECT 需要 service_role 或你在 SQL 中按注释放开 anon SELECT。
         """
         admin_token = os.getenv("SECURITY_ADMIN_TOKEN", "")
         request_token = request.headers.get("X-Admin-Token", "")
@@ -320,5 +420,11 @@ def init_security_handlers(app):
                 "samples": rows[:10],
             })
         except Exception as e:
-            print(f"[SECURITY] stats error: {e}")
-            return jsonify({"error": "stats unavailable"}), 500
+            print(f"[SECURITY] stats error: {_format_supabase_error(e)}")
+            return jsonify({
+                "error": "stats unavailable",
+                "hint": (
+                    "写入可用 anon INSERT；读取需 service_role 或在 "
+                    "sql/security_logs.sql 中按注释启用 anon SELECT"
+                ),
+            }), 500

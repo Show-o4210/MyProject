@@ -146,7 +146,8 @@ MyProject/
 - **真实访客 IP**：`get_visitor_info()` / `visitor_ip_key()` 统一解析 IP（优先 `CF-Connecting-IP`，其次 `X-Forwarded-For`，最后 `remote_addr`），反馈限流与安全拦截共用同一套 key，避免在 Render 反代后全站共享限流桶。
 - **黑名单拦截**：在 `before_request` 钩子中命中黑名单时，敏感接口 403、提交类接口影子封禁、普通页面伪装 404。
 - **影子封禁 (Shadow Ban)**：对恶意留言/反馈返回与正常成功一致的契约 `{"ok": true, "message": "提交成功"}`，实际不进入业务写入。
-- **记录审计**：高危事件写入 Supabase `security_logs`，可通过 `/security/stats`（Header：`X-Admin-Token`）查看当日抽样。
+- **记录审计**：高危事件写入 Supabase `security_logs`，可通过 `/security/stats`（Header：`X-Admin-Token`）查看当日抽样。首次请在 Supabase 执行 [`sql/security_logs.sql`](sql/security_logs.sql)（anon 仅 INSERT；缺权限会出现 `permission denied for table security_logs`）。
+- **自唤醒识别**：进程内 KeepAlive 使用 UA `PVZH-KeepAlive/1.0` 并默认请求 `/health`，不会被当成外部脚本 UA 告警。
 
 ### 4. 意见反馈模块 (`blueprints/feedback.py` + `services/feedback.py`)
 
@@ -271,7 +272,10 @@ python scripts/validate_downloads.py
 4. **（首次 / 重建）初始化反馈表**：
    在 Supabase SQL Editor 执行 `sql/feedbacks.sql`。会删除并重建 `public.feedbacks` 及 RLS；若有旧数据请先导出。
 
-5. **启动服务**：
+5. **（首次 / 重建）初始化安全审计表**：
+   在 Supabase SQL Editor 执行 `sql/security_logs.sql`。会删除并重建 `public.security_logs` 及 RLS（anon 仅 INSERT）。若 Render 日志出现 `permission denied for table security_logs`，几乎都是这张表未正确授权。
+
+6. **启动服务**：
    - 双击根目录下的 `开始.bat`；
    - 或者使用命令行直接运行：
 

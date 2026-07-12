@@ -155,41 +155,130 @@ class FormatManager:
         return result
 
 
-def transform_json_tree(tree, mode='expand', process_strategy='auto'):
-    target_keys = {"m_Script", "m_Data", "m_RawData"}
+# 仅对「字符串里嵌 JSON」的字段做 expand/collapse。
+# 切勿包含 m_Script：在 Unity 里它是 PPtr（{m_FileID, m_PathID}），
+# collapse 成字符串会导致 save_typetree 报 'str' object has no attribute 'm_FileID'。
+STRING_EMBEDDED_JSON_KEYS = {
+    "m_Data",
+    "m_RawData",
+    "m_ScriptText",
+    "jsonData",
+    "JsonData",
+    "dataJson",
+    "rawJson",
+}
 
+
+def is_pptr_like(value):
+    """识别 Unity PPtr / FileID-PathID 引用，禁止被当成 JSON 字符串折叠。"""
+    if not isinstance(value, dict):
+        return False
+    keys = set(value.keys())
+    if not keys:
+        return False
+    allowed = {"m_FileID", "m_PathID", "m_FileId", "m_PathId"}
+    return keys.issubset(allowed) and (
+        "m_FileID" in value or "m_FileId" in value or "m_PathID" in value or "m_PathId" in value
+    )
+
+
+def looks_like_json_text(text):
+    if not isinstance(text, str):
+        return False
+    s = text.strip()
+    return (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]"))
+
+
+def parse_embedded_json(text, process_strategy="auto"):
+    cleaned = clean_json_string(text) if process_strategy == "auto" else text
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        try:
+            return json5.loads(cleaned)
+        except Exception:
+            return text
+
+
+def transform_json_tree(tree, mode="expand", process_strategy="auto"):
+    """
+    expand：把「字符串形式的嵌入 JSON」解析成对象，便于编辑。
+    collapse：把上述字段重新压回字符串，再 save_typetree。
+
+    重要：
+    - 不处理 m_Script / 任意 PPtr 形态字段
+    - 非 STRING_EMBEDDED_JSON_KEYS 的 dict/list 只递归，不 stringify
+    """
     if isinstance(tree, dict):
-        for k, v in tree.items():
-            if k in target_keys:
-                if mode == 'expand' and isinstance(v, str):
-                    cleaned_v = clean_json_string(v) if process_strategy == 'auto' else v
+        for k, v in list(tree.items()):
+            if is_pptr_like(v):
+                continue
 
-                    if (
-                        (cleaned_v.startswith('{') and cleaned_v.endswith('}'))
-                        or (cleaned_v.startswith('[') and cleaned_v.endswith(']'))
-                    ):
-                        try:
-                            tree[k] = json.loads(cleaned_v)
-                            transform_json_tree(tree[k], mode, process_strategy)
-                        except json.JSONDecodeError:
-                            try:
-                                tree[k] = json5.loads(cleaned_v)
-                                transform_json_tree(tree[k], mode, process_strategy)
-                            except Exception:
-                                tree[k] = cleaned_v
+            if k in STRING_EMBEDDED_JSON_KEYS:
+                if mode == "expand" and isinstance(v, str) and looks_like_json_text(v):
+                    parsed = parse_embedded_json(v, process_strategy)
+                    tree[k] = parsed
+                    if isinstance(parsed, (dict, list)):
+                        transform_json_tree(parsed, mode, process_strategy)
 
-                elif mode == 'collapse' and isinstance(v, (dict, list)):
+                elif mode == "collapse" and isinstance(v, (dict, list)):
+                    # PPtr 误入 m_Data 时也不折叠
+                    if is_pptr_like(v):
+                        continue
                     transform_json_tree(v, mode, process_strategy)
-                    separators = (',', ':') if process_strategy == 'auto' else None
+                    separators = (",", ":") if process_strategy == "auto" else None
                     tree[k] = json.dumps(v, separators=separators, ensure_ascii=False)
-            else:
-                if isinstance(v, (dict, list)):
+
+                elif isinstance(v, (dict, list)):
                     transform_json_tree(v, mode, process_strategy)
+
+            elif isinstance(v, (dict, list)):
+                transform_json_tree(v, mode, process_strategy)
 
     elif isinstance(tree, list):
         for item in tree:
             if isinstance(item, (dict, list)):
                 transform_json_tree(item, mode, process_strategy)
+
+    return tree
+
+
+def restore_pptr_fields(tree):
+    """
+    兼容旧版错误导出：曾把 m_Script 等 PPtr collapse 成 JSON 字符串。
+    回填前把可识别的 PPtr 字符串还原为 dict，避免 save_typetree 失败。
+    """
+    pptr_keys = {
+        "m_Script",
+        "m_GameObject",
+        "m_Father",
+        "m_Controller",
+        "m_Mesh",
+        "m_Material",
+        "m_Font",
+        "m_Texture",
+        "m_Sprite",
+    }
+
+    if isinstance(tree, dict):
+        for k, v in list(tree.items()):
+            if isinstance(v, str) and (k in pptr_keys or k.startswith("m_")) and looks_like_json_text(v):
+                try:
+                    parsed = json.loads(clean_json_string(v))
+                except Exception:
+                    try:
+                        parsed = json5.loads(clean_json_string(v))
+                    except Exception:
+                        parsed = None
+                if is_pptr_like(parsed):
+                    tree[k] = parsed
+                    continue
+            if isinstance(v, (dict, list)):
+                restore_pptr_fields(v)
+    elif isinstance(tree, list):
+        for item in tree:
+            if isinstance(item, (dict, list)):
+                restore_pptr_fields(item)
 
     return tree
 
@@ -839,9 +928,20 @@ def repack():
                     elif lower_name.endswith('.json'):
                         raw_json_str = read_text_from_zip(zf, actual_zip_path)
                         cleaned_str = clean_json_string(raw_json_str) if process_mode == 'auto' else raw_json_str
-                        new_tree = json.loads(cleaned_str)
+                        try:
+                            new_tree = json.loads(cleaned_str)
+                        except json.JSONDecodeError:
+                            new_tree = json5.loads(cleaned_str)
 
-                        collapsed_tree = transform_json_tree(new_tree, mode='collapse', process_strategy=process_mode)
+                        if not isinstance(new_tree, dict):
+                            raise Exception("JSON 根节点必须是对象（typetree dict），不能是数组或原始值")
+
+                        # 将可编辑的嵌入 JSON 压回字符串；PPtr（含 m_Script）保持 dict
+                        collapsed_tree = transform_json_tree(
+                            new_tree, mode='collapse', process_strategy=process_mode
+                        )
+                        # 防御：若旧版导出/手改把 m_Script 弄成了字符串，尝试解析回来
+                        collapsed_tree = restore_pptr_fields(collapsed_tree)
                         obj.save_typetree(collapsed_tree)
                         modified_files_count += 1
 
@@ -849,7 +949,13 @@ def repack():
                         csv_text = read_text_from_zip(zf, actual_zip_path)
                         new_tree = FormatManager.from_csv(csv_text)
 
-                        collapsed_tree = transform_json_tree(new_tree, mode='collapse', process_strategy=process_mode)
+                        if not isinstance(new_tree, dict):
+                            raise Exception("CSV 未能解析为对象字段表")
+
+                        collapsed_tree = transform_json_tree(
+                            new_tree, mode='collapse', process_strategy=process_mode
+                        )
+                        collapsed_tree = restore_pptr_fields(collapsed_tree)
                         obj.save_typetree(collapsed_tree)
                         modified_files_count += 1
 
@@ -858,14 +964,22 @@ def repack():
                         modified_files_count += 1
 
                 except Exception as e:
-                    raise Exception(f"文件 [{expected_filename}] 注入失败：{e}")
+                    raise Exception(f"文件 [{expected_filename}] 注入失败：{e}") from e
 
             if modified_files_count == 0:
-                raise Exception("没有检测到任何被修改的内容被注入，请检查文件名、_index.json 或 Bundle 是否匹配")
+                raise Exception(
+                    "没有检测到任何被修改的内容被注入，请检查文件名、_index.json 或 Bundle 是否匹配"
+                )
 
         # UnityPy 的 save 本身会产生完整输出，无法完全避免峰值；但落盘返回可以减少后续复制。
+        try:
+            saved_bytes = env.file.save(packer="lz4")
+        except Exception:
+            # 个别资源对 lz4 打包敏感时回退默认 packer
+            saved_bytes = env.file.save()
+
         with open(output_bundle_path, 'wb') as fp:
-            fp.write(env.file.save(packer="lz4"))
+            fp.write(saved_bytes)
 
         register_cleanup(workdir)
         return send_file(
