@@ -74,6 +74,14 @@ app.register_blueprint(phantom_bp)
 def health():
     return {"status": "ok"}, 200
 
+@app.route("/robots.txt")
+def robots_txt():
+    return app.send_static_file("robots.txt")
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    return app.send_static_file("sitemap.xml")
+
 @app.route("/googleb2573588fdcd8e36.html")
 def google_verification():
     return app.send_static_file("googleb2573588fdcd8e36.html")
