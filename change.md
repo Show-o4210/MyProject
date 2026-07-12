@@ -112,3 +112,55 @@
 - **优化爬虫抓取路径（顺藤摸瓜）**：
   - 将下载中心 [templates/tab_downloads.html](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/templates/tab_downloads.html) 的 Mod 卡片重构为由标准的 `<a>` 标签包裹，并将内部的“查看详情”按钮改造为 `<div>` 从而彻底规避 `<a>` 标签嵌套的 HTML 语法问题，提高谷歌爬虫对 Mod 详情页的抓取效率。
 
+### 13. 🛡️ 安全审计、自唤醒误报与 `security_logs` 权限（2026-07-13）
+
+针对线上日志中周期性 `[SECURITY]` 刷屏与 `permission denied for table security_logs` 做了闭环修复。
+
+**现象**
+
+- 约每 14 分钟出现：`Event fallback: ip=74.220.49.7 … reason=脚本/命令行请求 UA`，UA 为 `python-requests/…`，路径为 `GET /`。
+- 同时伴随：`Failed to log to Supabase: permission denied for table security_logs (42501)`。
+
+**结论**
+
+| 项 | 判定 |
+|----|------|
+| `74.220.49.7` | Render 进程自唤醒经公网回环的**出站 IP**，不是外部攻击；**禁止**加入黑名单 |
+| `42501` | Supabase 表权限/RLS 问题（表未建或 anon 无 INSERT），不是典型的 Render Key 配错 |
+
+**代码改动**
+
+- `app.py`：KeepAlive 默认改为 `…/health`；UA `PVZH-KeepAlive/1.0`；可选 `X-Self-Ping-Token` / `SELF_PING_TOKEN`。
+- `security.py`：识别 KeepAlive UA/Token 与 `SECURITY_TRUSTED_IPS` 并跳过；脚本 UA 仅记录类事件节流；Supabase 写失败错误信息可区分「表权限 / 表不存在 / JWT」。
+- 新增 [`sql/security_logs.sql`](sql/security_logs.sql)：建表、索引、RLS、`GRANT INSERT` 给 anon（与 feedbacks 同模型）。
+- `.env.example` / README：补充 `SELF_PING_URL`、`SELF_PING_TOKEN`、`SECURITY_TRUSTED_IPS` 与部署检查清单。
+
+**运维动作（必做）**：在 Supabase SQL Editor 执行 `sql/security_logs.sql`；Render 上确认 `SELF_PING_URL` 指向 `/health`。
+
+### 14. 🔧 Unity 通用回填 `POST /repack` 500 修复（`m_Script` PPtr 被误折叠）（2026-07-13）
+
+**现象**
+
+- 用户流程：预检 `POST /unity/validate-repack` → **200**，随即 `POST /repack` → **500**（错误页约 17KB）。
+- 服务端异常形态：`AttributeError: 'str' object has no attribute 'm_FileID'`（经本地复现确认）。
+
+**根因**
+
+`blueprints/unity.py` 的 `transform_json_tree(mode='collapse')` 曾把 **`m_Script`** 列入「字符串嵌 JSON」字段。  
+在 Unity 中 `m_Script` 是 **PPtr**（`{m_FileID, m_PathID}` 字典），被 `json.dumps` 成字符串后，`obj.save_typetree()` 必然失败。  
+预检只校验 JSON 可解析与路径匹配，**不调用** `save_typetree`，故出现「预检过、回填挂」。
+
+**修复**
+
+- 仅对 `m_Data` / `m_RawData` 等真正可能嵌 JSON 的键做 expand/collapse。
+- 识别 PPtr 形态（`is_pptr_like`），禁止 stringify。
+- 新增 `restore_pptr_fields()`：兼容历史错误导出（`m_Script` 已是字符串时自动还原）。
+- JSON 解析失败回退 `json5`；`env.file.save(packer="lz4")` 失败时回退默认 packer。
+
+**验证**
+
+- 本地对 `recipe_decks_1` / `recipe_definitions_1` / `data_assets_36`：导出 → 回填 → save 通过。
+- Flask 测试客户端：`/unpack` → `/unity/validate-repack` → `/repack` 端到端 200。
+
+**说明**：卡组工坊 `logic_unity.py` 一键打包不经过该 transform 路径，本 bug 主要影响 **AB 工作台** 的通用解包/回填。
+

@@ -1,6 +1,6 @@
 # PVZH Mod 工具箱 (PVZ Heroes Mod Tools)
 
-**最后一次更新时间： 2026-7-12**
+**最后一次更新时间： 2026-7-13**
 
 这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心（分区 + 作品包）以及用户反馈等功能。
 
@@ -88,7 +88,8 @@ MyProject/
 ├── services/                   # 业务服务层（与蓝图解耦的可复用逻辑）
 │   └── feedback.py             # 反馈校验、payload 组装、写入 Supabase feedbacks 表
 ├── sql/                        # 数据库 schema / 运维脚本
-│   └── feedbacks.sql           # Supabase feedbacks 表重建脚本（含 RLS 与 GRANT）
+│   ├── feedbacks.sql           # Supabase feedbacks 表重建脚本（含 RLS 与 GRANT）
+│   └── security_logs.sql       # Supabase security_logs 审计表重建脚本（anon 仅 INSERT）
 ├── data/                       # 核心静态数据与 Unity 底包目录
 │   ├── index_new.json          # 全站卡牌索引 (GUID, UUID, NAME_CN, TEXTURE_NAME, TYPE, FACTION, NAME_EN)
 │   ├── data_assets_36          # 官方关卡关配置底包 (Unity AssetBundle)
@@ -129,25 +130,48 @@ MyProject/
 
 ## 🛠️ 核心业务逻辑说明
 
-### 1. Unity 资源回填与打包机制 (`logic_unity.py` / `logic_level_editor.py`)
+### 1. Unity 资源回填与打包机制
+
+#### 1a. 卡组 / 关卡业务打包 (`logic_unity.py` / `logic_level_editor.py`)
 
 - **解包**：使用 `UnityPy.load()` 载入 AssetBundle 文件，提取 `MonoBehaviour` 或 `TextAsset` 的 typetree 信息。
-- **转换**：将 typetree 字典经过 `utils/json_clean.py` 转换为前端更易读取和展示的 JSON 格式。
-- **回填**：当用户修改数据并导出时，系统使用内存底包作为模板，替换更新 `CardGuid`、`NumCopies` 等参数后，调用 `obj.save_typetree()` 保存修改，最后以 `.zip` 压缩包或重构后的 `data_assets_36` 文件提供下载。
+- **回填**：卡组工坊在内存底包上替换 `CardGuid`、`NumCopies`、`Faction` 等字段后 `save_typetree()`，再写入 zip；关卡编辑器同理处理 `data_assets_36`。
+- **注意**：业务打包路径**不**走通用 AB 工具的 `transform_json_tree` expand/collapse，直接读写 typetree。
+
+#### 1b. 通用 AB 工作台 (`blueprints/unity.py` + `templates/tab_unity.html`)
+
+面向用户上传的任意 Bundle：结构检查、轻量解包、补丁预检与回填。
+
+| 路由 | 作用 |
+|------|------|
+| `POST /unity/inspect` | 分析 Bundle 对象列表（fast / deep） |
+| `POST /unpack` | 按预设导出 JSON/CSV/PNG zip（含 `_index.json`） |
+| `POST /unity/validate-repack` | 补丁 zip 与原始 Bundle 匹配预检 |
+| `POST /repack` | 将补丁注入原始 Bundle 并下载 |
+
+- **嵌入 JSON 处理**（`transform_json_tree`）：仅对 `m_Data` / `m_RawData` 等「字符串里嵌 JSON」的字段做 expand（便于编辑）与 collapse（再写回）。
+- **PPtr 保护**：`m_Script`、`m_GameObject` 等 Unity 引用是 `{ m_FileID, m_PathID }` 字典，**禁止**被 stringify。旧逻辑把 `m_Script` 压成字符串会导致 `save_typetree` 报 `'str' object has no attribute 'm_FileID'`，表现为预检 200、正式回填 500。
+- **兼容**：`restore_pptr_fields()` 可把历史错误导出中已字符串化的 PPtr 还原为 dict。
+- **并发**：与全站共用 `UNITY_TASK_LOCK`，避免 Render 512MB 下多路 UnityPy 同时跑爆内存。
 
 ### 2. EA API 代理流程 (`logic_ea_api.py`)
 
 - **授权方式**：用户在网页端填写 `EADP-AUTH-TOKEN` 和 `EADP-PERSONA-ID`，系统无缝代理直接发包。
 - **发送逻辑**：构建带时间戳的伪造客户端请求头，向 PopCap 远程服务器的 `commitSoftPurchase` 接口发送对应的 `Sku`（例如购买卡包的 SKU 或发送特定全卡牌的 `deckRecipe` 协议包）。
 
-### 3. 全局安全及日志审计 (`security.py`)
+### 3. 全局安全及日志审计 (`security.py` + `app.py` 自唤醒)
 
 - **流量限制**：接入 `Flask-Limiter` 限流策略，防止恶意的 API 扫描或频繁提交攻击。
 - **真实访客 IP**：`get_visitor_info()` / `visitor_ip_key()` 统一解析 IP（优先 `CF-Connecting-IP`，其次 `X-Forwarded-For`，最后 `remote_addr`），反馈限流与安全拦截共用同一套 key，避免在 Render 反代后全站共享限流桶。
-- **黑名单拦截**：在 `before_request` 钩子中命中黑名单时，敏感接口 403、提交类接口影子封禁、普通页面伪装 404。
+- **黑名单拦截**：在 `before_request` 钩子中命中黑名单时，敏感接口 403、提交类接口影子封禁、普通页面伪装 404。可通过 `SECURITY_BLOCKED_IPS` 追加。
 - **影子封禁 (Shadow Ban)**：对恶意留言/反馈返回与正常成功一致的契约 `{"ok": true, "message": "提交成功"}`，实际不进入业务写入。
-- **记录审计**：高危事件写入 Supabase `security_logs`，可通过 `/security/stats`（Header：`X-Admin-Token`）查看当日抽样。首次请在 Supabase 执行 [`sql/security_logs.sql`](sql/security_logs.sql)（anon 仅 INSERT；缺权限会出现 `permission denied for table security_logs`）。
-- **自唤醒识别**：进程内 KeepAlive 使用 UA `PVZH-KeepAlive/1.0` 并默认请求 `/health`，不会被当成外部脚本 UA 告警。
+- **记录审计**：命中规则写入 Supabase `security_logs`；`/security/stats`（Header：`X-Admin-Token`）查看当日抽样。建表脚本见 [`sql/security_logs.sql`](sql/security_logs.sql)（**anon 仅 INSERT**）。若日志出现 `permission denied for table security_logs` / `42501`，几乎总是表未建或未 GRANT，而不是 Render URL 配错。
+- **日志降噪**：非拦截类「脚本 UA」事件按 IP+reason 节流；Supabase 连续写失败时降低刷屏频率。
+- **自唤醒（KeepAlive）**：`app.py` 在北京时间 08:00–24:00 每 14 分钟请求公网 URL，防止 Render Free 休眠。
+  - 默认目标：`/health`（安全白名单路径，不参与可疑 UA 扫描）
+  - 专用 UA：`PVZH-KeepAlive/1.0`；可选头 `X-Self-Ping-Token`（与 `SELF_PING_TOKEN` 一致）
+  - 出站经负载均衡回环时，日志里可能看到 Render 出站 IP（历史案例：`74.220.49.7`）+ 旧版 `python-requests` UA——**那是自唤醒，不是外部攻击**，切勿加入 `SECURITY_BLOCKED_IPS`
+  - 可选 `SECURITY_TRUSTED_IPS`：对确认可信的 IP 跳过脚本 UA 告警（云厂商 IP 会变，优先依赖 KeepAlive UA）
 
 ### 4. 意见反馈模块 (`blueprints/feedback.py` + `services/feedback.py`)
 
@@ -261,12 +285,17 @@ python scripts/validate_downloads.py
    ```ini
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_KEY=your-supabase-anon-key
-   
-   # 可选：配置安全访问 Token
+
+   # 可选：安全审计统计鉴权
    SECURITY_ADMIN_TOKEN=your-random-secure-token
-   
-   # 可选：黑名单 IP 列表 (以英文逗号分隔)
+
+   # 可选：黑名单 / 可信 IP（英文逗号分隔）
    SECURITY_BLOCKED_IPS=1.2.3.4,5.6.7.8
+   # SECURITY_TRUSTED_IPS=
+
+   # 自唤醒：务必指向 /health，勿指向首页 /
+   SELF_PING_URL=https://your-app-name.onrender.com/health
+   # SELF_PING_TOKEN=your-random-self-ping-token
    ```
 
 4. **（首次 / 重建）初始化反馈表**：
@@ -291,11 +320,20 @@ python scripts/validate_downloads.py
 
 针对 **Render Free Tier (免费套餐)** 的限制，本项目在代码中加入了以下设计：
 
-1. **Unity 处理串行锁 (UNITY_TASK_LOCK)**：
-   在 `blueprints/unity.py` 中，大体积 AssetBundle 的并发解包可能直接打爆 512MB 的内存限额导致服务重启。因此引入了线程锁机制，当有任务在处理时，后续请求会被拦截并返回 `HTTP 429` 提示重试。
+1. **Unity 处理串行锁 (`UNITY_TASK_LOCK`)**：
+   大体积 AssetBundle 的并发解包/回填可能打爆 512MB 内存。全站共用线程锁；忙时返回 `HTTP 429` 提示稍后重试。
 
 2. **临时目录自动清理**：
-   Unity 解包过程中产生的临时缓存会保存在临时目录中，系统在每次请求时会调用清理函数 `cleanup_old_temp`，主动删除创建时间超过 30 分钟的缓存垃圾，防范磁盘空间耗尽问题。
+   解包/回填使用 `tempfile.mkdtemp(prefix=unity_tool_)`；`cleanup_old_temp` 清理超过约 30 分钟的残留，响应结束后 `after_this_request` 再清本次工作区。
+
+3. **自唤醒 KeepAlive**：
+   进程内 APScheduler 每 14 分钟 GET `SELF_PING_URL`（默认 `…/health`），UA 为 `PVZH-KeepAlive/1.0`。Render 环境变量若仍指向首页 `/`，请改为 `/health`，避免无意义的安全告警与首页流量。
+
+4. **Supabase 表初始化（部署检查清单）**：
+   - [ ] 已执行 `sql/feedbacks.sql`
+   - [ ] 已执行 `sql/security_logs.sql`
+   - [ ] `SUPABASE_KEY` 使用 **anon key**（与两表 INSERT 策略一致）
+   - [ ] `SECURITY_ADMIN_TOKEN` 已设置（需要时才查 `/security/stats`）
 
 3. **Render 专属 Web 启动命令 (建议使用 Gunicorn)**：
    在线上建议配置启动命令锁定单 worker 运行，避免多进程绕过内存锁：
