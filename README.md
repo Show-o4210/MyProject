@@ -51,7 +51,7 @@ graph TD
     Utils_Index --> Utils_Json[utils/json_data.py JSON读取]
     
     %% 数据资产层
-    Utils_Json -.-> Data_Index[data/index.json 卡牌元数据]
+    Utils_Json -.-> Data_Index[data/index_new.json 卡牌元数据]
     Logic_Unity -.-> Data_Recipe[data/recipe_decks_1 / recipe_definitions_1 卡组底包]
     Logic_Level -.-> Data_Assets[data/data_assets_36 关卡底包]
     BP_Buyer -.-> Data_NameId[data/name_id_cost.txt 卡包配置]
@@ -81,7 +81,7 @@ MyProject/
 │   ├── deck_editor.py          # 卡组编辑器接口，支持前端初始化载入和自定义修改后的一键打包下载
 │   ├── level_editor.py         # 关卡编辑器接口，支持读取 AB 关卡配置列表、提取 JSON 以及回填打包
 │   ├── phantom.py              # 幻影卡牌工坊主页及 API
-│   ├── logic_phantom_config.py # 幻影工坊的配置加载，从 data/index.json 中注入卡牌数据
+│   ├── logic_phantom_config.py # 幻影工坊的配置加载，从 data/index_new.json 中注入卡牌数据
 │   ├── card_sender.py          # 卡牌发送 API，通过模拟 EA 协议直接向绑定账户注入全卡牌
 │   ├── pack_buyer.py           # 自定义卡包购买 API，支持在网页端购买指定的卡包 SKU (读取 name_id_cost.txt)
 │   └── unity.py                # 通用 Unity 包管理工具，支持在线对 Unity AB 包进行深入解析、解包和补丁回填
@@ -90,7 +90,7 @@ MyProject/
 ├── sql/                        # 数据库 schema / 运维脚本
 │   └── feedbacks.sql           # Supabase feedbacks 表重建脚本（含 RLS 与 GRANT）
 ├── data/                       # 核心静态数据与 Unity 底包目录
-│   ├── index.json              # 全站卡牌的基础映射索引 (GUID, UUID, NAME_CN, TEXTURE_NAME)
+│   ├── index_new.json          # 全站卡牌索引 (GUID, UUID, NAME_CN, TEXTURE_NAME, TYPE, FACTION, NAME_EN)
 │   ├── data_assets_36          # 官方关卡关配置底包 (Unity AssetBundle)
 │   ├── recipe_decks_1          # 官方卡组配置底包 1 (Unity MonoBehaviour)
 │   ├── recipe_definitions_1    # 官方卡组配置底包 2 (Unity MonoBehaviour)
@@ -118,7 +118,7 @@ MyProject/
 │   ├── feedback.html           # 意见反馈页面（原生 form + fetch，不依赖 Vue）
 │   └── download_detail.html    # 下载详情（single / bundle 文件列表）
 ├── utils/                      # 通用工具函数目录
-│   ├── card_index.py           # 统一读取 index.json 的卡牌信息，并转换为对应模块的专用格式
+│   ├── card_index.py           # 统一读取 index_new.json 的卡牌信息，并转换为对应模块的专用格式
 │   ├── json_clean.py           # JSON 字符串防御清洗，去除控制字符及 BOM 头，兼容中文符号
 │   └── json_data.py            # 辅助读取项目根目录下 data 内 JSON 文件的快捷函数
 ├── 开始.bat                     # 本地快速启动脚本
@@ -301,68 +301,3 @@ python scripts/validate_downloads.py
    ```
 
 ---
-
-## 🔄 最近更新与性能调优说明
-
-为了使项目在线上（特别是 Render 512MB 内存限制的免费套餐下）更加稳定、高效，且保持一致的美观交互，我们进行了以下深度优化：
-
-### 1. 🛡️ 统一并发锁控制 (`extensions.py` / `blueprints/`)
-
-- 将原本局部定义的 `UNITY_TASK_LOCK` 移至统一的 `extensions.py` 中。
-
-- 在卡组打包接口（`/api/quick_export`）以及关卡打包/提取接口（`/api/editor/ab/*`）中全数引入该串行处理锁，彻底杜绝了多模块并发调用 `UnityPy` 加载大包导致服务器发生 OOM 内存溢出崩溃。
-
-### 2. 🗂️ 零碰撞动态临时工作区
-
-- 废弃了原先写死且易发生请求碰撞的 `out/data_assets_36` 静态路径，改用 Python `tempfile.mkdtemp()` 动态分配隔离工作区。
-
-- 利用 Flask 的 `after_this_request` 回调钩子，在打包好的 AB 压缩包成功 stream 下载给用户后，于后台安全、彻底地清理这些动态分配的临时缓存文件夹，实现了零磁盘残留和高并发安全。
-
-### 3. 🎨 界面母版化与统一化重构 (`deck_editor.html` / `phantom.html`)
-
-- **母版继承**：将原本作为独立单页开发的“卡组工坊 Pro”和“幻影卡牌工坊”全部重构并继承自 `base.html`，完美接入全站的主导航头和统一页脚。
-
-- **移动端响应式升级**：对“幻影工坊”在小屏幕下的排版进行了重构，隐藏了会与母版全站底栏发生 Z-Index 冲突的内置底栏，并将原先隐藏的左侧边栏 `.sidebar` 改造为**顶部可横向滑动的水平滚动导航条**，完美解决了移动端下的点击失效与重叠 Bug。
-- **数据字段纠偏**：完全还原了幻影工坊底层的 Vue 属性绑定，避免了因引用未定义变量导致的 `TypeError` 卡死，并纠正了后端接口参数命名偏差（如 `message` 与 `msg`）。
-
-### 4. ⚡ 数据加载缓存化 (`logic_unity.py`)
-
-- 对卡牌数据库解包得到的静态底包元数据应用了内存缓存技术（`_cached_extracted_data`），在单次进程生命周期内仅在首次加载时解析一次，此后刷新页面均能秒级响应。
-
-### 5. 📦 大文件上传限制放宽 (`config.py`)
-
-- 将 `Config.MAX_CONTENT_LENGTH` 上限由 `20MB` 放宽至 `150MB`，从而完美兼容 100MB+ 体积的官方及第三方大型 Mod 关卡包的上传和处理。
-
-### 6. 🌐 根除 favicon.ico 404 警告 (`base.html`)
-
-- 统一在 `base.html` 头部嵌入了基于高性能 SVG Data URL 格式的 **📦 网站 Favicon 图标**，不仅美化了浏览器标签页，还完美杜绝了控制台中的 404 资源缺失警告。
-
-### 7. 🧹 物理清理无用历史资产
-
-- 彻底清除了 `data/` 下无引用的 `card_data_1` 原始底包文件和 `card_data_1.json` 废弃配置，为项目仓库减负约 10MB 空间。
-
-### 8. 💬 意见反馈模块重构（契约 / 分层 / Supabase 权限）
-
-- **分层**：路由迁至薄蓝图 + `services/feedback.py`，校验与写库与 HTTP 层解耦。
-
-- **契约统一**：成功 / 失败 / 限流 / 影子封禁均使用 `ok` + `error`/`message` 字段，前端不再出现“限流却显示通用失败”的错位。
-- **限流 key**：反馈接口使用 `visitor_ip_key()`，与安全模块真实 IP 一致。
-- **类型白名单**：仅接受 `bug` / `feature` / `other`；非法 JSON 用 `silent` 解析，返回 400 而非 500。
-- **前端降级**：反馈页改为原生 form + fetch，去掉对 Vue CDN 的强依赖，CDN 失败时页面仍可用。
-- **数据库**：提供 `sql/feedbacks.sql` 一键重建表结构、CHECK 约束、索引、RLS 与 GRANT（anon 仅 INSERT）。
-
-### 9. 📥 下载中心重构（分区 + 作品包）
-
-- **分区**：`Mod 内容` / `工具与资源`，列表 Tab 切换，短链 `/downloads/mods`、`/downloads/tools`。
-
-- **形态**：`single` 单文件与 `bundle` 作品包（一层子文件列表，支持推荐项与分卷下载）。
-- **体验**：列表封面、合集角标、系列互链、文件级 notes、本地下载计数。
-- **运维**：`scripts/validate_downloads.py` 校验目录结构；细节见 `docs/` 下下载中心文档。
-
-### 10. 📱 移动端竖屏深度体验优化
-
-- **响应式重构**：针对移动端竖屏（宽度 <= 640px 且竖屏状态）进行了深度视觉与布局重构。在保持横屏和 PC 端大卡片高级感的同时，彻底解决了小屏下卡片堆叠过长、内容遮挡等问题。
-- **核心组件小卡片化**：将首页原有的 `AB 工作台` 与 `幻影引擎` 两个核心大卡片，在小屏下自适应重排为**并排双列的精致小磁贴**，字号、内边距和圆角合理缩小，同时为 `AB 工作台` 注入微缩的应用图标，有效节约了首屏约 80% 的纵向高度。
-- **公告卡片精简化**：保留公告卡片的原生设计，但物理缩减了边距 `p-4`，字号按层级缩放，并隐藏了移动端非必要的背景大浮动图标，使得公告占用面积减少约 40%，首屏信息密度显著提升。
-- **扁平化横向列表**：为首页辅助工具网格（如卡组编辑器、关卡编辑器等 6 大工具）引入了横向扁平化弹性布局（`Flex Row`），图标靠左文字靠右，避免了多列排版文字严重折行导致的杂乱感，大幅提升了移动端的点按便捷性与浏览质感。
-- **赞助卡片图文并排**：优化了“让我吃点垃圾”赞助区域的排版，在竖屏下自动切换为图文并排布局（左侧文案与按钮，右侧微缩赞赏码），避免了单栏长图文排版导致的过度下滑。

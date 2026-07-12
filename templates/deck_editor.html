@@ -434,6 +434,17 @@
                 }
             };
 
+            /** 统一阵营为 0=植物 / 1=僵尸（兼容旧缓存里的字符串） */
+            const normalizeFaction = (value) => {
+                if (typeof value === 'number' && Number.isFinite(value)) return value === 1 ? 1 : 0;
+                const s = String(value ?? '').trim().toLowerCase();
+                if (s === '1' || s === 'zombie' || s === 'zombies' || s === '僵尸') return 1;
+                if (s === '0' || s === 'plant' || s === 'plants' || s === '植物') return 0;
+                const n = Number(value);
+                if (Number.isFinite(n)) return n === 1 ? 1 : 0;
+                return 0;
+            };
+
             const loadMockData = () => {
                 heroDecks.value = {
                     "绿影侠": [{ eng_id: "deck_gs_pea", chn_name: "豌豆突击卡组" }, { eng_id: "deck_gs_freeze", chn_name: "冰冻控制卡组" }],
@@ -443,7 +454,7 @@
                 cardDb.value = Array.from({length: 50}, (_, i) => ({
                     CardGuid: 10000 + i,
                     name: `测试卡牌 ${['双发射手', '传送门', '星际赏金', '小鬼投掷者', '三线射手'][i % 5]} - 型号${i}`,
-                    Faction: i % 2 === 0 ? "Plant" : "Zombie"
+                    Faction: i % 2
                 }));
             };
 
@@ -451,7 +462,10 @@
                 currentDeck.value = deck;
                 const saved = localStorage.getItem(`pvzh_deck_${deck.eng_id}`);
                 if (saved) {
-                    deckCards.value = JSON.parse(saved);
+                    deckCards.value = JSON.parse(saved).map(c => ({
+                        ...c,
+                        faction: normalizeFaction(c.faction)
+                    }));
                 } else {
                     try {
                         const allRaw = JSON.parse(localStorage.getItem('pvzh_raw_bundle_data') || '{}');
@@ -459,11 +473,14 @@
                         if (original?.Cards?.CardEntries) {
                             deckCards.value = original.Cards.CardEntries.map(e => {
                                 const cInfo = cardDb.value.find(c => String(c.CardGuid) === String(e.CardGuid));
+                                // 优先用 index 中的阵营，避免旧 bundle / 关键词推断错误
                                 return {
                                     name: cInfo?.name || `未知卡牌(${e.CardGuid})`,
                                     cardguid: e.CardGuid,
                                     count: e.NumCopies,
-                                    faction: cInfo ? cInfo.Faction : e.Faction
+                                    faction: normalizeFaction(
+                                        cInfo != null ? cInfo.Faction : e.Faction
+                                    )
                                 };
                             });
                         } else {
@@ -490,7 +507,7 @@
                         name: card.name, 
                         cardguid: card.CardGuid, 
                         count: 1, 
-                        faction: card.Faction || 'Plant'
+                        faction: normalizeFaction(card.Faction)
                     });
                 }
                 showToast(`已添加: ${card.name}`, 'success');
@@ -543,7 +560,7 @@
                         mods[key.replace('pvzh_deck_', '')] = cards.map(card => ({
                             cardguid: Number(card.cardguid),
                             count: Number(card.count),
-                            faction: Number(card.faction)
+                            faction: normalizeFaction(card.faction)
                         }));
                     }
                 }
@@ -561,7 +578,7 @@
                     cleanedMods[deckId] = cards.map(card => ({
                         cardguid: Number(card.cardguid),
                         count: Number(card.count),
-                        faction: typeof card.faction === 'number' ? card.faction : (card.faction === "Zombie" ? 1 : 0)
+                        faction: normalizeFaction(card.faction)
                     }));
                 }
                 

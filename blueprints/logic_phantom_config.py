@@ -27,7 +27,7 @@ def _read_static_config() -> dict[str, Any]:
 
 
 def _apply_card_index(config: dict[str, Any]) -> dict[str, Any]:
-    """卡牌索引统一从 data/index.json 注入，覆盖静态配置中的冗余副本。"""
+    """卡牌索引统一从 data/index_new.json 注入，覆盖静态配置中的冗余副本。"""
     merged = dict(config)
     merged["card_index"] = to_phantom_card_index()
     merged["card_index_meta"] = card_index_meta()
@@ -35,7 +35,7 @@ def _apply_card_index(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_phantom_config() -> dict[str, Any]:
-    """加载 Phantom 配置，卡牌索引始终来自 data/index.json。"""
+    """加载 Phantom 配置，卡牌索引始终来自 data/index_new.json。"""
     global _cached_config
     if _cached_config is None:
         _cached_config = _read_static_config()

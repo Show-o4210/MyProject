@@ -172,8 +172,13 @@
               <label class="span-2">Prefab Name<input v-model="card.prefabName" placeholder="UUID / Prefab"></label>
               <div class="index-hint span-2" v-if="cardIndexInfo">
                 <div><strong>📇 索引匹配：</strong>[[ cardIndexInfo.NAME_CN || '未命名' ]]</div>
-                <div class="muted">UUID：[[ cardIndexInfo.UUID ]]<template v-if="cardIndexInfo.TEXTURE_NAME"> · 贴图 [[ cardIndexInfo.TEXTURE_NAME ]]</template></div>
-                <button class="mini-btn" @click="syncCardFromIndex">🔄 同步名称 / UUID</button>
+                <div class="muted">
+                  UUID：[[ cardIndexInfo.UUID ]]
+                  <template v-if="cardIndexInfo.FACTION"> · 阵营 [[ cardIndexInfo.FACTION ]]</template>
+                  <template v-if="cardIndexInfo.TYPE"> · 类型 [[ cardIndexInfo.TYPE ]]</template>
+                  <template v-if="cardIndexInfo.TEXTURE_NAME"> · 贴图 [[ cardIndexInfo.TEXTURE_NAME ]]</template>
+                </div>
+                <button class="mini-btn" @click="syncCardFromIndex">🔄 同步名称 / UUID / 阵营</button>
               </div>
               <div class="index-hint span-2 muted" v-else>未匹配到 index 索引。填写 GUID 后可尝试自动同步。</div>
             </div>

@@ -5,6 +5,7 @@ import UnityPy
 from io import BytesIO
 import zipfile
 from logic_data import data_manager
+from utils.card_index import parse_faction
 import uuid
 
 class UnityProcessor:
@@ -101,13 +102,8 @@ class UnityProcessor:
                                                 # 设置新卡牌的值
                                                 new_entry["CardGuid"] = card_guid
                                                 new_entry["NumCopies"] = int(card_data.get('count', 1))
-                                                # ✅ Faction 必须是整数
-                                                faction_val = card_data.get('faction', 0)
-                                                if isinstance(faction_val, int):
-                                                    new_entry["Faction"] = faction_val
-                                                else:
-                                                    # 如果是字符串，转换为整数
-                                                    new_entry["Faction"] = 1 if faction_val == "Zombie" else 0
+                                                # Faction 必须是整数 0=植物 / 1=僵尸
+                                                new_entry["Faction"] = parse_faction(card_data.get('faction', 0))
                                                 new_entry["Guid"] = str(uuid.uuid4())
                                                 new_entry["Filter"] = ""
                                             else:

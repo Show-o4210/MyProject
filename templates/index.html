@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}首页 - PVZH Mod 工具箱{% endblock %}
+{% block title %}PVZH Mod Toolkit · 植物大战僵尸英雄 Mod 工具箱{% endblock %}
+
+{% block meta_description %}Free online PVZH mod tools for Plants vs. Zombies Heroes — AssetBundle workbench, deck &amp; level editors, phantom engine, card tools and downloads. 植物大战僵尸：英雄 免费在线 Mod 工具：AB 工作台、卡组/关卡编辑、幻影引擎、送卡买包与下载中心。{% endblock %}
 
 {% block content %}
 <div id="lobby-app" class="px-4 sm:px-6 lg:px-8 py-8 md:py-12" v-cloak>
@@ -120,7 +122,7 @@
                 <div class="relative z-10">
                     <div class="inline-flex items-center gap-1.5 px-2 py-0.5 md:px-2.5 md:py-1 rounded-full bg-brand-50 text-brand-700 text-[10px] md:text-[11px] font-bold mb-2 md:mb-3 border border-brand-100">
                         <span class="material-symbols-rounded text-[12px] md:text-[14px]">campaign</span>
-                        公告
+                        公告 · Notice
                     </div>
 
                     <div class="flex items-center gap-2 text-[9px] md:text-[10px] text-slate-400 font-mono mb-1.5 md:mb-2">
@@ -173,12 +175,15 @@
                         <h1 class="text-base md:text-5xl font-extrabold tracking-tight mb-1 md:mb-4 leading-[1.1]">
                             AB 工作台
                         </h1>
+                        <p class="hidden md:block text-xs font-semibold tracking-wide text-brand-200/80 uppercase mb-3">
+                            AssetBundle Workbench
+                        </p>
 
                         <p class="hidden md:block text-sm md:text-base text-slate-300/90 leading-relaxed max-w-xl">
-                            通用 AssetBundle 检查、解包、预检与回填工具。面向资源分析、JSON/RAW/PNG 导出、轻量回填与 Mod 数据验证的核心工作台。
+                            通用 AssetBundle 检查、解包、预检与回填工具。面向资源分析、JSON / PNG 导出、轻量回填与 Mod 数据验证的核心工作台。
                         </p>
                         <p class="md:hidden text-[11px] text-slate-400 leading-normal">
-                            AB包提取、解包与回填验证。
+                            Inspect · Unpack · Validate · Repack
                         </p>
                     </div>
 
@@ -197,11 +202,12 @@
                         <span class="material-symbols-rounded text-[22px] md:text-[26px]">auto_fix_high</span>
                     </div>
                     <h2 class="text-base md:text-2xl font-extrabold text-slate-900 mb-1 md:mb-2 tracking-tight">幻影引擎</h2>
+                    <p class="hidden md:block text-[11px] font-bold tracking-wide text-brand-500/80 uppercase mb-2">Phantom Engine</p>
                     <p class="hidden md:block text-sm text-slate-500 leading-relaxed">卡牌数据编辑、技能结构树、JSON 保留与 card_data 注入。</p>
-                    <p class="md:hidden text-[11px] text-slate-500 leading-normal">数据编辑与 JSON 注入。</p>
+                    <p class="md:hidden text-[11px] text-slate-500 leading-normal">Card data · skill trees · JSON inject</p>
                 </div>
                 <div class="hidden md:inline-flex mt-6 items-center text-sm font-bold text-brand-600 group-hover:gap-2 transition-all">
-                    进入编辑器
+                    进入编辑器 · Open
                     <span class="material-symbols-rounded text-[18px] ml-1 group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
                 </div>
             </a>
@@ -219,10 +225,10 @@
                             </span>
                             辅助工具
                         </h2>
-                        <p class="text-xs text-slate-400 mt-1.5 ml-[2.625rem]">主工作流之外的账号、卡组、关卡与下载工具。</p>
+                        <p class="text-xs text-slate-400 mt-1.5 ml-[2.625rem]">Side Tools · decks, accounts, levels &amp; downloads</p>
                     </div>
                     <a href="/tools" class="hidden sm:inline-flex items-center text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 border border-brand-100 px-3 py-2 rounded-xl hover:bg-brand-100 transition-colors">
-                        工具总览
+                        工具总览 · All Tools
                         <span class="material-symbols-rounded text-[16px] ml-1">arrow_forward</span>
                     </a>
                 </div>
@@ -233,7 +239,8 @@
                             <span class="material-symbols-rounded text-[22px]">style</span>
                         </div>
                         <div class="tool-info">
-                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">卡组编辑器</h3>
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-0.5">卡组编辑器</h3>
+                            <p class="text-[10px] font-bold tracking-wide text-brand-500/70 uppercase mb-1">Deck Editor</p>
                             <p class="text-xs text-slate-500 leading-relaxed">编辑卡组配置并生成可用数据。</p>
                         </div>
                     </a>
@@ -243,7 +250,8 @@
                             <span class="material-symbols-rounded text-[22px]">send</span>
                         </div>
                         <div class="tool-info">
-                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">卡牌发送器</h3>
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-0.5">卡牌发送器</h3>
+                            <p class="text-[10px] font-bold tracking-wide text-brand-500/70 uppercase mb-1">Card Sender</p>
                             <p class="text-xs text-slate-500 leading-relaxed">按账号与数量批量发送卡牌。</p>
                         </div>
                     </a>
@@ -253,7 +261,8 @@
                             <span class="material-symbols-rounded text-[22px]">shopping_cart</span>
                         </div>
                         <div class="tool-info">
-                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">卡包购买器</h3>
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-0.5">卡包购买器</h3>
+                            <p class="text-[10px] font-bold tracking-wide text-brand-500/70 uppercase mb-1">Pack Buyer</p>
                             <p class="text-xs text-slate-500 leading-relaxed">浏览并执行卡包购买操作。</p>
                         </div>
                     </a>
@@ -263,7 +272,8 @@
                             <span class="material-symbols-rounded text-[22px]">download</span>
                         </div>
                         <div class="tool-info">
-                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">下载中心</h3>
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-0.5">下载中心</h3>
+                            <p class="text-[10px] font-bold tracking-wide text-brand-500/70 uppercase mb-1">Downloads</p>
                             <p class="text-xs text-slate-500 leading-relaxed">集中下载工具、补丁与参考文件。</p>
                         </div>
                     </a>
@@ -273,7 +283,8 @@
                             <span class="material-symbols-rounded text-[22px]">dashboard_customize</span>
                         </div>
                         <div class="tool-info">
-                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">关卡编辑器</h3>
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-0.5">关卡编辑器</h3>
+                            <p class="text-[10px] font-bold tracking-wide text-brand-500/70 uppercase mb-1">Level Editor</p>
                             <p class="text-xs text-slate-500 leading-relaxed">提取修改 AB 包，自定义人机与场景事件。</p>
                         </div>
                     </a>
@@ -283,7 +294,8 @@
                             <span class="material-symbols-rounded text-[22px]">forum</span>
                         </div>
                         <div class="tool-info">
-                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-1">反馈中心</h3>
+                            <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 mb-0.5">反馈中心</h3>
+                            <p class="text-[10px] font-bold tracking-wide text-brand-500/70 uppercase mb-1">Feedback</p>
                             <p class="text-xs text-slate-500 leading-relaxed">提交 Bug、建议和测试结果。</p>
                         </div>
                     </a>
@@ -298,6 +310,7 @@
                         </div>
                         <div>
                             <h2 class="text-base font-extrabold text-slate-900 tracking-tight">让我吃点垃圾</h2>
+                            <p class="text-[10px] font-bold tracking-wide text-amber-600/70 uppercase">Buy me a snack</p>
                         </div>
                     </div>
 
@@ -309,7 +322,7 @@
                             <a href="https://space.bilibili.com/1578548705" target="_blank" rel="noopener noreferrer"
                                class="sponsor-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-[#00a1d6] hover:bg-[#0090c0] shadow-soft transition-all active:scale-[0.98] w-full justify-center">
                                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.172 2.757L10.414 6h3.171l3.243-3.243a1 1 0 0 1 1.414 1.414L14.586 7H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3.414L5.757 4.172A1 1 0 0 1 7.172 2.757zM6 9v10h12V9H6zm2.5 2.5a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1zm7 0a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1z"/></svg>
-                                关注作者 B 站
+                                关注作者 B 站 · Follow
                             </a>
                         </div>
                         <div class="qrcode-container relative rounded-2xl p-3 bg-gradient-to-br from-amber-50 to-rose-50 border border-amber-100/60 group-hover:scale-[1.02] transition-transform duration-300 self-center">
@@ -333,13 +346,13 @@
                     </span>
                     更新日志
                 </h2>
-                <p class="text-xs text-slate-400 mt-1.5 ml-[2.625rem]">最近变更与历史记录。</p>
+                <p class="text-xs text-slate-400 mt-1.5 ml-[2.625rem]">Changelog · recent updates &amp; history</p>
             </div>
             <button v-if="logs.length > maxDisplayLogs"
                     @click="showAllLogs = !showAllLogs"
                     class="inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 border border-brand-100 px-3 py-2 rounded-xl transition-colors hover:bg-brand-100">
                 <span class="material-symbols-rounded text-[16px]">{{ showAllLogs ? 'expand_less' : 'expand_more' }}</span>
-                {{ showAllLogs ? '收起' : '查看全部' }}
+                {{ showAllLogs ? '收起 · Collapse' : '查看全部 · View all' }}
             </button>
         </div>
 
@@ -371,7 +384,7 @@
 
         <div v-if="logs.length > maxDisplayLogs && !showAllLogs" class="mt-5 text-center">
             <p class="text-xs text-slate-400">
-                显示最近 {{ maxDisplayLogs }} 条，共 {{ logs.length }} 条更新
+                Showing latest {{ maxDisplayLogs }} · {{ logs.length }} updates total
             </p>
         </div>
     </section>

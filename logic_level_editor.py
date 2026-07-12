@@ -22,7 +22,7 @@ class LevelEditorLogic:
 
     # ================= 数据字典读取 =================
     def get_card_index(self):
-        """返回卡牌索引列表 (从 data/index.json)"""
+        """返回卡牌索引列表 (从 data/index_new.json)"""
         from utils.card_index import to_level_editor_cards
         return to_level_editor_cards()
 

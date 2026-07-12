@@ -281,6 +281,13 @@ createApp({
       if (!guid) return null;
       return list.find(item => this.normalizeIndexText(item.GUID) === guid) || null;
     },
+    applyIndexFaction(target, info) {
+      if (!target || !info) return;
+      const enumVal = info.FACTION_ENUM
+        || (info.FACTION === '僵尸' || info.FACTION === 'Zombies' ? 'Zombies' : '')
+        || (info.FACTION === '植物' || info.FACTION === 'Plants' ? 'Plants' : '');
+      if (enumVal) target.faction = enumVal;
+    },
     syncCardFromIndex() {
       const info = this.findCardIndexInfo(this.card);
       if (!info) {
@@ -289,7 +296,8 @@ createApp({
       }
       this.card.name = info.NAME_CN || this.card.name;
       this.card.prefabName = info.UUID || this.card.prefabName;
-      this.showToast('已同步名称与 UUID');
+      this.applyIndexFaction(this.card, info);
+      this.showToast('已同步名称 / UUID / 阵营');
     },
     resetCard() {
       if (!confirm('清空本地草稿并重新开始？')) return;
@@ -305,6 +313,10 @@ createApp({
       if (info) {
         if (info.NAME_CN) merged.name = info.NAME_CN;
         if (info.UUID) merged.prefabName = info.UUID;
+        // 导入时若阵营仍是默认 Plants，用索引纠正
+        if (!merged.faction || merged.faction === 'Plants' || merged.faction === 'All') {
+          this.applyIndexFaction(merged, info);
+        }
       }
       const originalEntities = JSON.parse(JSON.stringify(merged.logicEntities || []));
       merged.skillTreeDraft = migrateLegacyTreeDraft(merged.skillTreeDraft, originalEntities, this.nodeDef);

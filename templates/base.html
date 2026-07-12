@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>{% block title %}PVZH Mod 工具箱{% endblock %}</title>
+    <title>{% block title %}PVZH Mod Toolkit · 植物大战僵尸英雄 Mod 工具箱{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}Free online PVZH (Plants vs. Zombies Heroes) mod toolkit: AssetBundle unpack/repack, deck &amp; level editors, phantom card workshop and downloads. 植物大战僵尸：英雄 免费在线 Mod 工具箱：AB 解包回填、卡组/关卡编辑、幻影工坊与下载中心。{% endblock %}">
+    <meta name="keywords" content="PVZH, PVZ Heroes, Plants vs Zombies Heroes, Mod Toolkit, AssetBundle, 植物大战僵尸英雄, Mod 工具箱, AB 解包, 卡组编辑">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ self.title() }}">
+    <meta property="og:description" content="{{ self.meta_description() }}">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
 
     <script src="https://cdn.tailwindcss.com"></script>
