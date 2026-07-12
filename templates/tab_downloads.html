@@ -67,7 +67,7 @@
     <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
         {% if active_section and active_section.entries %}
             {% for tool in active_section.entries %}
-            <article class="bg-white rounded-3xl shadow-sm hover:shadow-lg border border-slate-200 transition-all duration-300 overflow-hidden flex flex-col hover:-translate-y-0.5">
+            <a href="{{ url_for('downloads.detail', item_id=tool.id) }}" class="group bg-white rounded-3xl shadow-sm hover:shadow-lg border border-slate-200 transition-all duration-300 overflow-hidden flex flex-col hover:-translate-y-0.5">
 
                 {% if tool.cover %}
                 <div class="relative h-36 sm:h-40 bg-slate-100 overflow-hidden">
@@ -157,13 +157,12 @@
                         {% if tool.kind == 'bundle' %}打开合集{% else %}说明页{% endif %}
                     </span>
 
-                    <a href="{{ url_for('downloads.detail', item_id=tool.id) }}"
-                       class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-2xl transition active:scale-95">
+                    <div class="inline-flex items-center justify-center bg-blue-600 group-hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-2xl transition active:scale-95">
                         查看详情
                         <span class="material-symbols-rounded text-[18px] ml-1">arrow_forward</span>
-                    </a>
+                    </div>
                 </div>
-            </article>
+            </a>
             {% endfor %}
         {% else %}
             <div class="col-span-full text-center py-16 bg-white rounded-3xl border border-slate-200 border-dashed">

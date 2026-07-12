@@ -300,4 +300,10 @@ python scripts/validate_downloads.py
    gunicorn --workers 1 --threads 2 --timeout 120 app:app
    ```
 
+4. **谷歌 Chrome 搜索收录与 SEO 优化（GSC）**：
+   - 实现了动态 `robots.txt` 与 `sitemap.xml`：通过读取 `data/downloads.json` 的分类和具体 Mod 条目自动生成站点地图。
+   - 对下载中心的列表进行爬虫抓取路径的层级优化，并将全局 Title、Keywords、Description 配置为高权重中文关键词。
+   - 建议在白天活跃期间手动向 Google Search Console 提交站点地图以获得最佳的谷歌 Chrome 搜索收录效果。
+
 ---
+

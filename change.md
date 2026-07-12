@@ -96,3 +96,19 @@
 | 幻影工坊 | `to_phantom_card_index()` | `FACTION`（中文）+ `FACTION_ENUM`（`Plants`/`Zombies`）+ `TYPE` / `NAME_EN` |
 
 **维护提示**：更新卡牌表时只维护 `data/index_new.json`；改索引文件名或字段约定时同步修改 `utils/card_index.py` 中的 `INDEX_FILENAME` 与 `parse_faction()`。Unity 补丁工具里的 `_index.json` 是 AssetStudio 导出索引，与本卡牌元数据无关，勿混淆。
+
+### 12. 🌐 全站谷歌 Chrome 搜索收录与 SEO 优化（GSC）
+
+为了确保 Render 部署的工具箱能够在 Google 浏览器中被完美搜索和收录，同时兼顾夜间休眠的运行策略，我们对全站进行了针对性的 SEO 调优：
+
+- **动态注入 `robots.txt` 与 `sitemap.xml`**：
+  - 移除了 [app.py](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/app.py) 中的静态 `robots.txt` 路由。
+  - 在首页蓝图 [blueprints/home.py](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/blueprints/home.py) 中新增了动态生成指令，使得站点地图和爬虫协议免于手动维护。
+  - **动态站点地图**：`sitemap.xml` 中排除了所有的后端 `/api/` 路由，并显式包含了主导航及功能页面；同时动态读取 `downloads.json`，将下载中心的每个具体 Mod 说明页也自动编入 Sitemap，引导爬虫深度抓取。
+
+- **补全全局 SEO 元数据**：
+  - 在母版 [templates/base.html](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/templates/base.html) 中将 Title、Description 与 Keywords 重构为高度精准的 PVZH 在线 Mod 辅助工具相关中文关键词，优化谷歌搜索结果的卡片展示。
+
+- **优化爬虫抓取路径（顺藤摸瓜）**：
+  - 将下载中心 [templates/tab_downloads.html](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/templates/tab_downloads.html) 的 Mod 卡片重构为由标准的 `<a>` 标签包裹，并将内部的“查看详情”按钮改造为 `<div>` 从而彻底规避 `<a>` 标签嵌套的 HTML 语法问题，提高谷歌爬虫对 Mod 详情页的抓取效率。
+
