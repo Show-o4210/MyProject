@@ -11,8 +11,18 @@
     ],
     "changelogs": [
         {
-            "date": "2026-07-12",
+            "date": "2026-07-16",
             "tag": "最新",
+            "title": "Unity 工具转义与 m_Script 保护升级",
+            "details": [
+                "解决转义丢失：在 <code>FormatManager.to_csv</code> 中显式指定 <code>lineterminator='\\n'</code>，并移除回写 CSV 时的 3 个冗余空行，实现多行剧情与带 <code>\\\"</code> 嵌套 JSON 字符串的正确读写，防止斜杠丢失",
+                "保护 <code>m_Script</code>：在 <code>transform_json_tree</code> 中明确对 <code>m_Script</code> 字段执行避让，防止 PPtr 资源引用被折叠为字符串而引起 UnityPy 底层保存时死机并报 500"
+            ],
+            "is_expanded": true
+        },
+        {
+            "date": "2026-07-12",
+            "tag": "功能",
             "title": "下载中心重构：分区 + 作品包",
             "details": [
                 "下载中心按用途分为 <strong>Mod 内容</strong> 与 <strong>工具与资源</strong> 两大分区，列表 Tab 切换更清晰",
@@ -23,7 +33,7 @@
                 "提供 <code>scripts/validate_downloads.py</code> 校验目录结构；设计说明见仓库 <code>docs/</code>",
                 "同步更新 README：下载中心架构、路由与维护约定"
             ],
-            "is_expanded": true
+            "is_expanded": false
         },
         {
             "date": "2026-07-09",

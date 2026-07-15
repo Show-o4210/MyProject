@@ -164,3 +164,23 @@
 
 **说明**：卡组工坊 `logic_unity.py` 一键打包不经过该 transform 路径，本 bug 主要影响 **AB 工作台** 的通用解包/回填。
 
+### 15. 🔧 Unity 工具 CSV 转义丢失修复 & m_Script 强力保护（2026-07-16）
+
+**问题**
+
+1. **转义字符丢失**：导出 CSV 再读取回写时，由于未在 `csv.writer` 显式声明 `lineterminator`，且存在回写时盲目写入无意义空行（3 行）的逻辑，导致带有多行文本或大量转义引号 `\"` 的嵌套 JSON 字符串在 CSV 和 JSON 互转读写时发生斜杠丢失，破坏格式。
+2. **`m_Script` 被强行折叠 500**：`m_Script`（或部分 PPtr 引用）在通用解包/回填转换中，即使处于嵌套结构，一旦进入 collapse 逻辑变成字符串，就会导致 UnityPy 的底层 `save_typetree` 无法序列化字典而引发 500 报错。
+
+**解决与优化**
+
+- **解决转义丢失**：在 `FormatManager.to_csv` 中显式指定 `lineterminator='\n'`，并且回写 CSV 时**移除**以往无意义写入 3 空行的逻辑。修改后无论嵌套层级多深，在 CSV 与 JSON 转换中均能够正确并精确地单行或多行一次性读取，不会发生任何反斜杠丢失问题。
+- **保护 `m_Script`（拒绝 500）**：在 `transform_json_tree` 核心转换逻辑中，除了 `is_pptr_like` 判断外，明确将 `m_Script` 作为键白名单进行硬性避让（`if k == "m_Script" or is_pptr_like(v): continue`），确保该引用类型绝不参与任何 collapse/stringify 压缩，大幅提升了对复杂 MonoBehaviour 数据回写时的安全系数。
+
+**验证与测试**
+
+- 经编写本地测试脚本测试证明：
+  - 嵌套复杂 JSON 和带转义 `\"` 文本的数据转换前后的 CSV 内容可完美 round-trip 还原，且不再夹杂冗余空行。
+  - 含有 `m_Script` 的 Typetree 在 `mode='expand'` 与 `mode='collapse'` 时，`m_Script` 所指向的 PPtr 引用字段在全程均得到完美保留而不被折叠为字符串。
+  - 全部单体断言测试均一次性通过。
+
+

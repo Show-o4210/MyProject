@@ -121,15 +121,12 @@ class FormatManager:
     @staticmethod
     def to_csv(data_dict):
         output = io.StringIO()
-        writer = csv.writer(output)
+        writer = csv.writer(output, lineterminator='\n')
 
         if isinstance(data_dict, dict):
             for key, value in data_dict.items():
                 val_str = json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else value
                 writer.writerow([key, val_str])
-
-                for _ in range(3):
-                    writer.writerow([])
 
         return output.getvalue().encode('utf-8-sig')
 
@@ -211,7 +208,7 @@ def transform_json_tree(tree, mode="expand", process_strategy="auto"):
     """
     if isinstance(tree, dict):
         for k, v in list(tree.items()):
-            if is_pptr_like(v):
+            if k == "m_Script" or is_pptr_like(v):
                 continue
 
             if k in STRING_EMBEDDED_JSON_KEYS:
