@@ -149,8 +149,8 @@ MyProject/
 | `POST /unity/validate-repack` | 补丁 zip 与原始 Bundle 匹配预检 |
 | `POST /repack` | 将补丁注入原始 Bundle 并下载 |
 
-- **嵌入 JSON 处理**（`transform_json_tree`）：仅对 `m_Data` / `m_RawData` 等「字符串里嵌 JSON」的字段做 expand（便于编辑）与 collapse（再写回）。
-- **PPtr 保护**：`m_Script`、`m_GameObject` 等 Unity 引用是 `{ m_FileID, m_PathID }` 字典，**禁止**被 stringify。旧逻辑把 `m_Script` 压成字符串会导致 `save_typetree` 报 `'str' object has no attribute 'm_FileID'`，表现为预检 200、正式回填 500。
+- **嵌入 JSON 处理**（`transform_json_tree`）：对 `m_Data` / `m_RawData` / **TextAsset 的 `m_Script` 文本** 等「字符串里嵌 JSON」的字段做 expand（导出为可正常换行的嵌套对象）与 collapse（再写回字符串）。
+- **`m_Script` 双语义**：MonoBehaviour 里是 PPtr 字典 `{ m_FileID, m_PathID }`，只按**值形态** `is_pptr_like` 保护、禁止 stringify；TextAsset 里是正文，必须 expand，否则 `json.dumps` 会二次转义成一整行 `{\\r\\n \\"1\\":...}`。
 - **兼容**：`restore_pptr_fields()` 可把历史错误导出中已字符串化的 PPtr 还原为 dict。
 - **并发**：与全站共用 `UNITY_TASK_LOCK`，避免 Render 512MB 下多路 UnityPy 同时跑爆内存。
 

@@ -153,16 +153,25 @@ class FormatManager:
 
 
 # 仅对「字符串里嵌 JSON」的字段做 expand/collapse。
-# 切勿包含 m_Script：在 Unity 里它是 PPtr（{m_FileID, m_PathID}），
-# collapse 成字符串会导致 save_typetree 报 'str' object has no attribute 'm_FileID'。
+#
+# m_Script 有双语义，不可按键名一刀切：
+# - MonoBehaviour：PPtr 字典 {m_FileID, m_PathID} —— 禁止 stringify
+#   （stringify 会导致 save_typetree 报 'str' object has no attribute 'm_FileID'）
+# - TextAsset：实际文本内容，常为整段 pretty JSON（含真实 \r\n）—— 必须 expand
+#   否则 json.dumps 会把正文二次转义成 "{\\r\\n \\"1\\": ...}" 一整行，无法正常换行编辑
+#
+# 判定顺序：先 is_pptr_like(v) 跳过引用；仅当值为 JSON 文本字符串时才 expand/collapse。
 STRING_EMBEDDED_JSON_KEYS = {
     "m_Data",
     "m_RawData",
     "m_ScriptText",
+    "m_Script",  # TextAsset 文本；MonoBehaviour 时因 is_pptr_like 被跳过
     "jsonData",
     "JsonData",
     "dataJson",
     "rawJson",
+    "script",
+    "text",
 }
 
 
@@ -183,7 +192,40 @@ def looks_like_json_text(text):
     if not isinstance(text, str):
         return False
     s = text.strip()
+    if not s:
+        return False
     return (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]"))
+
+
+def detect_json_newline(text):
+    """从原始嵌入 JSON 文本推断换行风格，collapse 时尽量还原。"""
+    if not isinstance(text, str):
+        return "\n"
+    # 优先检测真实 CRLF / CR；再检测已被写成字面 \\r\\n 的情况（极少见）
+    if "\r\n" in text:
+        return "\r\n"
+    if "\r" in text and "\n" not in text:
+        return "\r"
+    return "\n"
+
+
+def dumps_embedded_json(value, process_strategy="auto", newline="\n"):
+    """
+    把 expand 后的对象压回字符串。
+    - auto：紧凑单行，体积小、稳定
+    - 其它（raw 等）：保留 indent=4 可读格式，并按原文本换行风格输出
+    """
+    if process_strategy == "auto":
+        body = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    else:
+        body = json.dumps(value, indent=4, ensure_ascii=False)
+
+    if newline == "\r\n":
+        # json.dumps 只产出 \n，按原 TextAsset 习惯还原 CRLF
+        body = body.replace("\r\n", "\n").replace("\n", "\r\n")
+    elif newline == "\r":
+        body = body.replace("\r\n", "\n").replace("\n", "\r")
+    return body
 
 
 def parse_embedded_json(text, process_strategy="auto"):
@@ -197,45 +239,54 @@ def parse_embedded_json(text, process_strategy="auto"):
             return text
 
 
-def transform_json_tree(tree, mode="expand", process_strategy="auto"):
+def transform_json_tree(tree, mode="expand", process_strategy="auto", _newline_hints=None):
     """
-    expand：把「字符串形式的嵌入 JSON」解析成对象，便于编辑。
+    expand：把「字符串形式的嵌入 JSON」解析成对象，便于正常换行编辑。
     collapse：把上述字段重新压回字符串，再 save_typetree。
 
     重要：
-    - 不处理 m_Script / 任意 PPtr 形态字段
+    - 任意 PPtr 形态字段（含 MonoBehaviour 的 m_Script dict）绝不 stringify
+    - TextAsset 的 m_Script 字符串 JSON 会 expand 成对象（导出带真实换行）
     - 非 STRING_EMBEDDED_JSON_KEYS 的 dict/list 只递归，不 stringify
     """
+    if _newline_hints is None:
+        _newline_hints = {}
+
     if isinstance(tree, dict):
         for k, v in list(tree.items()):
-            if k == "m_Script" or is_pptr_like(v):
+            # 只按值形态保护 PPtr，不再按键名硬跳过 m_Script
+            if is_pptr_like(v):
                 continue
 
             if k in STRING_EMBEDDED_JSON_KEYS:
                 if mode == "expand" and isinstance(v, str) and looks_like_json_text(v):
+                    # 记录原换行风格，供同树 collapse 时还原（同一次调用链内有效）
+                    _newline_hints[id(tree), k] = detect_json_newline(v)
                     parsed = parse_embedded_json(v, process_strategy)
                     tree[k] = parsed
                     if isinstance(parsed, (dict, list)):
-                        transform_json_tree(parsed, mode, process_strategy)
+                        transform_json_tree(parsed, mode, process_strategy, _newline_hints)
 
                 elif mode == "collapse" and isinstance(v, (dict, list)):
-                    # PPtr 误入 m_Data 时也不折叠
+                    # PPtr 误入可折叠键时也不折叠
                     if is_pptr_like(v):
                         continue
-                    transform_json_tree(v, mode, process_strategy)
-                    separators = (",", ":") if process_strategy == "auto" else None
-                    tree[k] = json.dumps(v, separators=separators, ensure_ascii=False)
+                    transform_json_tree(v, mode, process_strategy, _newline_hints)
+                    newline = _newline_hints.get((id(tree), k), "\n")
+                    # TextAsset 正文：raw 模式保留 pretty+原换行；auto 紧凑（语义等价）
+                    # 若值为「非 PPtr 的普通对象」，一律按嵌入 JSON 字符串写回
+                    tree[k] = dumps_embedded_json(v, process_strategy, newline=newline)
 
                 elif isinstance(v, (dict, list)):
-                    transform_json_tree(v, mode, process_strategy)
+                    transform_json_tree(v, mode, process_strategy, _newline_hints)
 
             elif isinstance(v, (dict, list)):
-                transform_json_tree(v, mode, process_strategy)
+                transform_json_tree(v, mode, process_strategy, _newline_hints)
 
     elif isinstance(tree, list):
         for item in tree:
             if isinstance(item, (dict, list)):
-                transform_json_tree(item, mode, process_strategy)
+                transform_json_tree(item, mode, process_strategy, _newline_hints)
 
     return tree
 
@@ -933,11 +984,12 @@ def repack():
                         if not isinstance(new_tree, dict):
                             raise Exception("JSON 根节点必须是对象（typetree dict），不能是数组或原始值")
 
-                        # 将可编辑的嵌入 JSON 压回字符串；PPtr（含 m_Script）保持 dict
+                        # 嵌入 JSON 字符串压回；MonoBehaviour 的 m_Script PPtr 保持 dict，
+                        # TextAsset 的 m_Script 对象则 dumps 回文本字符串
                         collapsed_tree = transform_json_tree(
                             new_tree, mode='collapse', process_strategy=process_mode
                         )
-                        # 防御：若旧版导出/手改把 m_Script 弄成了字符串，尝试解析回来
+                        # 防御：旧版误把 PPtr m_Script 导出成字符串时，尝试解析回来
                         collapsed_tree = restore_pptr_fields(collapsed_tree)
                         obj.save_typetree(collapsed_tree)
                         modified_files_count += 1

@@ -13,10 +13,11 @@
         {
             "date": "2026-07-16",
             "tag": "最新",
-            "title": "Unity 工具转义与 m_Script 保护升级",
+            "title": "Unity 工具 TextAsset 换行修复 & m_Script 双语义",
             "details": [
-                "解决转义丢失：在 <code>FormatManager.to_csv</code> 中显式指定 <code>lineterminator='\\n'</code>，并移除回写 CSV 时的 3 个冗余空行，实现多行剧情与带 <code>\\\"</code> 嵌套 JSON 字符串的正确读写，防止斜杠丢失",
-                "保护 <code>m_Script</code>：在 <code>transform_json_tree</code> 中明确对 <code>m_Script</code> 字段执行避让，防止 PPtr 资源引用被折叠为字符串而引起 UnityPy 底层保存时死机并报 500"
+                "修复 TextAsset 解包「一整行转义地狱」：<code>m_Script</code> 在 TextAsset 中是正文 JSON，不再被当成 MonoBehaviour PPtr 整键跳过；expand 后导出为可正常换行编辑的嵌套对象",
+                "保留 MonoBehaviour 保护：仅当值为 <code>{m_FileID,m_PathID}</code> 时跳过，避免 PPtr 被 stringify 导致回填 500",
+                "回填 collapse 时 TextAsset 正文写回字符串、PPtr 保持字典；CSV 转义与 round-trip 语义一致性已用 <code>card_data_5</code> 验证"
             ],
             "is_expanded": true
         },

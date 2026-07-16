@@ -183,4 +183,32 @@
   - 含有 `m_Script` 的 Typetree 在 `mode='expand'` 与 `mode='collapse'` 时，`m_Script` 所指向的 PPtr 引用字段在全程均得到完美保留而不被折叠为字符串。
   - 全部单体断言测试均一次性通过。
 
+### 16. 🔧 Unity TextAsset `m_Script` 转义/换行修复（双语义）（2026-07-16）
+
+**问题**
+
+上一版为防 MonoBehaviour 回填 500，对 **`m_Script` 键名硬性 `continue` 跳过**。  
+但在 **TextAsset** 中，`m_Script` 不是 PPtr，而是整段文本（例如 `card_data_5` 的卡牌 JSON，约 7.7MB，原文带真实换行）。  
+硬跳过后 `json.dumps` 会把正文二次转义成：
+
+```json
+"m_Script": "{\r\n    \"1\": {\r\n ..."
+```
+
+整文件几乎只有 2 行真实换行，编辑体验极差（`Unpacked_card_data_5` 即此现象）。
+
+**解决**
+
+- **`m_Script` 双语义**：
+  - 值是 PPtr 字典 `{m_FileID, m_PathID}` → `is_pptr_like` 跳过（MonoBehaviour）
+  - 值是 JSON 文本字符串 → 纳入 `STRING_EMBEDDED_JSON_KEYS`，expand 成对象 / collapse 回字符串（TextAsset）
+- **不再按键名一刀切**；判定只看值形态。
+- collapse 时 `auto` 紧凑 dumps（语义等价、体积更小）；`raw` 保留 indent=4，并可按原文本换行风格还原 CRLF。
+
+**验证**
+
+- 使用目录 `card_data_5`：expand 后导出 `Unpacked_card_data_5`，真实换行约 13 万行，正文可正常阅读。
+- expand → 导出 JSON → 再 collapse → `save_typetree` → 重载 Bundle：与原文 `json.loads` 语义全等。
+- 合成 MonoBehaviour：`m_Script` PPtr 全程不被 stringify；`m_Data` 仍可 expand/collapse。
+
 
