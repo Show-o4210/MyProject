@@ -1,11 +1,14 @@
 # render.yaml
+# Free 套餐约 512MB：workers 保持 1；threads 分担 I/O（送卡/买包等出站请求）。
+# max-requests 不宜过低（旧值 50 会几乎每分钟换 worker，加重冷启动与 500 毛刺）。
+# 若 Dashboard 里自定义了 Start Command，请同步改成下面这一行。
 services:
   - type: web
     name: pvz-h-tools
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt && python scripts/generate_sitemap.py
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 --max-requests 50 --max-requests-jitter 10
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --max-requests 500 --max-requests-jitter 50 --access-logfile - --error-logfile -
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.3"

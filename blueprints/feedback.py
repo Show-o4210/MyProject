@@ -30,7 +30,9 @@ def submit_feedback():
     except FeedbackValidationError as e:
         return jsonify({"ok": False, "error": e.message, "code": "VALIDATION_ERROR"}), 400
     except FeedbackStorageError as e:
-        return jsonify({"ok": False, "error": e.message, "code": "STORAGE_ERROR"}), 500
+        # 配置/表/权限问题对运维可见 code；文案可直接展示给用户
+        http_status = 503 if e.code in {"TABLE_NOT_FOUND", "CONFIG_ERROR", "PERMISSION_DENIED"} else 500
+        return jsonify({"ok": False, "error": e.message, "code": e.code}), http_status
     except Exception as e:
         logger.error("意见反馈未预期异常: %s: %s", type(e).__name__, e)
         return jsonify(

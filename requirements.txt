@@ -2,6 +2,7 @@ Flask
 UnityPy>=1.20.26
 Pillow
 gunicorn
+whitenoise
 supabase
 pydantic>=2.11.0,<3
 pydantic-core>=2.27.0,<3

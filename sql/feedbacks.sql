@@ -44,6 +44,11 @@ DROP POLICY IF EXISTS "feedbacks_authenticated_select" ON public.feedbacks;
 
 -- 4a) 匿名 / 已登录客户端：只允许 INSERT（后端用 anon key 写入）
 --     不开放 SELECT/UPDATE/DELETE，避免任何人用 anon key 把反馈列表读走
+--
+-- 重要（后端约定）：
+--   supabase-py / PostgREST 默认 INSERT 使用 Prefer: return=representation，
+--   会在插入后尝试 SELECT 回读。anon 无 SELECT 时会失败（常被误认为「接口 404」）。
+--   后端必须使用 returning=minimal（见 services/feedback.py）。
 CREATE POLICY "feedbacks_anon_insert"
     ON public.feedbacks
     FOR INSERT

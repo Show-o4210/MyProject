@@ -26,8 +26,9 @@ class FeedbackValidationError(Exception):
 class FeedbackStorageError(Exception):
     """持久化失败（配置缺失或 Supabase 异常）。"""
 
-    def __init__(self, message: str = "服务器开小差了，请稍后再试"):
+    def __init__(self, message: str = "服务器开小差了，请稍后再试", *, code: str = "STORAGE_ERROR"):
         self.message = message
+        self.code = code
         super().__init__(message)
 
 
@@ -63,11 +64,55 @@ def build_insert_row(normalized: dict[str, str]) -> dict[str, Any]:
         "content": normalized["content"],
         "contact": normalized["contact"],
         "ua_info": {
-            "user_agent": user_agent,
-            "ip": client_ip,
+            "user_agent": (user_agent or "")[:2000],
+            "ip": client_ip or "unknown",
         },
         "status": "pending",
     }
+
+
+def _classify_storage_error(err: BaseException) -> FeedbackStorageError:
+    """把 Supabase/PostgREST 异常归类成可运维的错误码（不把用户正文回传前端）。"""
+    msg = str(err)
+    low = msg.lower()
+
+    # PostgREST 表不存在 / schema cache 未刷新时常表现为 HTTP 404 + PGRST205
+    if (
+        "pgrst205" in low
+        or "could not find the table" in low
+        or "does not exist" in low
+        or "404" in low and "feedbacks" in low
+    ):
+        return FeedbackStorageError(
+            "反馈表未就绪或未暴露给 API，请在 Supabase 执行 sql/feedbacks.sql 并刷新 schema cache",
+            code="TABLE_NOT_FOUND",
+        )
+
+    # anon 仅有 INSERT、无 SELECT 时，默认 returning=representation 会失败
+    if (
+        "permission denied" in low
+        or "42501" in low
+        or "row-level security" in low
+        or "rls" in low
+    ):
+        return FeedbackStorageError(
+            "写入权限被拒：请确认 anon 有 INSERT，且后端使用 returning=minimal",
+            code="PERMISSION_DENIED",
+        )
+
+    if "jwt" in low or "invalid api key" in low or "401" in low:
+        return FeedbackStorageError(
+            "Supabase 密钥无效：请检查 Render 上的 SUPABASE_URL / SUPABASE_KEY（anon key）",
+            code="CONFIG_ERROR",
+        )
+
+    if "supabase 未配置" in low or "初始化失败" in low:
+        return FeedbackStorageError(
+            "Supabase 未配置：请在环境变量中设置 SUPABASE_URL 与 SUPABASE_KEY",
+            code="CONFIG_ERROR",
+        )
+
+    return FeedbackStorageError()
 
 
 def create_feedback(data: dict[str, Any] | None) -> dict[str, Any]:
@@ -85,7 +130,16 @@ def create_feedback(data: dict[str, Any] | None) -> dict[str, Any]:
     row = build_insert_row(normalized)
 
     try:
-        get_supabase().table("feedbacks").insert(row).execute()
+        # 关键：feedbacks 对 anon 仅 GRANT INSERT，无 SELECT。
+        # supabase-py 默认 returning=representation 会要求读回插入行，
+        # PostgREST 在无 SELECT 权限时失败（常见日志/表象为 404 或 permission denied）。
+        from postgrest.types import ReturnMethod
+
+        get_supabase().table("feedbacks").insert(
+            row, returning=ReturnMethod.minimal
+        ).execute()
+    except FeedbackValidationError:
+        raise
     except Exception as e:
         # 不把完整用户正文打进日志；只记类型与异常类型
         logger.error(
@@ -94,6 +148,6 @@ def create_feedback(data: dict[str, Any] | None) -> dict[str, Any]:
             type(e).__name__,
             e,
         )
-        raise FeedbackStorageError() from e
+        raise _classify_storage_error(e) from e
 
     return row

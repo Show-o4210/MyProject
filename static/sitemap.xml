@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://pvz-h-tools.onrender.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/downloads</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/deck-editor</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/editor</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/phantom</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/unity</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/card-sender</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/pack-buyer</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/feedback</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/downloads/MyMod</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/downloads/pvzh-DIY</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/downloads/pvzh-v3</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://pvz-h-tools.onrender.com/downloads/pvzh-heroes</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/</loc><lastmod>2026-07-17</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/downloads</loc><lastmod>2026-07-17</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/unity</loc><lastmod>2026-07-17</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/deck-editor</loc><lastmod>2026-07-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/editor</loc><lastmod>2026-07-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/phantom</loc><lastmod>2026-07-17</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/card-sender</loc><lastmod>2026-07-17</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/pack-buyer</loc><lastmod>2026-07-17</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/feedback</loc><lastmod>2026-07-17</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/downloads/MyMod</loc><lastmod>2026-07-17</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/downloads/pvzh-DIY</loc><lastmod>2026-07-17</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/downloads/pvzh-v3</loc><lastmod>2026-07-17</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://pvz-h-tools.onrender.com/downloads/pvzh-heroes</loc><lastmod>2026-07-17</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
 </urlset>

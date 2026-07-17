@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
 
+Disallow: /api/
+Disallow: /security/
+
 Sitemap: https://pvz-h-tools.onrender.com/sitemap.xml

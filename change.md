@@ -211,4 +211,78 @@
 - expand → 导出 JSON → 再 collapse → `save_typetree` → 重载 Bundle：与原文 `json.loads` 语义全等。
 - 合成 MonoBehaviour：`m_Script` PPtr 全程不被 stringify；`m_Data` 仍可 expand/collapse。
 
+### 17. 🛠️ 线上稳定性 & SEO 闭环（反馈 / 送卡 / 静态 / Gunicorn / 索引）（2026-07-17）
+
+对照 Render access log 与线上实测，按优先级修复一批「日志看起来坏、实际更糟/或被误判」的问题。
+
+#### P0 · 反馈接口「一直失败 / 像 404」
+
+**根因（代码级）**
+
+- `feedbacks` 表对 `anon` **仅 GRANT INSERT、无 SELECT**（设计如此，防列表被扫）。
+- `supabase-py` 默认 `insert(..., returning=representation)` → PostgREST 插入后 **SELECT 回读**。
+- 无 SELECT 时插入链路失败；PostgREST 对「表未暴露 / schema cache」等也会表现为 **HTTP 404（PGRST205）**，容易被当成「路由 404」。
+- 表结构本身往往是对的——问题在 **写库客户端约定**，不在 CHECK 约束。
+
+**修复**
+
+- `services/feedback.py`：`insert(..., returning=ReturnMethod.minimal)`。
+- 异常归类为 `TABLE_NOT_FOUND` / `PERMISSION_DENIED` / `CONFIG_ERROR` / `STORAGE_ERROR`，运维可读。
+- `security_logs` 写入同样改为 `minimal`（同类坑）。
+- `sql/feedbacks.sql` 补充注释说明此约定。
+
+#### P0 · `/api/send-cards` 间歇 500
+
+**根因**
+
+- `token` / `persona_id` 非字符串时 `.strip()` → `AttributeError` → 裸 500。
+- 上游 EA 网络类异常未细分类；响应体解析不够稳健。
+- 上游鉴权失败本应 200 + `success:false`，却被未捕获异常打成 500。
+
+**修复**
+
+- 全量 `str(... or '').strip()`；`get_json(silent=True)`。
+- 安全解析上游 body；`Timeout`/`ConnectionError`/`RequestException` 分别 504/503/502。
+- 上游非 200 时仍返回 JSON 契约 + `error` 提示（Token 过期等），避免前端只看到「状态码 500」。
+
+#### P1 · 日志里 js/css/png「200 0」
+
+**结论**
+
+- 线上实测 body **有内容**；Gunicorn access log 在 **无 Content-Length / sendfile** 时常把长度记成 `0`（假象）。
+- 接入 **WhiteNoise** 托管 `/static/`，正确写出 `Content-Length` 与缓存头，日志与浏览器行为一致。
+
+#### P2 · Gunicorn 频繁重启
+
+**结论**
+
+- Free 套餐 **空闲休眠** 是主因（日志里 `==> Running 'gunicorn app:app'` 与夜间/凌晨冷启动一致），不全是 OOM。
+- 若 Dashboard 使用 `render.yaml` 旧 Start Command：`--max-requests 50` 过激进，会加剧 worker 轮换。
+- 调整为：`workers 1 --threads 4 --max-requests 500 --max-requests-jitter 50`。
+- KeepAlive 改为 **全天** 每 14 分钟 ping `/health`（原仅北京 08–24），减轻 Googlebot 夜间撞冷启动。
+
+#### SEO · 仅 `/unity` 可被搜到
+
+**原因（综合）**
+
+- Free 冷启动导致爬虫超时/软 404；unity 访问多、常温。
+- 缺 `canonical` / `lastmod` / 分页面 description；部分页面同质。
+
+**修复**
+
+- `base.html`：`robots=index,follow`、`link rel=canonical`、`og:url`。
+- 主要工具页补独立 `meta_description`。
+- 动态 `sitemap.xml` 增加 `lastmod`；`robots.txt` 明确 `Disallow: /api/`、`/security/`。
+- 全天保活 + 建议 GSC 重新提交 sitemap。
+
+#### 低 · favicon.ico 404
+
+- 新增 `static/favicon.svg` + 路由 `GET /favicon.ico`，消除浏览器/Googlebot-Image 的 404 噪音。
+
+**本地验证（Flask test_client）**
+
+- `/favicon.ico` 200；`/static/js/phantom/main.js` 200 且 Content-Length=文件大小。
+- 反馈空内容 → 400；无 Supabase 配置 → 503 `CONFIG_ERROR`。
+- 送卡坏类型 → 400（不再 500）；假 Token 上游 401 → HTTP 200 + `success:false`。
+
 

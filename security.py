@@ -268,7 +268,15 @@ def log_security_event(ip, user_agent, reason, severity="medium", blocked=True):
             "timestamp": utc_now_iso(),
             "blocked": blocked,
         }
-        result = get_supabase().table("security_logs").insert(data).execute()
+        # anon 通常仅 GRANT INSERT；默认 returning=representation 会因无 SELECT 失败
+        from postgrest.types import ReturnMethod
+
+        result = (
+            get_supabase()
+            .table("security_logs")
+            .insert(data, returning=ReturnMethod.minimal)
+            .execute()
+        )
         _supabase_log_fail_count = 0
         print(f"[SECURITY] {'BLOCKED' if blocked else 'LOGGED'} {ip} {request.method} {request.path} - {reason}")
         return result

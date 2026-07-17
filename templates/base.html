@@ -6,11 +6,17 @@
     <title>{% block title %}PVZH Mod 工具箱 - Plants vs. Zombies Heroes 在线辅助工具{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}全功能 PVZ Heroes 在线 Mod 辅助工具箱。提供卡组在线编辑、关卡底包读写、Unity AB包解包回填、幻影卡牌工坊及官方卡包模拟购买。{% endblock %}">
     <meta name="keywords" content="PVZH, 植物大战僵尸英雄, PVZ Heroes, Mod工具, 卡组编辑器, 关卡编辑器, UnityPy">
+    <meta name="robots" content="index, follow">
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="PVZH Mod 工具箱">
+    <meta property="og:locale" content="zh_CN">
     <meta property="og:title" content="{{ self.title() }}">
     <meta property="og:description" content="{{ self.meta_description() }}">
+    <meta property="og:url" content="{% block og_url %}https://pvz-h-tools.onrender.com{{ request.path }}{% endblock %}">
     <meta name="twitter:card" content="summary">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+    <link rel="canonical" href="{% block canonical %}https://pvz-h-tools.onrender.com{{ request.path }}{% endblock %}">
+    <link rel="icon" href="/favicon.ico" type="image/svg+xml">
+    <link rel="alternate icon" href="/static/favicon.svg" type="image/svg+xml">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>

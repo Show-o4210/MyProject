@@ -1,10 +1,10 @@
 # PVZH Mod 工具箱 (PVZ Heroes Mod Tools)
 
-**最后一次更新时间： 2026-7-13**
+**最后一次更新时间： 2026-7-17**
 
 这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心（分区 + 作品包）以及用户反馈等功能。
 
-该项目已针对 Render 免费套餐进行了优化部署配置（例如加入串行处理锁、内存清理与自唤醒逻辑）。
+该项目已针对 Render 免费套餐进行了优化部署配置（串行处理锁、WhiteNoise 静态资源、全天 KeepAlive、Gunicorn 单 worker 等）。详情见 [`change.md`](change.md) §17。
 
 ---
 
@@ -167,11 +167,13 @@ MyProject/
 - **影子封禁 (Shadow Ban)**：对恶意留言/反馈返回与正常成功一致的契约 `{"ok": true, "message": "提交成功"}`，实际不进入业务写入。
 - **记录审计**：命中规则写入 Supabase `security_logs`；`/security/stats`（Header：`X-Admin-Token`）查看当日抽样。建表脚本见 [`sql/security_logs.sql`](sql/security_logs.sql)（**anon 仅 INSERT**）。若日志出现 `permission denied for table security_logs` / `42501`，几乎总是表未建或未 GRANT，而不是 Render URL 配错。
 - **日志降噪**：非拦截类「脚本 UA」事件按 IP+reason 节流；Supabase 连续写失败时降低刷屏频率。
-- **自唤醒（KeepAlive）**：`app.py` 在北京时间 08:00–24:00 每 14 分钟请求公网 URL，防止 Render Free 休眠。
+- **自唤醒（KeepAlive）**：`app.py` **全天** 每 14 分钟请求公网 URL，防止 Render Free 休眠（并降低 Googlebot 夜间冷启动失败）。
   - 默认目标：`/health`（安全白名单路径，不参与可疑 UA 扫描）
   - 专用 UA：`PVZH-KeepAlive/1.0`；可选头 `X-Self-Ping-Token`（与 `SELF_PING_TOKEN` 一致）
   - 出站经负载均衡回环时，日志里可能看到 Render 出站 IP（历史案例：`74.220.49.7`）+ 旧版 `python-requests` UA——**那是自唤醒，不是外部攻击**，切勿加入 `SECURITY_BLOCKED_IPS`
   - 可选 `SECURITY_TRUSTED_IPS`：对确认可信的 IP 跳过脚本 UA 告警（云厂商 IP 会变，优先依赖 KeepAlive UA）
+- **静态资源**：`WhiteNoise` 托管 `/static/`，保证 `Content-Length`；勿被 access log 里的 `200 0` 误导（旧 Gunicorn/sendfile 假象）。
+- **security_logs 写入**：`insert(..., returning=minimal)`，与「anon 仅 INSERT」策略一致。
 
 ### 4. 意见反馈模块 (`blueprints/feedback.py` + `services/feedback.py`)
 
@@ -187,6 +189,13 @@ MyProject/
 - 蓝图：解析 JSON、限流、统一响应；不直接拼业务 payload。
 - `services/feedback.py`：类型白名单（`bug` / `feature` / `other`）、内容长度校验（内容 ≤500、联系方式 ≤100）、组装 `ua_info`、写入 `feedbacks` 表。
 
+**关键约定（2026-07-17 修复）**
+
+- 表策略：**anon 只有 INSERT、没有 SELECT**。
+- 后端 **必须** `insert(row, returning=ReturnMethod.minimal)`。  
+  若使用默认 `representation`，PostgREST 会在插入后 SELECT 回读 → 失败；线上常被误认为「接口 404」。
+- 表不存在 / schema 未刷新 → `code: TABLE_NOT_FOUND`；环境变量缺失 → `CONFIG_ERROR`；权限 → `PERMISSION_DENIED`。
+
 **统一 API 契约**
 
 ```json
@@ -196,8 +205,8 @@ MyProject/
 // 校验失败 400
 { "ok": false, "error": "...", "code": "VALIDATION_ERROR" }
 
-// 写入失败 500
-{ "ok": false, "error": "服务器开小差了，请稍后再试", "code": "STORAGE_ERROR" }
+// 写入/配置失败 500 或 503
+{ "ok": false, "error": "...", "code": "STORAGE_ERROR|TABLE_NOT_FOUND|PERMISSION_DENIED|CONFIG_ERROR" }
 
 // 限流 429（extensions 全局 handler，含 error 字段）
 { "ok": false, "error": "操作太频繁啦！...", "code": "RATE_LIMITED", ... }
@@ -207,13 +216,13 @@ MyProject/
 
 **Supabase 建表**：在 Dashboard → SQL Editor 中执行仓库内 [`sql/feedbacks.sql`](sql/feedbacks.sql)（会 `DROP` 旧表后重建）。权限策略：
 
-- `anon` / `authenticated`：仅允许 ****INSERT**（`status` 必须为 `pending` 2026-7-9 3:52）**
+- `anon` / `authenticated`：仅允许 **INSERT**（`status` 必须为 `pending`）
 - 不对 anon 开放 **SELECT**，避免反馈列表被公开拉取
 - Dashboard / `service_role` 可完整管理
 
 表字段：`id`, `type`, `content`, `contact`, `ua_info` (jsonb), `status`, `created_at`。
 
-后端 `.env` 中 `SUPABASE_KEY` 使用 **anon key** 即可（与 INSERT 策略匹配）。
+后端 `.env` / Render 中 `SUPABASE_KEY` 使用 **anon key** 即可（与 INSERT 策略匹配）。
 
 ### 5. 下载中心 (`blueprints/downloads.py` + `data/downloads.json`)
 
@@ -327,25 +336,29 @@ python scripts/validate_downloads.py
    解包/回填使用 `tempfile.mkdtemp(prefix=unity_tool_)`；`cleanup_old_temp` 清理超过约 30 分钟的残留，响应结束后 `after_this_request` 再清本次工作区。
 
 3. **自唤醒 KeepAlive**：
-   进程内 APScheduler 每 14 分钟 GET `SELF_PING_URL`（默认 `…/health`），UA 为 `PVZH-KeepAlive/1.0`。Render 环境变量若仍指向首页 `/`，请改为 `/health`，避免无意义的安全告警与首页流量。
+   进程内 APScheduler **全天** 每 14 分钟 GET `SELF_PING_URL`（默认 `…/health`），UA 为 `PVZH-KeepAlive/1.0`。Render 环境变量若仍指向首页 `/`，请改为 `/health`，避免无意义的安全告警与首页流量。
 
 4. **Supabase 表初始化（部署检查清单）**：
    - [ ] 已执行 `sql/feedbacks.sql`
    - [ ] 已执行 `sql/security_logs.sql`
    - [ ] `SUPABASE_KEY` 使用 **anon key**（与两表 INSERT 策略一致）
+   - [ ] 反馈写入使用 `returning=minimal`（代码已处理；勿改回 representation）
    - [ ] `SECURITY_ADMIN_TOKEN` 已设置（需要时才查 `/security/stats`）
 
-3. **Render 专属 Web 启动命令 (建议使用 Gunicorn)**：
-   在线上建议配置启动命令锁定单 worker 运行，避免多进程绕过内存锁：
+5. **Render Start Command（务必与 Dashboard 一致）**：
+   Free 套餐 **单 worker**；线程分担 I/O；`max-requests` 不要设太小（旧值 50 会频繁换 worker）：
 
    ```bash
-   gunicorn --workers 1 --threads 2 --timeout 120 app:app
+   gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --max-requests 500 --max-requests-jitter 50 --access-logfile - --error-logfile -
    ```
 
-4. **谷歌 Chrome 搜索收录与 SEO 优化（GSC）**：
-   - 实现了动态 `robots.txt` 与 `sitemap.xml`：通过读取 `data/downloads.json` 的分类和具体 Mod 条目自动生成站点地图。
-   - 对下载中心的列表进行爬虫抓取路径的层级优化，并将全局 Title、Keywords、Description 配置为高权重中文关键词。
-   - 建议在白天活跃期间手动向 Google Search Console 提交站点地图以获得最佳的谷歌 Chrome 搜索收录效果。
+   若 Dashboard 自定义了 Start Command，以 Dashboard 为准；`render.yaml` 仅作模板。
+
+6. **谷歌收录与 SEO（GSC）**：
+   - 动态 `robots.txt` / `sitemap.xml`（含 `lastmod`，并编入下载中心详情页）。
+   - 母版 `canonical` + `robots=index,follow`；各工具页独立 `meta description`。
+   - 全天 KeepAlive 降低爬虫撞冷启动。
+   - 部署后请在 Google Search Console **重新提交** `https://pvz-h-tools.onrender.com/sitemap.xml`，并对首页、`/downloads`、`/deck-editor` 等使用「请求编入索引」。
 
 ---
 

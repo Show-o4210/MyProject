@@ -1,4 +1,6 @@
 import json
+import logging
+from typing import Any
 
 from flask import Blueprint, render_template, request, jsonify
 import requests
@@ -11,6 +13,7 @@ from logic_ea_api import (
 )
 
 card_sender_bp = Blueprint('card_sender', __name__)
+logger = logging.getLogger(__name__)
 
 # 所有卡牌 ID
 CARD_IDS = [
@@ -40,6 +43,28 @@ def build_cards(count: int) -> dict:
     return {str(cid): count for cid in CARD_IDS}
 
 
+def _parse_upstream_body(response: requests.Response) -> tuple[Any, str]:
+    """安全解析上游响应，避免 .text / json 解码异常变成 500。"""
+    try:
+        response_text = response.text or ""
+    except Exception:
+        try:
+            response_text = (response.content or b"")[:8000].decode("utf-8", errors="replace")
+        except Exception:
+            response_text = ""
+
+    response_json: Any = None
+    try:
+        response_json = response.json()
+    except Exception:
+        try:
+            response_json = json.loads(response_text) if response_text else None
+        except Exception:
+            response_json = None
+
+    return response_json if response_json is not None else response_text, response_text
+
+
 @card_sender_bp.route('/card-sender')
 def card_sender_page():
     return render_template(
@@ -53,12 +78,13 @@ def card_sender_page():
 @limiter.limit("5 per minute")
 def send_cards():
     """发送卡牌请求，无需登录，直接使用前端传入的 Token 和 Persona ID。"""
-    data = request.get_json()
-    if not data:
+    data = request.get_json(silent=True)
+    if not data or not isinstance(data, dict):
         return jsonify({"success": False, "error": "无效的请求数据"}), 400
 
-    eadp_token = data.get('token', '').strip()
-    persona_id = data.get('persona_id', '').strip()
+    # 防止 token 为 null/数字时 .strip() 抛 AttributeError → 500
+    eadp_token = str(data.get('token') or '').strip()
+    persona_id = str(data.get('persona_id') or '').strip()
     card_count = data.get('card_count', 999999)
 
     if not eadp_token:
@@ -72,7 +98,7 @@ def send_cards():
             return jsonify({"success": False, "error": "卡牌数量必须大于 0"}), 400
         if card_count > 999999:
             return jsonify({"success": False, "error": "每张卡牌数量不能超过 999999"}), 400
-    except ValueError:
+    except (ValueError, TypeError):
         return jsonify({"success": False, "error": "卡牌数量必须是有效的数字"}), 400
 
     payload = {
@@ -87,24 +113,29 @@ def send_cards():
 
     try:
         response = post_soft_purchase(payload, headers, timeout=DEFAULT_REQUEST_TIMEOUT)
-
-        response_text = response.text
-        response_json = None
-        try:
-            response_json = json.loads(response_text)
-        except Exception:
-            pass
+        response_body, response_text = _parse_upstream_body(response)
+        success = response.status_code == 200
 
         return jsonify({
-            "success": response.status_code == 200,
+            "success": success,
             "status_code": response.status_code,
-            "response": response_json if response_json else response_text,
+            "response": response_body,
+            "raw_response": (response_text or "")[:2000],
             "total_cards": len(CARD_IDS) * card_count,
+            "error": None if success else (
+                f"上游返回 HTTP {response.status_code}，请检查 Token / Persona ID 是否过期，或稍后重试"
+            ),
         })
 
     except requests.Timeout:
+        logger.warning("send-cards 上游超时 persona=%s…", persona_id[:8])
         return jsonify({"success": False, "error": "请求超时，请稍后重试"}), 504
-    except requests.ConnectionError:
-        return jsonify({"success": False, "error": "网络连接失败"}), 503
+    except requests.ConnectionError as e:
+        logger.warning("send-cards 网络失败: %s", type(e).__name__)
+        return jsonify({"success": False, "error": "网络连接失败，请稍后重试"}), 503
+    except requests.RequestException as e:
+        logger.warning("send-cards 上游请求异常: %s: %s", type(e).__name__, e)
+        return jsonify({"success": False, "error": f"上游请求失败: {type(e).__name__}"}), 502
     except Exception as e:
-        return jsonify({"success": False, "error": f"请求失败: {str(e)}"}), 500
+        logger.exception("send-cards 未预期异常: %s", e)
+        return jsonify({"success": False, "error": "服务器处理失败，请稍后重试"}), 500
