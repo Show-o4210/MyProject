@@ -900,6 +900,32 @@ def validate_repack():
         release_unity_lock()
 
 
+def _client_error(msg, status=400):
+    """回填/解包错误：fetch 客户端返回 JSON，普通表单仍返回错误页。"""
+    from extensions import _wants_json_error
+    if _wants_json_error():
+        return jsonify({"success": False, "error": str(msg)}), status
+    return render_template("error.html", msg=str(msg)), status
+
+
+def _save_bundle_bytes(env):
+    """
+    将 UnityPy env 序列化为 bytes。
+    lz4 在个别资源上会失败，需多层回退，避免整次 repack 500。
+    """
+    last_err = None
+    for packer in ("lz4", None):
+        try:
+            if packer is None:
+                return env.file.save()
+            return env.file.save(packer=packer)
+        except Exception as e:
+            last_err = e
+            print(f"[repack] env.file.save(packer={packer!r}) failed: {e}")
+    # 最后尝试不带关键字参数的默认路径已在上面；若仍失败则抛出
+    raise Exception(f"Bundle 写出失败（lz4/默认 packer 均失败）：{last_err}")
+
+
 # ==================== 正式回填 ====================
 
 @unity_bp.route('/repack', methods=['POST'])
@@ -919,13 +945,16 @@ def repack():
         repack_mode = request.form.get('repack_mode', 'patch')
 
         if not orig_file or not mod_zip:
-            return render_template('error.html', msg="缺少文件！"), 400
+            return _client_error("缺少文件！请同时上传原始 Bundle 与修改后的 ZIP。", 400)
 
         orig_path = save_upload_to_workdir(orig_file, workdir, "original_bundle")
         zip_path = save_upload_to_workdir(mod_zip, workdir, "modified.zip")
         output_bundle_path = os.path.join(workdir, f"modded_{safe_name(orig_file.filename)}")
 
-        env = UnityPy.load(orig_path)
+        try:
+            env = UnityPy.load(orig_path)
+        except Exception as e:
+            return _client_error(f"无法解析原始 Bundle，请确认文件完整且为 Unity AssetBundle。详情：{e}", 400)
 
         with zipfile.ZipFile(zip_path, 'r') as zf:
             # 预检改为可选手动：仅当前端显式要求时才阻断；默认直接尝试回填。
@@ -939,16 +968,16 @@ def repack():
                 )
 
                 if not validate_report["ok"]:
-                    return render_template(
-                        'error.html',
-                        msg=f"预检未通过，已中止打包。错误数：{validate_report['summary']['errors']}。请先回到页面执行预检查看详情。"
-                    ), 400
+                    return _client_error(
+                        f"预检未通过，已中止打包。错误数：{validate_report['summary']['errors']}。"
+                        f"请先回到页面执行预检查看详情。",
+                        400,
+                    )
 
             zip_file_map, fallback_map, index_data, _ = build_zip_patch_maps(zf)
             modified_files_count = 0
 
             for obj in env.objects:
-                path_id_str = str(obj.path_id)
                 actual_zip_path, expected_filename, _ = find_patch_for_object(
                     obj,
                     zip_file_map,
@@ -991,7 +1020,18 @@ def repack():
                         )
                         # 防御：旧版误把 PPtr m_Script 导出成字符串时，尝试解析回来
                         collapsed_tree = restore_pptr_fields(collapsed_tree)
-                        obj.save_typetree(collapsed_tree)
+                        try:
+                            obj.save_typetree(collapsed_tree)
+                        except Exception as save_err:
+                            # 再做一轮 PPtr 修复后重试一次，覆盖嵌套/历史坏导出
+                            collapsed_tree = restore_pptr_fields(collapsed_tree)
+                            try:
+                                obj.save_typetree(collapsed_tree)
+                            except Exception:
+                                raise Exception(
+                                    f"save_typetree 失败（常见原因：m_Script 等 PPtr 被写成字符串，"
+                                    f"或字段类型与原始 Bundle 不匹配）：{save_err}"
+                                ) from save_err
                         modified_files_count += 1
 
                     elif lower_name.endswith('.csv'):
@@ -1005,7 +1045,16 @@ def repack():
                             new_tree, mode='collapse', process_strategy=process_mode
                         )
                         collapsed_tree = restore_pptr_fields(collapsed_tree)
-                        obj.save_typetree(collapsed_tree)
+                        try:
+                            obj.save_typetree(collapsed_tree)
+                        except Exception as save_err:
+                            collapsed_tree = restore_pptr_fields(collapsed_tree)
+                            try:
+                                obj.save_typetree(collapsed_tree)
+                            except Exception:
+                                raise Exception(
+                                    f"CSV save_typetree 失败：{save_err}"
+                                ) from save_err
                         modified_files_count += 1
 
                     else:
@@ -1020,15 +1069,23 @@ def repack():
                     "没有检测到任何被修改的内容被注入，请检查文件名、_index.json 或 Bundle 是否匹配"
                 )
 
-        # UnityPy 的 save 本身会产生完整输出，无法完全避免峰值；但落盘返回可以减少后续复制。
+        # UnityPy 的 save 会产生完整输出；落盘返回可减少后续复制。
+        # lz4 失败时回退默认 packer，避免整次 500。
         try:
-            saved_bytes = env.file.save(packer="lz4")
-        except Exception:
-            # 个别资源对 lz4 打包敏感时回退默认 packer
-            saved_bytes = env.file.save()
+            saved_bytes = _save_bundle_bytes(env)
+        except MemoryError:
+            gc.collect()
+            raise Exception(
+                "服务器内存不足，无法完成大 Bundle 写出。"
+                "请改用「仅补丁」ZIP（只含修改过的对象 + _index.json），或使用本地版工具。"
+            )
+        except Exception as e:
+            raise Exception(str(e)) from e
 
         with open(output_bundle_path, 'wb') as fp:
             fp.write(saved_bytes)
+        del saved_bytes
+        gc.collect()
 
         register_cleanup(workdir)
         return send_file(
@@ -1040,9 +1097,23 @@ def repack():
 
     except ValueError as e:
         shutil.rmtree(workdir, ignore_errors=True)
-        return render_template('error.html', msg=str(e)), 413
+        return _client_error(str(e), 413)
+    except zipfile.BadZipFile:
+        shutil.rmtree(workdir, ignore_errors=True)
+        return _client_error("修改包不是有效的 ZIP 文件，请重新打包后再试。", 400)
+    except MemoryError:
+        shutil.rmtree(workdir, ignore_errors=True)
+        gc.collect()
+        print("[repack] MemoryError during repack")
+        return _client_error(
+            "服务器内存不足，打包中止。请缩小补丁包体积或稍后再试。",
+            507,
+        )
     except Exception as e:
         shutil.rmtree(workdir, ignore_errors=True)
-        return render_template('error.html', msg=f"打包异常中止！原因：{e}"), 500
+        import traceback
+        print(f"[repack] FAILED: {e}")
+        traceback.print_exc()
+        return _client_error(f"打包异常中止！原因：{e}", 500)
     finally:
         release_unity_lock()

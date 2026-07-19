@@ -352,16 +352,27 @@ def security_check():
         log_security_event(ip, user_agent, reason + " / hidden_404", severity="high", blocked=True)
         return not_found_response()
 
-    # 2. 辅助记录：脚本 UA / 空 UA，不直接封（敏感路径除外）
+    # 2. 脚本 UA / 空 UA
+    # - 敏感路径：硬拒绝
+    # - 纯脚本工具（curl/wget/python-requests 等）访问业务页：直接 403，
+    #   避免返回完整 HTML（浪费带宽与 CPU）；搜索引擎 UA 不在此列表内。
+    # - 其余可疑 UA：仅记录（去重），不封禁
     ua_key, ua_config = detect_suspicious_ua(user_agent)
     if ua_config:
-        # 对敏感接口提高强度
         if path_matches(path, SENSITIVE_PATH_KEYWORDS):
             log_security_event(ip, user_agent, ua_config["description"], severity=ua_config["severity"], blocked=True)
             return forbidden_response()
-        else:
-            # 仅记录；已做去重，避免脚本探针每分钟刷库
-            log_security_event(ip, user_agent, ua_config["description"], severity=ua_config["severity"], blocked=False)
+
+        # 明确的命令行/脚本客户端：业务页与 API 一律 403（健康检查已在白名单）
+        if ua_key == "python_requests":
+            log_security_event(
+                ip, user_agent, ua_config["description"] + " / hard_block",
+                severity=ua_config["severity"], blocked=True,
+            )
+            return forbidden_response()
+
+        # 空 UA 等：仅记录
+        log_security_event(ip, user_agent, ua_config["description"], severity=ua_config["severity"], blocked=False)
 
     # 3. 内容辱骂检测：只对提交类请求检查
     if method in {"POST", "PUT", "PATCH"} and path_matches(path, SHADOW_BAN_PATH_KEYWORDS):

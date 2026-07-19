@@ -23,8 +23,12 @@ from blueprints.phantom import phantom_bp
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config.from_object(Config)
 
-# WhiteNoise：正确设置 Content-Length / 缓存头，避免 Gunicorn access log
+# Flask send_file 默认缓存（favicon 等非 WhiteNoise 路径）
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 7
+
+# WhiteNoise：正确设置 Content-Length / Cache-Control，避免 Gunicorn access log
 # 把静态文件记成「200 0」（sendfile 无长度时常见假象），并提升 js/css/png 可靠性。
+# max_age=7 天：浏览器强缓存，减少重复拉 CSS/JS/图片。
 app.wsgi_app = WhiteNoise(
     app.wsgi_app,
     root=os.path.join(app.root_path, "static"),
@@ -33,6 +37,14 @@ app.wsgi_app = WhiteNoise(
 )
 
 init_security_handlers(app)
+
+
+@app.route("/health")
+def health():
+    return {"status": "ok"}, 200
+
+
+# 限流在 health 注册之后初始化，才能正确 exempt /health
 init_limiter(app)
 
 # --- 唤醒逻辑开始 ---
@@ -46,9 +58,14 @@ scheduler = APScheduler()
 SELF_PING_UA = "PVZH-KeepAlive/1.0"
 DEFAULT_SELF_PING_URL = "https://pvz-h-tools.onrender.com/health"
 
+# 成功的 self-ping 只每 N 次打一条，避免日志被健康检查刷屏
+_SELF_PING_OK_COUNTER = 0
+_SELF_PING_LOG_EVERY = 12  # 约 12 * 14min ≈ 每 3 小时一条成功摘要
+
 
 def keep_awake():
     """自唤醒任务：全天每 14 分钟请求一次，降低 Free 休眠与 SEO 冷启动问题。"""
+    global _SELF_PING_OK_COUNTER
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     url = os.environ.get("SELF_PING_URL", DEFAULT_SELF_PING_URL)
     headers = {"User-Agent": SELF_PING_UA}
@@ -57,7 +74,15 @@ def keep_awake():
         headers["X-Self-Ping-Token"] = token
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        print(f"[{now}] Self-ping status: {response.status_code} url={url}")
+        if response.status_code == 200:
+            _SELF_PING_OK_COUNTER += 1
+            if _SELF_PING_OK_COUNTER == 1 or _SELF_PING_OK_COUNTER % _SELF_PING_LOG_EVERY == 0:
+                print(
+                    f"[{now}] Self-ping ok x{_SELF_PING_OK_COUNTER} "
+                    f"(logging every {_SELF_PING_LOG_EVERY} successes) url={url}"
+                )
+        else:
+            print(f"[{now}] Self-ping status: {response.status_code} url={url}")
     except Exception as e:
         print(f"[{now}] Self-ping failed: {e}")
 
@@ -87,10 +112,6 @@ app.register_blueprint(unity_bp)
 app.register_blueprint(level_editor_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(phantom_bp)
-
-@app.route("/health")
-def health():
-    return {"status": "ok"}, 200
 
 
 @app.route("/favicon.ico")

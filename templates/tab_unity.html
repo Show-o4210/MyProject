@@ -665,7 +665,11 @@
                 try {
                     const response = await fetch('/unity/validate-repack', {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'fetch',
+                            'Accept': 'application/json'
+                        }
                     });
 
                     const data = await response.json();
@@ -747,11 +751,24 @@
 
                     const response = await fetch(formElement.action, {
                         method: formElement.method || 'POST',
-                        body: formData
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'fetch',
+                            'Accept': 'application/octet-stream, application/json, text/html;q=0.8, */*;q=0.5'
+                        }
                     });
 
                     if (response.ok) {
                         const blob = await response.blob();
+                        // 部分错误也会被误标 200；若实际是 JSON 错误体则不当作文件下载
+                        const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+                        if (contentType.includes('application/json')) {
+                            const text = await blob.text();
+                            let data = {};
+                            try { data = JSON.parse(text); } catch (_) {}
+                            throw new Error(data.error || data.message || '操作失败');
+                        }
+
                         const downloadUrl = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
 
@@ -778,18 +795,25 @@
                         const contentType = response.headers.get('Content-Type') || '';
                         if (contentType.includes('application/json')) {
                             const data = await response.json();
-                            throw new Error(data.error || '操作失败');
+                            if (response.status === 429) {
+                                throw new Error(data.error || '服务器正忙或操作过于频繁，请稍等半分钟后再试。');
+                            }
+                            throw new Error(data.error || data.message || '操作失败');
                         }
 
+                        // HTML 错误页：尽量抽出正文，避免整页被 document.write 替换
                         const errorHtml = await response.text();
-                        document.open();
-                        document.write(errorHtml);
-                        document.close();
+                        const msgMatch = errorHtml.match(/<p class="text-gray-600[^"]*">([\s\S]*?)<\/p>/);
+                        const plain = msgMatch
+                            ? msgMatch[1].replace(/<[^>]+>/g, '').trim()
+                            : (response.status === 429
+                                ? '服务器正忙或操作过于频繁，请稍等半分钟后再试。'
+                                : `操作失败（HTTP ${response.status}）`);
+                        throw new Error(plain || '操作失败');
                     }
                 } catch (error) {
-                    globalError.value = `网络连接异常或文件传输失败：${error.message}`;
-                } finally {
-                    originalStates.forEach(state => {
+                    globalError.value = error.message || '网络连接异常或文件传输失败';
+                } finally {                    originalStates.forEach(state => {
                         state.btn.innerHTML = state.html;
                         state.btn.disabled = state.disabled;
                         state.btn.classList.remove('opacity-80', 'cursor-not-allowed');
