@@ -1,10 +1,10 @@
 # PVZH Mod 工具箱 (PVZ Heroes Mod Tools)
 
-**最后一次更新时间： 2026-7-17**
+**最后一次更新时间： 2026-7-20**
 
 这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心（分区 + 作品包）以及用户反馈等功能。
 
-该项目已针对 Render 免费套餐进行了优化部署配置（串行处理锁、WhiteNoise 静态资源、全天 KeepAlive、Gunicorn 单 worker 等）。详情见 [`change.md`](change.md) §17。
+该项目已针对 Render 免费套餐进行了优化部署配置（串行处理锁、WhiteNoise 静态资源、全天 KeepAlive、Gunicorn 单 worker 等）。详情见 [`change.md`](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/change.md) §18。
 
 ---
 
@@ -69,7 +69,7 @@ MyProject/
 ├── config.py                   # 全局配置类，加载环境变量，设置最大文件上传限制 (150MB)
 ├── database.py                 # Supabase 客户端懒加载封装，避免启动时强依赖
 ├── security.py                 # 安全拦截拦截器，提供黑名单 IP 封禁、提交接口的“影子封禁”、安全日志写入
-├── extensions.py               # 限流扩展，使用 Flask-Limiter 对接口请求频率进行硬限制
+├── extensions.py               # 限流扩展，使用 Flask-Limiter 对接口请求频率基于 visitor_ip_key 进行客户端真实 IP 限制，提供 Unity 并发任务锁短排队机制
 ├── logic_data.py               # 卡组和卡牌数据的内存管理单例 (DataManager)
 ├── logic_ea_api.py             # 封装了与 PopCap/EA 服务器交互的 commitSoftPurchase 接口
 ├── logic_level_editor.py       # 关卡编辑业务逻辑，使用 UnityPy 解析和打包 data_assets_36 底包
@@ -161,8 +161,8 @@ MyProject/
 
 ### 3. 全局安全及日志审计 (`security.py` + `app.py` 自唤醒)
 
-- **流量限制**：接入 `Flask-Limiter` 限流策略，防止恶意的 API 扫描或频繁提交攻击。
-- **真实访客 IP**：`get_visitor_info()` / `visitor_ip_key()` 统一解析 IP（优先 `CF-Connecting-IP`，其次 `X-Forwarded-For`，最后 `remote_addr`），反馈限流与安全拦截共用同一套 key，避免在 Render 反代后全站共享限流桶。
+- **流量限制**：接入 `Flask-Limiter` 限流策略（基于客户端真实 IP），防止恶意的 API 扫描或频繁提交攻击。
+- **真实访客 IP**：`get_visitor_info()` / `visitor_ip_key()` 统一解析 IP（优先 `CF-Connecting-IP`，其次 `X-Forwarded-For`，最后 `remote_addr`），反馈限流、安全拦截以及全站 API 限流共用同一套 key，彻底解决在 Render 反代后由于 remote_addr 均为 127.0.0.1 导致全站共享同一个限流桶而误触 429 的问题。
 - **黑名单拦截**：在 `before_request` 钩子中命中黑名单时，敏感接口 403、提交类接口影子封禁、普通页面伪装 404。可通过 `SECURITY_BLOCKED_IPS` 追加。
 - **影子封禁 (Shadow Ban)**：对恶意留言/反馈返回与正常成功一致的契约 `{"ok": true, "message": "提交成功"}`，实际不进入业务写入。
 - **记录审计**：命中规则写入 Supabase `security_logs`；`/security/stats`（Header：`X-Admin-Token`）查看当日抽样。建表脚本见 [`sql/security_logs.sql`](sql/security_logs.sql)（**anon 仅 INSERT**）。若日志出现 `permission denied for table security_logs` / `42501`，几乎总是表未建或未 GRANT，而不是 Render URL 配错。

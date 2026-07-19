@@ -215,8 +215,8 @@
     </section>
 
     <section class="mb-10 md:mb-12">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
-            <div class="lg:col-span-8">
+        <div class="flex flex-col lg:grid lg:grid-cols-12 gap-6 md:gap-8">
+            <div class="lg:col-span-8 order-2 lg:order-1">
                 <div class="flex items-center justify-between mb-5">
                     <div>
                         <h2 class="text-lg font-extrabold text-slate-900 flex items-center tracking-tight">
@@ -302,28 +302,23 @@
                 </div>
             </div>
 
-            <aside class="lg:col-span-4">
-                <div class="sponsor-card bg-white/90 backdrop-blur-sm rounded-3xl p-5 md:p-6 border border-slate-200/80 shadow-soft hover:shadow-soft-lg hover:border-amber-200 hover:-translate-y-0.5 transition-all duration-300 h-full group">
+            <aside class="lg:col-span-4 order-1 lg:order-2">
+                <div class="sponsor-card bg-white/90 backdrop-blur-sm rounded-3xl p-5 md:p-6 border border-slate-200/80 shadow-soft hover:shadow-soft-lg hover:border-amber-300 hover:-translate-y-0.5 transition-all duration-300 h-full group flex flex-col justify-between">
                     <div class="sponsor-header flex items-center gap-3 mb-5">
                         <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 text-amber-600 flex items-center justify-center group-hover:from-amber-500 group-hover:to-orange-500 group-hover:text-white transition-all duration-300">
-                            <span class="material-symbols-rounded text-[22px]">coffee</span>
+                            <span class="material-symbols-rounded text-[22px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
                         </div>
                         <div>
-                            <h2 class="text-base font-extrabold text-slate-900 tracking-tight">让我吃点垃圾</h2>
-                            <p class="text-[10px] font-bold tracking-wide text-amber-600/70 uppercase">Buy me a snack</p>
+                            <h2 class="text-base font-extrabold text-slate-900 tracking-tight">赞助与支持</h2>
+                            <p class="text-[10px] font-bold tracking-wide text-amber-600/70 uppercase">Support &amp; Coffee</p>
                         </div>
                     </div>
 
                     <div class="sponsor-body flex flex-col gap-4">
                         <div class="sponsor-info">
-                            <p class="text-xs text-slate-500 leading-relaxed mb-4">
-                                工具免费开放，扫码或关注 B 站都是对维护的支持。未来赞助用户会优先体验到更稳定、更顺手的版本。
+                            <p class="text-xs text-slate-500 leading-relaxed">
+                                工具箱完全免费开放。您的赞助将直接用于分担服务器域名开销与后续维护。感谢每一位支持项目运转的小伙伴！
                             </p>
-                            <a href="https://space.bilibili.com/1578548705" target="_blank" rel="noopener noreferrer"
-                               class="sponsor-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-[#00a1d6] hover:bg-[#0090c0] shadow-soft transition-all active:scale-[0.98] w-full justify-center">
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.172 2.757L10.414 6h3.171l3.243-3.243a1 1 0 0 1 1.414 1.414L14.586 7H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3.414L5.757 4.172A1 1 0 0 1 7.172 2.757zM6 9v10h12V9H6zm2.5 2.5a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1zm7 0a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1z"/></svg>
-                                关注作者 B 站 · Follow
-                            </a>
                         </div>
                         <div class="qrcode-container relative rounded-2xl p-3 bg-gradient-to-br from-amber-50 to-rose-50 border border-amber-100/60 group-hover:scale-[1.02] transition-transform duration-300 self-center">
                             <img src="{{ url_for('static', filename='images/index/thank.png') }}"

@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>{% block title %}PVZH Mod 工具箱 - Plants vs. Zombies Heroes 在线辅助工具{% endblock %}</title>
-    <meta name="description" content="{% block meta_description %}全功能 PVZ Heroes 在线 Mod 辅助工具箱。提供卡组在线编辑、关卡底包读写、Unity AB包解包回填、幻影卡牌工坊及官方卡包模拟购买。{% endblock %}">
+    <meta name="description"
+        content="{% block meta_description %}全功能 PVZ Heroes 在线 Mod 辅助工具箱。提供卡组在线编辑、关卡底包读写、Unity AB包解包回填、幻影卡牌工坊及官方卡包模拟购买。{% endblock %}">
     <meta name="keywords" content="PVZH, 植物大战僵尸英雄, PVZ Heroes, Mod工具, 卡组编辑器, 关卡编辑器, UnityPy">
     <meta name="robots" content="index, follow">
     <meta property="og:type" content="website">
@@ -12,7 +15,8 @@
     <meta property="og:locale" content="zh_CN">
     <meta property="og:title" content="{{ self.title() }}">
     <meta property="og:description" content="{{ self.meta_description() }}">
-    <meta property="og:url" content="{% block og_url %}https://pvz-h-tools.onrender.com{{ request.path }}{% endblock %}">
+    <meta property="og:url"
+        content="{% block og_url %}https://pvz-h-tools.onrender.com{{ request.path }}{% endblock %}">
     <meta name="twitter:card" content="summary">
     <link rel="canonical" href="{% block canonical %}https://pvz-h-tools.onrender.com{{ request.path }}{% endblock %}">
     <link rel="icon" href="/favicon.ico" type="image/svg+xml">
@@ -46,16 +50,28 @@
     </script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
 
     <style>
-        [v-cloak] { display: none; }
+        [v-cloak] {
+            display: none;
+        }
 
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
 
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
 
         .page-bg {
             background-color: #f4f6fb;
@@ -69,6 +85,7 @@
             position: relative;
             transition: color 0.2s, background-color 0.2s;
         }
+
         .nav-link::after {
             content: '';
             position: absolute;
@@ -81,7 +98,10 @@
             background: #2558eb;
             transition: transform 0.2s;
         }
-        .nav-link:hover::after { transform: translateX(-50%) scaleX(1); }
+
+        .nav-link:hover::after {
+            transform: translateX(-50%) scaleX(1);
+        }
 
         .material-symbols-rounded {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
@@ -96,11 +116,13 @@
             <div class="h-14 md:h-16 flex items-center justify-between gap-4">
 
                 <a href="/" class="flex items-center gap-2.5 group shrink-0">
-                    <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-white flex items-center justify-center shadow-soft group-hover:from-brand-600 group-hover:to-brand-700 group-hover:shadow-glow transition-all duration-300">
+                    <div
+                        class="w-9 h-9 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-white flex items-center justify-center shadow-soft group-hover:from-brand-600 group-hover:to-brand-700 group-hover:shadow-glow transition-all duration-300">
                         <span class="material-symbols-rounded text-[22px]">inventory_2</span>
                     </div>
                     <div class="leading-tight">
-                        <div class="font-extrabold text-[15px] md:text-base tracking-tight text-slate-900 group-hover:text-brand-600 transition-colors">
+                        <div
+                            class="font-extrabold text-[15px] md:text-base tracking-tight text-slate-900 group-hover:text-brand-600 transition-colors">
                             PVZH Mod 工具箱
                         </div>
                         <div class="hidden sm:block text-[10px] text-slate-400 font-medium tracking-wide">
@@ -110,31 +132,46 @@
                 </a>
 
                 <nav class="hidden md:flex items-center gap-0.5">
-                    <a href="/" class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">首页</a>
-                    <a href="/unity" class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">AB 工作台</a>
-                    <a href="/phantom" class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">幻影引擎</a>
-                    <a href="/downloads" class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">下载中心</a>
-                    <a href="/tools" class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">工具总览</a>
+                    <a href="/"
+                        class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">首页</a>
+                    <a href="/unity"
+                        class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">AB
+                        工作台</a>
+                    <a href="/phantom"
+                        class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">幻影引擎</a>
+                    <a href="/downloads"
+                        class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">下载中心</a>
+                    <a href="/tools"
+                        class="nav-link px-3.5 py-2 text-sm font-semibold text-slate-600 hover:text-brand-600 rounded-xl hover:bg-brand-50/80 transition">工具总览</a>
                 </nav>
 
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <a href="https://space.bilibili.com/1578548705" target="_blank" rel="noopener noreferrer"
-                       class="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-[#00a1d6] transition-colors"
-                       title="作者 B 站主页">
-                        <svg class="w-[17px] h-[17px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.172 2.757L10.414 6h3.171l3.243-3.243a1 1 0 0 1 1.414 1.414L14.586 7H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3.414L5.757 4.172A1 1 0 0 1 7.172 2.757zM6 9v10h12V9H6zm2.5 2.5a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1zm7 0a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1z"/></svg>
-                        B站
-                    </a>
+                    <button onclick="openSupportModal()"
+                        class="hidden sm:inline-flex items-center gap-1.5 text-sm font-bold text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/60 px-3.5 py-1.5 rounded-xl transition-all shadow-sm active:scale-95">
+                        <span class="material-symbols-rounded text-[17px]"
+                            style="font-variation-settings: 'FILL' 1;">favorite</span>
+                        赞助
+                    </button>
 
-                    <a href="/feedback" class="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-brand-600 transition-colors">
+                    <button onclick="openSupportModal()"
+                        class="sm:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 hover:text-amber-700 active:scale-95 transition-all">
+                        <span class="material-symbols-rounded text-[20px]"
+                            style="font-variation-settings: 'FILL' 1;">favorite</span>
+                    </button>
+
+                    <a href="/feedback"
+                        class="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-brand-600 transition-colors">
                         <span class="material-symbols-rounded text-[17px]">forum</span>
                         反馈
                     </a>
 
-                    <a href="/feedback" class="sm:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100/80 text-slate-600 hover:bg-brand-50 hover:text-brand-600 transition-all active:scale-95">
+                    <a href="/feedback"
+                        class="sm:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100/80 text-slate-600 hover:bg-brand-50 hover:text-brand-600 transition-all active:scale-95">
                         <span class="material-symbols-rounded text-[20px]">forum</span>
                     </a>
 
-                    <a href="/unity" class="hidden sm:inline-flex items-center gap-2 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-brand-600 hover:to-brand-700 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-soft hover:shadow-glow active:scale-[0.98] transition-all duration-300">
+                    <a href="/unity"
+                        class="hidden sm:inline-flex items-center gap-2 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-brand-600 hover:to-brand-700 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-soft hover:shadow-glow active:scale-[0.98] transition-all duration-300">
                         <span class="material-symbols-rounded text-[17px]">rocket_launch</span>
                         打开 AB 工作台
                     </a>
@@ -152,11 +189,6 @@
         <div class="max-w-7xl mx-auto px-4 py-5 flex items-center justify-between text-xs text-slate-400 gap-4">
             <span class="font-medium">PVZH Mod Toolkit</span>
             <div class="flex items-center gap-4">
-                <a href="https://space.bilibili.com/1578548705" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center gap-1 font-semibold text-slate-400 hover:text-[#00a1d6] transition-colors">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.172 2.757L10.414 6h3.171l3.243-3.243a1 1 0 0 1 1.414 1.414L14.586 7H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3.414L5.757 4.172A1 1 0 0 1 7.172 2.757zM6 9v10h12V9H6zm2.5 2.5a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1zm7 0a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1z"/></svg>
-                    作者 B 站
-                </a>
                 <span>Powered by Flask · Vue · UnityPy</span>
             </div>
         </div>
@@ -166,41 +198,55 @@
     <div id="support-modal" class="fixed inset-0 z-[100] hidden" aria-hidden="true">
         <div id="support-modal-backdrop" class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
         <div class="absolute inset-0 flex items-center justify-center p-4 sm:p-6">
-            <div class="relative w-full max-w-md bg-white rounded-3xl shadow-soft-lg border border-slate-200/80 overflow-hidden animate-[supportPop_0.35s_ease-out]" role="dialog" aria-labelledby="support-modal-title" aria-modal="true">
+            <div class="relative w-full max-w-md bg-white rounded-3xl shadow-soft-lg border border-slate-200/80 overflow-hidden animate-[supportPop_0.35s_ease-out]"
+                role="dialog" aria-labelledby="support-modal-title" aria-modal="true">
                 <div class="h-1.5 bg-gradient-to-r from-amber-400 via-rose-400 to-brand-500"></div>
                 <div class="p-6 sm:p-7">
-                    <div class="flex items-start gap-4 mb-4">
-                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 text-amber-600 flex items-center justify-center shrink-0">
-                            <span class="material-symbols-rounded text-[26px]">favorite</span>
+                    <div class="flex items-start gap-4 mb-3">
+                        <div
+                            class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-100 to-rose-100 text-amber-600 flex items-center justify-center shrink-0">
+                            <span class="material-symbols-rounded text-[26px]"
+                                style="font-variation-settings: 'FILL' 1;">favorite</span>
                         </div>
                         <div>
-                            <h2 id="support-modal-title" class="text-lg font-extrabold text-slate-900 tracking-tight">工具免费开放中</h2>
-                            <p class="text-xs text-slate-400 mt-1">个人业余时间维护 · Render 免费部署</p>
+                            <h2 id="support-modal-title" class="text-lg font-extrabold text-slate-900 tracking-tight">
+                                工具箱免费开放中</h2>
+                            <p class="text-xs text-slate-400 mt-1">个人业余时间维护 · 维持 Render 部署</p>
                         </div>
                     </div>
 
-                    <p class="text-sm text-slate-600 leading-relaxed mb-4">
-                        这套 PVZH Mod 工具箱目前没有强制收费，也不会把核心功能锁在付费墙后面。如果它确实帮到了你，欢迎关注作者的 B 站，或在首页扫码支持一下——这能让我更有动力持续维护。
+                    <p class="text-sm text-slate-600 leading-relaxed mb-3">
+                        这套 PVZH Mod 工具箱由个人在业余时间为爱发电维护，且不设付费墙。如果它确实帮到了你，欢迎在下方扫码赞助支持——这能让我更有动力持续更新与维护。
                     </p>
-                    <p class="text-xs text-slate-400 leading-relaxed mb-5">
-                        未来若有赞助，会优先用于更稳定的部署与更顺手的工具体验，细节会慢慢补上，不必有压力。
+
+                    <!-- 赞赏码展示区域 -->
+                    <div
+                        class="flex flex-col items-center my-4 p-4 bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-2xl border border-amber-100/60 shadow-inner">
+                        <img src="/static/images/index/thank.png" alt="赞赏码"
+                            class="w-40 h-40 object-contain rounded-xl bg-white shadow-soft border border-amber-100/40">
+                        <span class="text-[11px] text-amber-800 font-extrabold mt-2 flex items-center gap-1">
+                            <span class="material-symbols-rounded text-[13px]"
+                                style="font-variation-settings: 'FILL' 1;">qr_code_2</span>
+                            扫码以支持作者
+                        </span>
+                    </div>
+
+                    <p class="text-xs text-slate-400 leading-relaxed mb-4">
+                        赞助主要用于高频服务器运行、域名与后续功能打磨，感谢你的理解与支持。
                     </p>
 
                     <label class="flex items-center gap-2.5 mb-5 cursor-pointer select-none group">
-                        <input id="support-modal-dismiss" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
-                        <span class="text-xs text-slate-500 group-hover:text-slate-700 transition-colors">不再提醒（仅保存在本浏览器）</span>
+                        <input id="support-modal-dismiss" type="checkbox"
+                            class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
+                        <span
+                            class="text-xs text-slate-500 group-hover:text-slate-700 transition-colors">不再弹出（仅保存在当前浏览器）</span>
                     </label>
 
-                    <div class="flex flex-col-reverse sm:flex-row gap-2.5">
+                    <div class="flex gap-2.5">
                         <button id="support-modal-close" type="button"
-                            class="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
-                            好的，我先逛逛
+                            class="w-full px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-slate-800 hover:bg-slate-700 shadow-soft transition-all active:scale-[0.98]">
+                            好的，我知道了
                         </button>
-                        <a href="https://space.bilibili.com/1578548705" target="_blank" rel="noopener noreferrer"
-                            class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-[#00a1d6] hover:bg-[#0090c0] shadow-soft transition-all active:scale-[0.98]">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.172 2.757L10.414 6h3.171l3.243-3.243a1 1 0 0 1 1.414 1.414L14.586 7H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3.414L5.757 4.172A1 1 0 0 1 7.172 2.757zM6 9v10h12V9H6zm2.5 2.5a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1zm7 0a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0v-3a1 1 0 0 1 1-1z"/></svg>
-                            去 B 站看看
-                        </a>
                     </div>
                 </div>
             </div>
@@ -209,70 +255,92 @@
 
     <style>
         @keyframes supportPop {
-            from { opacity: 0; transform: scale(0.94) translateY(8px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
+            from {
+                opacity: 0;
+                transform: scale(0.94) translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
         }
     </style>
     <script>
-    (function () {
-        var STORAGE_KEY = 'pvzh_support_modal_dismissed_v1';
-        var modal = document.getElementById('support-modal');
-        if (!modal || localStorage.getItem(STORAGE_KEY) === '1') return;
+            (function () {
+                var STORAGE_KEY = 'pvzh_support_modal_dismissed_v1';
+                var modal = document.getElementById('support-modal');
+                if (!modal) return;
 
-        var backdrop = document.getElementById('support-modal-backdrop');
-        var closeBtn = document.getElementById('support-modal-close');
-        var dismissCheck = document.getElementById('support-modal-dismiss');
+                var backdrop = document.getElementById('support-modal-backdrop');
+                var closeBtn = document.getElementById('support-modal-close');
+                var dismissCheck = document.getElementById('support-modal-dismiss');
 
-        function closeModal(persist) {
-            modal.classList.add('hidden');
-            modal.setAttribute('aria-hidden', 'true');
-            document.body.style.overflow = '';
-            if (persist || (dismissCheck && dismissCheck.checked)) {
-                localStorage.setItem(STORAGE_KEY, '1');
-            }
-        }
+                function closeModal(persist) {
+                    modal.classList.add('hidden');
+                    modal.setAttribute('aria-hidden', 'true');
+                    document.body.style.overflow = '';
+                    if (persist || (dismissCheck && dismissCheck.checked)) {
+                        localStorage.setItem(STORAGE_KEY, '1');
+                    }
+                }
 
-        function openModal() {
-            modal.classList.remove('hidden');
-            modal.setAttribute('aria-hidden', 'false');
-            document.body.style.overflow = 'hidden';
-        }
+                function openModal() {
+                    modal.classList.remove('hidden');
+                    modal.setAttribute('aria-hidden', 'false');
+                    document.body.style.overflow = 'hidden';
+                    if (dismissCheck) {
+                        dismissCheck.checked = false; // Reset checkbox state when manually opened
+                    }
+                }
 
-        window.addEventListener('DOMContentLoaded', function () {
-            setTimeout(openModal, 700);
-        });
+                // Expose open support modal globally
+                window.openSupportModal = openModal;
 
-        if (closeBtn) closeBtn.addEventListener('click', function () { closeModal(false); });
-        if (backdrop) backdrop.addEventListener('click', function () { closeModal(false); });
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal(false);
-        });
-    })();
+                // Auto-popup logic
+                if (localStorage.getItem(STORAGE_KEY) !== '1') {
+                    window.addEventListener('DOMContentLoaded', function () {
+                        setTimeout(openModal, 700);
+                    });
+                }
+
+                if (closeBtn) closeBtn.addEventListener('click', function () { closeModal(false); });
+                if (backdrop) backdrop.addEventListener('click', function () { closeModal(false); });
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal(false);
+                });
+            })();
     </script>
 
-    <nav class="md:hidden fixed bottom-0 left-0 right-0 w-full bg-white/90 backdrop-blur-2xl border-t border-slate-200/70 z-50 pb-safe shadow-[0_-4px_24px_-4px_rgba(15,23,42,0.08)]">
+    <nav
+        class="md:hidden fixed bottom-0 left-0 right-0 w-full bg-white/90 backdrop-blur-2xl border-t border-slate-200/70 z-50 pb-safe shadow-[0_-4px_24px_-4px_rgba(15,23,42,0.08)]">
         <div class="flex justify-around items-center h-[3.5rem] px-1">
-            <a href="/" class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
+            <a href="/"
+                class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
                 <span class="material-symbols-rounded text-[22px]">home</span>
                 <span class="text-[10px] font-semibold">首页</span>
             </a>
 
-            <a href="/unity" class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
+            <a href="/unity"
+                class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
                 <span class="material-symbols-rounded text-[22px]">inventory_2</span>
                 <span class="text-[10px] font-semibold">AB</span>
             </a>
 
-            <a href="/phantom" class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
+            <a href="/phantom"
+                class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
                 <span class="material-symbols-rounded text-[22px]">auto_fix_high</span>
                 <span class="text-[10px] font-semibold">幻影</span>
             </a>
 
-            <a href="/downloads" class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
+            <a href="/downloads"
+                class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
                 <span class="material-symbols-rounded text-[22px]">download</span>
                 <span class="text-[10px] font-semibold">下载</span>
             </a>
 
-            <a href="/tools" class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
+            <a href="/tools"
+                class="flex flex-col items-center justify-center w-full h-full gap-0.5 text-slate-400 hover:text-brand-600 active:text-brand-600 transition-colors">
                 <span class="material-symbols-rounded text-[22px]">apps</span>
                 <span class="text-[10px] font-semibold">工具</span>
             </a>
@@ -281,4 +349,5 @@
 
     {% block scripts %}{% endblock %}
 </body>
+
 </html>

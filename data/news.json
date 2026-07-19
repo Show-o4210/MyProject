@@ -4,15 +4,28 @@
             "id": 1,
             "title": "工具免费开放 · 欢迎支持维护",
             "version": "3.5",
-            "updated_at": "2026-07-17",
-            "content": "本项目由个人业余时间维护，部署在 Render 免费实例上，核心功能不会上付费墙。若工具帮到了你，欢迎关注作者 B 站（导航栏可直达）或在首页扫码支持。\n\n注意：长时间不访问后首次唤醒可能有 30–50 秒延迟。有 Bug 或好点子欢迎走反馈中心（现已修复写入问题）！",
+            "updated_at": "2026-07-20",
+            "content": "本项目由个人业余时间维护，部署在 Render 免费实例上，核心功能不会上付费墙。若工具帮到了你，欢迎点击顶部导航栏中的【赞助】按钮或在首页扫码支持。\n\n注意：长时间不访问后首次唤醒可能有 30–50 秒延迟。有 Bug 或好点子欢迎走反馈中心！",
             "type": "important"
         }
     ],
     "changelogs": [
         {
-            "date": "2026-07-17",
+            "date": "2026-07-20",
             "tag": "最新",
+            "title": "Unity 打包加固 / 穿透真实 IP 限流 / 赞助体验优化",
+            "details": [
+                "加固通用 AB 回填：支持 JSON 错误内联提示，增加保存多层回退机制与 m_Script 嵌套 PPtr 修复重试，防范 OOM 内存溢出",
+                "修复 Render 真实客户端 IP 限流：改用 <code>visitor_ip_key</code> 解决反向代理 remote_addr 均为 127.0.0.1 导致全站共用限流桶的问题",
+                "优化并发锁逻辑：Unity 并发任务获取锁时支持最高 25 秒非阻塞短排队，改善预检-回填高频连点体验",
+                "安全防御与日志降噪：直接 403 阻断 python-requests 脚本爬虫；成功的自保活自唤醒日志每 12 次聚合输出一次，清爽日志区",
+                "改版赞助与支持：移除导航与弹窗中的 B 站外部链接，引入弹窗内置二维码与全局 <code>openSupportModal</code> 主动触发入口"
+            ],
+            "is_expanded": true
+        },
+        {
+            "date": "2026-07-17",
+            "tag": "修复",
             "title": "线上稳定性：反馈写入 / 送卡 500 / 静态资源 / SEO",
             "details": [
                 "修复意见反馈写入失败：anon 仅 INSERT 时必须 <code>returning=minimal</code>，避免 PostgREST 回读导致失败（常被误认为 404）",
@@ -21,7 +34,7 @@
                 "Gunicorn 建议 <code>max-requests 500</code>、threads 4；KeepAlive 改为全天保活，减轻 Free 休眠与 Google 抓取冷启动",
                 "SEO：canonical、分页面 description、sitemap lastmod、favicon 占位消除 404；请在 GSC 重新提交 sitemap"
             ],
-            "is_expanded": true
+            "is_expanded": false
         },
         {
             "date": "2026-07-16",
