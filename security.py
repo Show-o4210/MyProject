@@ -81,6 +81,9 @@ EXCLUDED_PATH_PREFIXES = [
 EXCLUDED_EXACT_PATHS = {
     "/health",
     "/favicon.ico",
+    "/version",
+    "/version.txt",
+    "/api/version",
 }
 
 # 可选：内容辱骂词/垃圾词检测。

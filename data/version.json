@@ -1,0 +1,9 @@
+{
+  "version": "v4.4.3",
+  "version_code": 40403,
+  "update_title": "版本更新 v4.4.3",
+  "update_log": "1. 优化连接与版本检查响应速度；\n2. 预留版本更新接口与直链支持。",
+  "download_url": "",
+  "force_update": false,
+  "release_date": "2026-07-21"
+}
