@@ -1,7 +1,7 @@
 {
   "version": "v4.4.3",
-  "version_code": 40403,
-  "update_title": "版本更新 v4.4.3",
+  "version_code": 40404,
+  "update_title": "版本更新 v4.4.4",
   "update_log": "1. 优化连接与版本检查响应速度；\n2. 预留版本更新接口与直链支持。",
   "download_url": "https://cdn.jsdelivr.net/gh/bitbar/test-samples@master/apps/android/bitbar-sample-app.apk",
   "force_update": false,
