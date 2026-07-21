@@ -1,9 +1,9 @@
 {
-  "version": "v4.4.4",
-  "version_code": 40404,
-  "update_title": "版本更新 v4.4.4",
-  "update_log": "1. 优化连接与版本检查响应速度；\n2. 预留版本更新接口与直链支持。",
-  "download_url": "https://github.com/Show-o4210/MyProject/releases/download/%E6%AD%A3%E5%BC%8F%E7%89%88/app-release.apk",
+  "version": "v4.4.5",
+  "version_code": 40405,
+  "update_title": "版本更新 v4.4.5",
+  "update_log": "热拉上了",
+  "download_url": "https://github.com/Show-o4210/PVZH-DIY/releases/download/%E6%AD%A3%E5%BC%8F%E7%89%88/app-release.apk",
   "force_update": false,
   "release_date": "2026-07-21"
 }
