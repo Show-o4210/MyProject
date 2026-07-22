@@ -20,6 +20,7 @@ from blueprints.level_editor import level_editor_bp
 from blueprints.feedback import feedback_bp
 from blueprints.phantom import phantom_bp
 from blueprints.version import version_bp
+from blueprints.sponsors import sponsors_bp
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config.from_object(Config)
@@ -114,6 +115,7 @@ app.register_blueprint(level_editor_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(phantom_bp)
 app.register_blueprint(version_bp)
+app.register_blueprint(sponsors_bp)
 
 
 @app.route("/favicon.ico")

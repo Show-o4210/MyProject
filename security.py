@@ -84,6 +84,12 @@ EXCLUDED_EXACT_PATHS = {
     "/version",
     "/version.txt",
     "/api/version",
+    "/sponsors",
+    "/sponsors.txt",
+    "/api/sponsors",
+    "/thanks",
+    "/thanks.txt",
+    "/api/thanks",
 }
 
 # 可选：内容辱骂词/垃圾词检测。
