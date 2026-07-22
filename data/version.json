@@ -1,9 +1,9 @@
 {
-  "version": "v4.4.5",
-  "version_code": 40405,
-  "update_title": "版本更新 v4.4.5",
-  "update_log": "热拉上了",
-  "download_url": "https://github.com/Show-o4210/PVZH-DIY/releases/download/%E6%AD%A3%E5%BC%8F%E7%89%88/app-release.apk",
+  "version": "v4.5.0",
+  "version_code": 40500,
+  "update_title": "版本更新 v4.5.0",
+  "update_log": "PVZH卡牌DIY v4.5.0 版本更新",
+  "download_url": "https://github.com/Show-o4210/MyProject/releases/download/%E7%BD%91%E7%AB%99%E4%B8%8B%E8%BD%BD%E9%93%BE%E6%8E%A52/v4.5.0.apk",
   "force_update": false,
-  "release_date": "2026-07-21"
+  "release_date": "2026-07-22"
 }

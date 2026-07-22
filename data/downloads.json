@@ -58,9 +58,9 @@
         {
           "id": "pvzh-DIY",
           "kind": "single",
-          "name": "PVZH卡牌DIY v4.4.5",
+          "name": "PVZH卡牌DIY v4.5.0",
           "description": "自制卡工具，由 qhsj 定制制作，用于 PVZH 卡牌内容编辑与 DIY 制作。",
-          "details": "PVZH卡牌DIY v4.4.5 是一个面向自制卡制作的辅助工具，提供了一套模板和编辑功能。\n\n该工具更偏向简单的创作用途。",
+          "details": "PVZH卡牌DIY v4.5.0 是一个面向自制卡制作的辅助工具，提供了一套模板和编辑功能。\n\n该工具更偏向简单的创作用途。",
           "usage": [
             "分为了编辑界面和资源界面两部分，编辑界面用于卡牌内容的编辑，资源界面用于管理和替换游戏资源。",
             "在编辑界面中，可以选择不同的卡牌模板，输入卡牌名称、描述、属性等信息，生成自制卡图片。",
@@ -72,11 +72,11 @@
             "建议在测试环境中使用，不要直接覆盖重要数据。",
             "如果工具无法正常运行，可以尝试更换安卓版本或模拟器环境。"
           ],
-          "version": "4.4.5",
+          "version": "4.5.0",
           "tag": "APK",
           "icon": "extension",
           "size": "67 MB",
-          "url": "https://github.com/Show-o4210/MyProject/releases/download/%E7%BD%91%E7%AB%99%E4%B8%8B%E8%BD%BD%E9%93%BE/v4.4.5.apk",
+          "url": "https://github.com/Show-o4210/MyProject/releases/download/%E7%BD%91%E7%AB%99%E4%B8%8B%E8%BD%BD%E9%93%BE%E6%8E%A52/v4.5.0.apk",
           "updated_at": "2026-07-22",
           "images": []
         },
