@@ -150,15 +150,24 @@
                     </div>
                 </div>
 
-                <div class="bg-slate-50 px-5 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                <div class="bg-slate-50 px-5 py-4 border-t border-slate-100 flex items-center justify-between gap-2">
+                    {% if tool.default_download_url and (tool.default_download_url.startswith('https://github.com/') or tool.default_download_url.startswith('http://github.com/')) %}
+                    <button type="button"
+                            onclick="event.preventDefault(); event.stopPropagation(); startGitHubMirrorRace({ itemId: '{{ tool.id }}', title: '{{ tool.name }}', url: '{{ tool.default_download_url }}' })"
+                            class="inline-flex items-center justify-center gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold py-2 px-3 rounded-xl transition active:scale-95 shadow-xs">
+                        <span class="material-symbols-rounded text-[16px]">bolt</span>
+                        竞速加速
+                    </button>
+                    {% else %}
                     <span class="text-xs font-bold text-slate-500 flex items-center gap-1">
                         <span class="material-symbols-rounded text-[16px]">
                             {% if tool.kind == 'bundle' %}folder_open{% else %}article{% endif %}
                         </span>
                         {% if tool.kind == 'bundle' %}打开合集{% else %}说明页{% endif %}
                     </span>
+                    {% endif %}
 
-                    <div class="inline-flex items-center justify-center bg-blue-600 group-hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded-2xl transition active:scale-95">
+                    <div class="inline-flex items-center justify-center bg-slate-900 group-hover:bg-blue-600 text-white text-xs sm:text-sm font-bold py-2 px-3.5 rounded-xl transition active:scale-95">
                         查看详情
                         <span class="material-symbols-rounded text-[18px] ml-1">arrow_forward</span>
                     </div>

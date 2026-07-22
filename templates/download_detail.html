@@ -66,11 +66,21 @@
                 </div>
 
                 {% if tool.default_download_url %}
-                <a href="{{ url_for('downloads.trigger_download', item_id=tool.id) }}"
-                   class="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm px-5 py-3 rounded-2xl shadow-sm transition active:scale-95 shrink-0">
-                    <span class="material-symbols-rounded text-[20px]">download</span>
-                    {% if tool.kind == 'bundle' %}下载推荐项{% else %}立即下载{% endif %}
-                </a>
+                <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+                    {% if tool.default_download_url.startswith('https://github.com/') or tool.default_download_url.startswith('http://github.com/') %}
+                    <button type="button"
+                            onclick="startGitHubMirrorRace({ itemId: '{{ tool.id }}', title: '{{ tool.name }}', url: '{{ tool.default_download_url }}' })"
+                            class="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-extrabold text-sm px-5 py-3 rounded-2xl shadow-md hover:shadow-lg transition active:scale-95">
+                        <span class="material-symbols-rounded text-[20px] animate-pulse">bolt</span>
+                        🚀 镜像竞速加速下载
+                    </button>
+                    {% endif %}
+                    <a href="{{ url_for('downloads.trigger_download', item_id=tool.id) }}"
+                       class="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm px-4 py-3 rounded-2xl shadow-sm transition active:scale-95">
+                        <span class="material-symbols-rounded text-[20px]">download</span>
+                        {% if tool.kind == 'bundle' %}下载推荐项{% else %}常规下载{% endif %}
+                    </a>
+                </div>
                 {% elif tool.kind == 'bundle' %}
                 <a href="#bundle-files"
                    class="inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-sm px-5 py-3 rounded-2xl shadow-sm transition active:scale-95 shrink-0">
@@ -148,12 +158,22 @@
                         </div>
 
                         {% if f.url %}
-                        <a href="{{ url_for('downloads.trigger_file_download', item_id=tool.id, file_id=f.id) }}"
-                           class="inline-flex items-center justify-center gap-1.5 shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition active:scale-95
-                                  {% if f.recommended %}bg-violet-600 hover:bg-violet-700 text-white{% else %}bg-white hover:bg-blue-50 text-blue-700 border border-slate-200{% endif %}">
-                            <span class="material-symbols-rounded text-[18px]">download</span>
-                            下载
-                        </a>
+                        <div class="flex items-center gap-2 shrink-0">
+                            {% if f.url.startswith('https://github.com/') or f.url.startswith('http://github.com/') %}
+                            <button type="button"
+                                    onclick="startGitHubMirrorRace({ itemId: '{{ tool.id }}', fileId: '{{ f.id }}', title: '{{ tool.name }} - {{ f.name }}', url: '{{ f.url }}' })"
+                                    class="inline-flex items-center justify-center gap-1 shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition active:scale-95">
+                                <span class="material-symbols-rounded text-[16px]">bolt</span>
+                                竞速加速
+                            </button>
+                            {% endif %}
+                            <a href="{{ url_for('downloads.trigger_file_download', item_id=tool.id, file_id=f.id) }}"
+                               class="inline-flex items-center justify-center gap-1.5 shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition active:scale-95
+                                      {% if f.recommended %}bg-violet-600 hover:bg-violet-700 text-white{% else %}bg-slate-900 hover:bg-slate-800 text-white{% endif %}">
+                                <span class="material-symbols-rounded text-[16px]">download</span>
+                                下载
+                            </a>
+                        </div>
                         {% else %}
                         <span class="text-xs font-bold text-slate-400 shrink-0">暂无链接</span>
                         {% endif %}
@@ -326,29 +346,39 @@
             <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
                 <h2 class="text-lg font-extrabold text-slate-900 mb-4 flex items-center">
                     <span class="material-symbols-rounded text-blue-500 mr-2">download</span>
-                    下载
+                    下载选项
                 </h2>
 
                 {% if tool.kind == 'bundle' %}
                 <p class="text-sm text-slate-500 leading-relaxed mb-4">
                     {% if tool.default_download_url %}
-                    「下载推荐项」会跳转完整包或默认文件；也可在左侧列表中单独选择分卷。
+                    推荐项与多镜像源加速；也可在左侧列表中单独选择分卷。
                     {% else %}
                     请从左侧文件列表中选择需要的文件下载。
                     {% endif %}
                 </p>
                 {% else %}
                 <p class="text-sm text-slate-500 leading-relaxed mb-4">
-                    点击按钮后将跳转到文件下载地址。
+                    支持 GitHub 多镜像源自动测速与极速加速下载。
                 </p>
                 {% endif %}
 
                 {% if tool.default_download_url %}
-                <a href="{{ url_for('downloads.trigger_download', item_id=tool.id) }}"
-                   class="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm px-5 py-3 rounded-2xl shadow-sm transition active:scale-95">
-                    <span class="material-symbols-rounded text-[20px]">download</span>
-                    {% if tool.kind == 'bundle' %}下载推荐项{% else %}立即下载{% endif %}
-                </a>
+                <div class="space-y-2.5">
+                    {% if tool.default_download_url.startswith('https://github.com/') or tool.default_download_url.startswith('http://github.com/') %}
+                    <button type="button"
+                            onclick="startGitHubMirrorRace({ itemId: '{{ tool.id }}', title: '{{ tool.name }}', url: '{{ tool.default_download_url }}' })"
+                            class="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-extrabold text-sm px-4 py-3 rounded-2xl shadow-md transition active:scale-95">
+                        <span class="material-symbols-rounded text-[20px]">bolt</span>
+                        🚀 镜像竞速加速下载
+                    </button>
+                    {% endif %}
+                    <a href="{{ url_for('downloads.trigger_download', item_id=tool.id) }}"
+                       class="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-sm px-4 py-2.5 rounded-2xl shadow-sm transition active:scale-95">
+                        <span class="material-symbols-rounded text-[20px]">download</span>
+                        {% if tool.kind == 'bundle' %}常规下载推荐项{% else %}常规下载{% endif %}
+                    </a>
+                </div>
                 {% elif tool.kind == 'bundle' %}
                 <a href="#bundle-files"
                    class="w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-sm px-5 py-3 rounded-2xl shadow-sm transition active:scale-95">

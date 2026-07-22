@@ -1,10 +1,10 @@
 # PVZH Mod 工具箱 (PVZ Heroes Mod Tools)
 
-**最后一次更新时间： 2026-7-20**
+**最后一次更新时间： 2026-7-22**
 
-这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心（分区 + 作品包）以及用户反馈等功能。
+这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心（分区 + 作品包 + 多源竞速）以及用户反馈等功能。
 
-该项目已针对 Render 免费套餐进行了优化部署配置（串行处理锁、WhiteNoise 静态资源、全天 KeepAlive、Gunicorn 单 worker 等）。详情见 [`change.md`](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/change.md) §18。
+该项目已针对 Render 免费套餐进行了优化部署配置（串行处理锁、WhiteNoise 静态资源、全天 KeepAlive、Gunicorn 单 worker 等）。详情见 [`change.md`](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/change.md) §19。
 
 ---
 

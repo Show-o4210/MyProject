@@ -1,0 +1,477 @@
+<!-- GitHub 多镜像源竞速加速下载弹窗 -->
+<div id="github-mirror-modal" class="fixed inset-0 z-[110] hidden" aria-hidden="true">
+    <div id="github-mirror-backdrop" class="absolute inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto">
+        <div class="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden my-auto animate-[mirrorModalPop_0.3s_cubic-bezier(0.16,1,0.3,1)]">
+            
+            <!-- Top Gradient Bar -->
+            <div class="h-2 bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400"></div>
+
+            <div class="p-5 sm:p-7">
+                <!-- Header -->
+                <div class="flex items-start justify-between gap-4 mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0 shadow-sm">
+                            <span class="material-symbols-rounded text-[24px]">bolt</span>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">多源并发竞速加速</h3>
+                                <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">自动过滤 404</span>
+                            </div>
+                            <p id="mirror-modal-filename" class="text-xs text-slate-500 font-semibold truncate max-w-xs sm:max-w-md mt-0.5">
+                                正在并发测试多镜像节点...
+                            </p>
+                        </div>
+                    </div>
+                    <button id="github-mirror-close-btn" type="button" class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200 flex items-center justify-center transition active:scale-95">
+                        <span class="material-symbols-rounded text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Auto Download Countdown Banner -->
+                <div id="mirror-countdown-banner" class="hidden mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-700 text-white shadow-md flex items-center justify-between gap-3 animate-fade-in">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="material-symbols-rounded text-[24px] animate-bounce shrink-0">rocket_launch</span>
+                        <div class="min-w-0">
+                            <div class="text-xs font-extrabold flex items-center gap-1.5 truncate">
+                                <span>已锁定最快可用源：</span>
+                                <span id="mirror-winner-name" class="underline decoration-emerald-200 underline-offset-2">Ghproxy Net</span>
+                            </div>
+                            <div class="text-[11px] text-emerald-100 font-medium truncate mt-0.5">
+                                验证通过(HTTP 200/206)，<span id="mirror-timer-sec" class="font-black text-white text-xs">2</span> 秒后自动开始下载...
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button id="mirror-pause-btn" type="button" class="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition active:scale-95">
+                            暂停
+                        </button>
+                        <button id="mirror-go-btn" type="button" class="px-3 py-1.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-black shadow transition active:scale-95">
+                            立即下载
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status & Retest Bar -->
+                <div class="mb-3 flex items-center justify-between text-xs text-slate-500 font-medium">
+                    <span id="mirror-status-text" class="flex items-center gap-1.5 text-blue-600 font-bold">
+                        <span class="inline-block w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
+                        并发请求各节点数据包，排查 404 故障源...
+                    </span>
+                    <button id="mirror-retest-btn" type="button" class="inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 font-bold text-[11px] transition">
+                        <span class="material-symbols-rounded text-[14px]">refresh</span>
+                        重新竞速
+                    </button>
+                </div>
+
+                <!-- Mirror Nodes List -->
+                <div id="mirror-nodes-container" class="space-y-2 max-h-72 overflow-y-auto pr-1 no-scrollbar">
+                    <!-- Skeleton -->
+                    <div class="p-3.5 rounded-2xl border border-slate-100 bg-slate-50 animate-pulse flex items-center justify-between">
+                        <div class="h-4 bg-slate-200 rounded w-1/3"></div>
+                        <div class="h-6 bg-slate-200 rounded-full w-16"></div>
+                    </div>
+                </div>
+
+                <!-- Footer options -->
+                <div class="mt-4 pt-3.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+                    <label class="inline-flex items-center gap-2 cursor-pointer select-none group">
+                        <input id="mirror-remember-check" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                        <span class="group-hover:text-slate-700 transition">记住可用节点偏好</span>
+                    </label>
+                    <span class="text-[11px] text-slate-400 font-medium">多源并发竞速 · 自动跳过 404 / 50x 节点</span>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes mirrorModalPop {
+    from { opacity: 0; transform: scale(0.95) translateY(12px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+</style>
+
+<script>
+(function() {
+    var modal = document.getElementById('github-mirror-modal');
+    if (!modal) return;
+
+    var backdrop = document.getElementById('github-mirror-backdrop');
+    var closeBtn = document.getElementById('github-mirror-close-btn');
+    var filenameEl = document.getElementById('mirror-modal-filename');
+    var statusTextEl = document.getElementById('mirror-status-text');
+    var nodesContainer = document.getElementById('mirror-nodes-container');
+    var countdownBanner = document.getElementById('mirror-countdown-banner');
+    var winnerNameEl = document.getElementById('mirror-winner-name');
+    var timerSecEl = document.getElementById('mirror-timer-sec');
+    var pauseBtn = document.getElementById('mirror-pause-btn');
+    var goBtn = document.getElementById('mirror-go-btn');
+    var retestBtn = document.getElementById('mirror-retest-btn');
+    var rememberCheck = document.getElementById('mirror-remember-check');
+
+    var currentTargetInfo = null;
+    var currentMirrors = [];
+    var testResults = {};
+    var timerInterval = null;
+    var countdownSec = 2;
+    var bestMirror = null;
+    var isPaused = false;
+    var activeAbortControllers = [];
+
+    var PREF_STORAGE_KEY = 'pvzh_mirror_preference';
+
+    var savedPref = localStorage.getItem(PREF_STORAGE_KEY);
+    if (rememberCheck && savedPref) {
+        rememberCheck.checked = true;
+    }
+
+    function abortAllActiveRequests() {
+        activeAbortControllers.forEach(function(ctrl) {
+            try { ctrl.abort(); } catch(e){}
+        });
+        activeAbortControllers = [];
+    }
+
+    function closeModal() {
+        abortAllActiveRequests();
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        if (timerInterval) clearInterval(timerInterval);
+    }
+
+    function openModal() {
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (backdrop) backdrop.addEventListener('click', closeModal);
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+    });
+
+    if (rememberCheck) {
+        rememberCheck.addEventListener('change', function() {
+            if (!rememberCheck.checked) {
+                localStorage.removeItem(PREF_STORAGE_KEY);
+            } else if (bestMirror) {
+                localStorage.setItem(PREF_STORAGE_KEY, bestMirror.id);
+            }
+        });
+    }
+
+    // Parallel GET Range request to test real file download response & eliminate 404s
+    function raceAndValidateMirror(mirror) {
+        return new Promise(function(resolve) {
+            var startTime = performance.now();
+            var controller = new AbortController();
+            activeAbortControllers.push(controller);
+
+            var timeoutId = setTimeout(function() {
+                controller.abort();
+            }, 3500);
+
+            fetch(mirror.url, {
+                method: 'GET',
+                headers: { 'Range': 'bytes=0-100' },
+                cache: 'no-cache',
+                signal: controller.signal
+            }).then(function(res) {
+                clearTimeout(timeoutId);
+                var latency = Math.round(performance.now() - startTime);
+
+                var contentType = (res.headers.get('content-type') || '').toLowerCase();
+                var isHtmlError = contentType.includes('text/html') && (res.status === 404 || res.status >= 400);
+
+                if (!res.ok || res.status === 404 || res.status === 403 || res.status >= 500 || isHtmlError) {
+                    resolve({
+                        id: mirror.id,
+                        status: '404',
+                        latency: 99999,
+                        errorMsg: '404/故障源 (已过滤)'
+                    });
+                } else {
+                    resolve({
+                        id: mirror.id,
+                        status: 'ok',
+                        statusCode: res.status,
+                        latency: latency
+                    });
+                }
+            }).catch(function(err) {
+                clearTimeout(timeoutId);
+                // Fallback test: HEAD with no-cors if Range header is rejected
+                var ctrl2 = new AbortController();
+                activeAbortControllers.push(ctrl2);
+                var tm2 = setTimeout(function() { ctrl2.abort(); }, 2500);
+                var start2 = performance.now();
+
+                fetch(mirror.url, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    cache: 'no-cache',
+                    signal: ctrl2.signal
+                }).then(function() {
+                    clearTimeout(tm2);
+                    var lat2 = Math.round(performance.now() - start2);
+                    resolve({ id: mirror.id, status: 'ok', statusCode: 200, latency: lat2 });
+                }).catch(function() {
+                    clearTimeout(tm2);
+                    resolve({ id: mirror.id, status: 'error', latency: 99999, errorMsg: '超时/连接失败' });
+                });
+            });
+        });
+    }
+
+    function triggerDownloadUrl(url, mirrorId) {
+        if (rememberCheck && rememberCheck.checked && mirrorId) {
+            localStorage.setItem(PREF_STORAGE_KEY, mirrorId);
+        }
+        closeModal();
+        window.location.href = url;
+    }
+
+    function renderMirrors() {
+        if (!currentMirrors || currentMirrors.length === 0) return;
+
+        // Sort mirrors: OK nodes first (lowest latency), then 404/errors
+        var list = currentMirrors.slice().sort(function(a, b) {
+            var resA = testResults[a.id] || { latency: 99999, status: 'testing' };
+            var resB = testResults[b.id] || { latency: 99999, status: 'testing' };
+            if (resA.status === 'ok' && resB.status !== 'ok') return -1;
+            if (resA.status !== 'ok' && resB.status === 'ok') return 1;
+            return resA.latency - resB.latency;
+        });
+
+        // Find fastest VALID completed mirror (status === 'ok')
+        var fastestValid = null;
+        for (var i = 0; i < list.length; i++) {
+            var res = testResults[list[i].id];
+            if (res && res.status === 'ok') {
+                fastestValid = list[i];
+                break;
+            }
+        }
+        bestMirror = fastestValid;
+
+        nodesContainer.innerHTML = '';
+        list.forEach(function(m) {
+            var res = testResults[m.id];
+            var isWinner = fastestValid && (fastestValid.id === m.id);
+            var is404 = res && (res.status === '404' || res.status === 'error');
+
+            var itemDiv = document.createElement('div');
+            itemDiv.className = 'p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3 ' +
+                (isWinner ? 'bg-emerald-50/95 border-emerald-300 shadow-sm ring-1 ring-emerald-200' :
+                 is404 ? 'bg-rose-50/40 border-rose-100 opacity-60' : 'bg-slate-50/80 border-slate-200/80 hover:bg-white hover:shadow-sm');
+
+            var leftDiv = document.createElement('div');
+            leftDiv.className = 'min-w-0 flex-grow';
+
+            var titleLine = document.createElement('div');
+            titleLine.className = 'flex flex-wrap items-center gap-1.5';
+
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'font-extrabold text-xs sm:text-sm ' + (is404 ? 'text-slate-400 line-through' : 'text-slate-900');
+            nameSpan.textContent = m.name;
+            titleLine.appendChild(nameSpan);
+
+            if (isWinner) {
+                var winBadge = document.createElement('span');
+                winBadge.className = 'bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs flex items-center gap-0.5 animate-pulse';
+                winBadge.innerHTML = '<span class="material-symbols-rounded text-[12px]">bolt</span>首选可用源';
+                titleLine.appendChild(winBadge);
+            }
+
+            if (m.tag && !is404) {
+                var tagSpan = document.createElement('span');
+                tagSpan.className = 'bg-slate-200/70 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full';
+                tagSpan.textContent = m.tag;
+                titleLine.appendChild(tagSpan);
+            }
+
+            leftDiv.appendChild(titleLine);
+
+            var prefixP = document.createElement('p');
+            prefixP.className = 'text-[11px] text-slate-400 truncate mt-0.5 font-mono';
+            prefixP.textContent = m.prefix ? m.prefix : 'github.com (官方直连)';
+            leftDiv.appendChild(prefixP);
+
+            itemDiv.appendChild(leftDiv);
+
+            // Right side status badge & download button
+            var rightDiv = document.createElement('div');
+            rightDiv.className = 'flex items-center gap-2 shrink-0';
+
+            var badgeSpan = document.createElement('span');
+            if (!res) {
+                badgeSpan.className = 'text-[11px] font-bold text-slate-400 bg-slate-200/60 px-2.5 py-1 rounded-xl flex items-center gap-1';
+                badgeSpan.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>并发测试中';
+            } else if (res.status === 'ok') {
+                var latColor = res.latency < 120 ? 'text-emerald-700 bg-emerald-100 border-emerald-200' : (res.latency < 400 ? 'text-amber-700 bg-amber-100 border-amber-200' : 'text-slate-600 bg-slate-100 border-slate-200');
+                badgeSpan.className = 'text-[11px] font-extrabold px-2.5 py-1 rounded-xl border flex items-center gap-1 ' + latColor;
+                badgeSpan.innerHTML = '<span class="material-symbols-rounded text-[13px]">check_circle</span>' + res.latency + ' ms';
+            } else if (res.status === '404') {
+                badgeSpan.className = 'text-[11px] font-extrabold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl flex items-center gap-1';
+                badgeSpan.innerHTML = '<span class="material-symbols-rounded text-[13px]">block</span>404 已过滤';
+            } else {
+                badgeSpan.className = 'text-[11px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl';
+                badgeSpan.textContent = '超时';
+            }
+            rightDiv.appendChild(badgeSpan);
+
+            var dlBtn = document.createElement('button');
+            dlBtn.type = 'button';
+            if (is404) {
+                dlBtn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed';
+                dlBtn.disabled = true;
+                dlBtn.textContent = '失效源';
+            } else {
+                dlBtn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 flex items-center gap-1 ' +
+                    (isWinner ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs' : 'bg-slate-800 hover:bg-blue-600 text-white');
+                dlBtn.innerHTML = '<span class="material-symbols-rounded text-[15px]">download</span>下载';
+                dlBtn.onclick = function() {
+                    triggerDownloadUrl(m.url, m.id);
+                };
+            }
+            rightDiv.appendChild(dlBtn);
+
+            itemDiv.appendChild(rightDiv);
+            nodesContainer.appendChild(itemDiv);
+        });
+    }
+
+    function startAutoCountdown() {
+        if (timerInterval) clearInterval(timerInterval);
+        if (!bestMirror) {
+            if (statusTextEl) {
+                statusTextEl.className = 'flex items-center gap-1.5 text-rose-600 font-bold';
+                statusTextEl.innerHTML = '<span class="material-symbols-rounded text-[16px]">error</span>所有镜像源返回 404 或超时，请尝试 GitHub 官方直连。';
+            }
+            return;
+        }
+
+        isPaused = false;
+        countdownSec = 2;
+        if (timerSecEl) timerSecEl.textContent = countdownSec;
+        if (countdownBanner) countdownBanner.classList.remove('hidden');
+
+        if (winnerNameEl && bestMirror) {
+            winnerNameEl.textContent = bestMirror.name;
+        }
+
+        timerInterval = setInterval(function() {
+            if (isPaused) return;
+            countdownSec--;
+            if (timerSecEl) timerSecEl.textContent = countdownSec;
+            if (countdownSec <= 0) {
+                clearInterval(timerInterval);
+                if (bestMirror) {
+                    triggerDownloadUrl(bestMirror.url, bestMirror.id);
+                }
+            }
+        }, 1000);
+    }
+
+    if (pauseBtn) {
+        pauseBtn.addEventListener('click', function() {
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseBtn.textContent = '继续';
+                pauseBtn.className = 'px-2.5 py-1.5 bg-amber-400 text-slate-900 rounded-xl text-xs font-bold transition active:scale-95';
+            } else {
+                pauseBtn.textContent = '暂停';
+                pauseBtn.className = 'px-2.5 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition active:scale-95';
+            }
+        });
+    }
+
+    if (goBtn) {
+        goBtn.addEventListener('click', function() {
+            if (bestMirror) {
+                triggerDownloadUrl(bestMirror.url, bestMirror.id);
+            }
+        });
+    }
+
+    if (retestBtn) {
+        retestBtn.addEventListener('click', function() {
+            if (currentTargetInfo) {
+                runRaceTest(currentTargetInfo);
+            }
+        });
+    }
+
+    function runRaceTest(targetInfo) {
+        currentTargetInfo = targetInfo;
+        testResults = {};
+        abortAllActiveRequests();
+
+        if (countdownBanner) countdownBanner.classList.add('hidden');
+        if (timerInterval) clearInterval(timerInterval);
+        if (statusTextEl) {
+            statusTextEl.className = 'flex items-center gap-1.5 text-blue-600 font-bold';
+            statusTextEl.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>正在并发请求镜像数据包，排查 404 故障源...';
+        }
+
+        filenameEl.textContent = targetInfo.title || targetInfo.url || '资源文件';
+
+        var apiUrl = '/api/download/mirrors?';
+        if (targetInfo.itemId) apiUrl += 'item_id=' + encodeURIComponent(targetInfo.itemId) + '&';
+        if (targetInfo.fileId) apiUrl += 'file_id=' + encodeURIComponent(targetInfo.fileId) + '&';
+        if (targetInfo.url) apiUrl += 'url=' + encodeURIComponent(targetInfo.url) + '&';
+
+        fetch(apiUrl).then(function(res) {
+            return res.json();
+        }).then(function(data) {
+            if (data.error || !data.mirrors) {
+                if (statusTextEl) statusTextEl.textContent = data.error || '获取镜像列表失败';
+                return;
+            }
+
+            currentMirrors = data.mirrors;
+            renderMirrors();
+
+            // Run concurrent GET Range tests on all mirrors
+            var promises = currentMirrors.map(function(m) {
+                return raceAndValidateMirror(m).then(function(res) {
+                    testResults[m.id] = res;
+                    renderMirrors();
+                });
+            });
+
+            Promise.all(promises).then(function() {
+                var okCount = Object.keys(testResults).filter(function(k){ return testResults[k].status === 'ok'; }).length;
+                var errCount = Object.keys(testResults).filter(function(k){ return testResults[k].status === '404'; }).length;
+
+                if (statusTextEl) {
+                    if (okCount > 0) {
+                        statusTextEl.className = 'flex items-center gap-1.5 text-emerald-700 font-bold';
+                        statusTextEl.innerHTML = '<span class="material-symbols-rounded text-[16px]">verified</span>并发验证完成！已剔除 ' + errCount + ' 个 404 故障源，已锁定最佳可用节点。';
+                    } else {
+                        statusTextEl.className = 'flex items-center gap-1.5 text-rose-600 font-bold';
+                        statusTextEl.innerHTML = '<span class="material-symbols-rounded text-[16px]">warning</span>未检测到可用镜像源，已建议使用官方直连。';
+                    }
+                }
+                startAutoCountdown();
+            });
+
+        }).catch(function(err) {
+            if (statusTextEl) statusTextEl.textContent = '网络异常，请重试';
+        });
+    }
+
+    // Global entry point function to launch mirror race
+    window.startGitHubMirrorRace = function(options) {
+        openModal();
+        runRaceTest(options || {});
+    };
+
+})();
+</script>

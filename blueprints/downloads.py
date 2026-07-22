@@ -276,8 +276,132 @@ def detail(item_id):
     )
 
 
+GITHUB_MIRRORS = [
+    {
+        'id': 'ghproxy-net',
+        'name': 'Ghproxy Net',
+        'prefix': 'https://ghproxy.net/',
+        'tag': '推荐 · 稳定节点',
+        'recommended': True,
+    },
+    {
+        'id': 'gh-proxy-com',
+        'name': 'Gh-Proxy Com',
+        'prefix': 'https://gh-proxy.com/',
+        'tag': 'Release 大文件',
+        'recommended': False,
+    },
+    {
+        'id': 'gh-ddlc',
+        'name': 'Gh DDLC',
+        'prefix': 'https://gh.ddlc.top/',
+        'tag': '社区高速源',
+        'recommended': False,
+    },
+    {
+        'id': 'akams',
+        'name': '1Panel / ghproxy',
+        'prefix': 'https://github.akams.cn/',
+        'tag': '备用节点',
+        'recommended': False,
+    },
+    {
+        'id': 'mirror-ghproxy',
+        'name': 'Mirror Ghproxy',
+        'prefix': 'https://mirror.ghproxy.com/',
+        'tag': '常用镜像点',
+        'recommended': False,
+    },
+    {
+        'id': 'edge-forks',
+        'name': 'Edge Forks',
+        'prefix': 'https://edge.forks.tools/',
+        'tag': '分发节点',
+        'recommended': False,
+    },
+    {
+        'id': 'direct',
+        'name': 'GitHub 官方直连',
+        'prefix': '',
+        'tag': '官方原源',
+        'recommended': False,
+    },
+]
+
+
+def is_github_url(url: str) -> bool:
+    if not url:
+        return False
+    u = url.strip().lower()
+    return u.startswith('https://github.com/') or u.startswith('http://github.com/')
+
+
+def build_accelerated_url(raw_url: str, mirror_id: str = None) -> str:
+    raw_url = (raw_url or '').strip()
+    if not is_github_url(raw_url):
+        return raw_url
+
+    if mirror_id == 'direct':
+        return raw_url
+
+    if mirror_id:
+        for m in GITHUB_MIRRORS:
+            if m['id'] == mirror_id and m['prefix']:
+                return m['prefix'] + raw_url
+
+    # Default fallback to top recommended mirror (ghproxy-net)
+    return GITHUB_MIRRORS[0]['prefix'] + raw_url
+
+
+@downloads_bp.route('/api/download/mirrors')
+def get_download_mirrors():
+    """返回给定 URL 或 item_id/file_id 的多镜像源竞速测速列表。"""
+    from flask import jsonify
+    item_id = request.args.get('item_id')
+    file_id = request.args.get('file_id')
+    target_url = request.args.get('url', '').strip()
+
+    title = "资源文件"
+    if item_id:
+        if file_id:
+            file_entry, item, _sec = find_file(item_id, file_id)
+            if file_entry and file_entry.get('url'):
+                target_url = file_entry['url']
+                title = f"{item.get('name', '')} - {file_entry.get('name', '')}"
+        else:
+            item, _sec = find_item(item_id)
+            if item:
+                target_url = item.get('default_download_url') or resolve_download_url(item) or ''
+                title = item.get('name', '')
+
+    if not target_url:
+        return jsonify({'error': '未找到有效的下载链接'}), 404
+
+    is_gh = is_github_url(target_url)
+    mirrors_data = []
+
+    if is_gh:
+        for m in GITHUB_MIRRORS:
+            acc_url = m['prefix'] + target_url if m['prefix'] else target_url
+            mirrors_data.append({
+                'id': m['id'],
+                'name': m['name'],
+                'prefix': m['prefix'],
+                'url': acc_url,
+                'tag': m['tag'],
+                'recommended': m.get('recommended', False),
+            })
+
+    return jsonify({
+        'title': title,
+        'target_url': target_url,
+        'is_github': is_gh,
+        'mirrors': mirrors_data,
+    })
+
+
 @downloads_bp.route('/api/download/<item_id>')
-@limiter.limit("5 per minute")
+@limiter.limit("20 per minute")
 def trigger_download(item_id):
     item, _section = find_item(item_id)
     if not item:
@@ -289,11 +413,16 @@ def trigger_download(item_id):
             return redirect(url_for('downloads.detail', item_id=item_id))
         return render_template('error.html', msg="未找到该资源，可能已被下架。"), 404
 
+    mirror_id = request.args.get('mirror')
+    if is_github_url(url):
+        final_url = build_accelerated_url(url, mirror_id)
+        return redirect(final_url)
+
     return redirect(url)
 
 
 @downloads_bp.route('/api/download/<item_id>/<file_id>')
-@limiter.limit("5 per minute")
+@limiter.limit("20 per minute")
 def trigger_file_download(item_id, file_id):
     file_entry, item, _section = find_file(item_id, file_id)
     if not item:
@@ -301,4 +430,11 @@ def trigger_file_download(item_id, file_id):
     if not file_entry or not (file_entry.get('url') or '').strip():
         return render_template('error.html', msg="未找到该文件，可能已被下架。"), 404
 
-    return redirect(file_entry['url'].strip())
+    raw_url = file_entry['url'].strip()
+    mirror_id = request.args.get('mirror')
+    if is_github_url(raw_url):
+        final_url = build_accelerated_url(raw_url, mirror_id)
+        return redirect(final_url)
+
+    return redirect(raw_url)
+

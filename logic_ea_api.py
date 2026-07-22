@@ -1,8 +1,11 @@
+import logging
 import os
 import time
 from typing import Any
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 EA_SOFT_PURCHASE_URL = (
     "https://pvz-heroes.awspopcap.com/persistence/v2/inventory/commitSoftPurchase"
@@ -46,9 +49,20 @@ def post_soft_purchase(
     headers: dict[str, str],
     timeout: int | None = None,
 ) -> requests.Response:
+    cleaned_headers = {}
+    for k, v in (headers or {}).items():
+        v_str = str(v)
+        try:
+            v_str.encode('latin-1')
+        except UnicodeEncodeError:
+            logger.warning("问题 header: %s=%r", k, v_str)
+            print(f"问题header: {k}={repr(v_str)}")
+            v_str = v_str.encode('ascii', errors='ignore').decode()
+        cleaned_headers[k] = v_str
+
     return requests.post(
         EA_SOFT_PURCHASE_URL,
         json=payload,
-        headers=headers,
+        headers=cleaned_headers,
         timeout=timeout or DEFAULT_REQUEST_TIMEOUT,
     )
