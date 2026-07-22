@@ -1,12 +1,24 @@
-from flask import Blueprint, jsonify, make_response, request
+from flask import Blueprint, jsonify, make_response
 from utils.json_data import load_json_file
 
 sponsors_bp = Blueprint("sponsors", __name__)
 
 DEFAULT_SPONSORS_DATA = {
     "sponsors": [
-        "赞赏者名单示例1",
-        "赞赏者名单示例2"
+        "夫不赖 #2026-7-19",
+        "夫不赖 #2026-7-21",
+        "咲梢汇星辰༅࿐ #2026-7-19",
+        "滕佳宏小雀瓜 #2026-7-19",
+        "鱼 #2026-7-21",
+        "小云 #2026-7-21",
+        "小云 #2026-7-22",
+        "西门吹雪  #2026-7-21",
+        "志志 #2026-7-21",
+        "Grrreenpig #2026-7-21",
+        "北海 #2026-7-21",
+        "是朵朵啊 #2026-7-21",
+        "愤怒的wan豆 #2026-7-22",
+        "以及默默使用本工具的你"
     ],
     "updated": "2026-07-22"
 }
@@ -24,13 +36,8 @@ def get_sponsors_info():
     return data
 
 
-def build_no_cache_response(data_or_text, is_json=True):
-    if is_json:
-        resp = make_response(jsonify(data_or_text))
-    else:
-        resp = make_response(str(data_or_text), 200)
-        resp.headers["Content-Type"] = "text/plain; charset=utf-8"
-
+def build_no_cache_response(data):
+    resp = make_response(jsonify(data))
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
@@ -42,26 +49,9 @@ def build_no_cache_response(data_or_text, is_json=True):
 @sponsors_bp.route("/sponsors", methods=["GET"])
 @sponsors_bp.route("/api/thanks", methods=["GET"])
 @sponsors_bp.route("/thanks", methods=["GET"])
-def get_sponsors():
-    info = get_sponsors_info()
-    fmt = request.args.get("format", "").strip().lower()
-    if fmt in ("text", "txt"):
-        sponsors_list = info.get("sponsors", []) if isinstance(info, dict) else info
-        if isinstance(sponsors_list, list):
-            text_output = "\n".join(str(s) for s in sponsors_list)
-        else:
-            text_output = str(sponsors_list)
-        return build_no_cache_response(text_output, is_json=False)
-    return build_no_cache_response(info, is_json=True)
-
-
 @sponsors_bp.route("/sponsors.txt", methods=["GET"])
 @sponsors_bp.route("/thanks.txt", methods=["GET"])
-def get_sponsors_txt():
+def get_sponsors():
     info = get_sponsors_info()
-    sponsors_list = info.get("sponsors", []) if isinstance(info, dict) else info
-    if isinstance(sponsors_list, list):
-        text_output = "\n".join(str(s) for s in sponsors_list)
-    else:
-        text_output = str(sponsors_list)
-    return build_no_cache_response(text_output, is_json=False)
+    return build_no_cache_response(info)
+

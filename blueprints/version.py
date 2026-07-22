@@ -1,14 +1,14 @@
-from flask import Blueprint, jsonify, make_response, request
+from flask import Blueprint, jsonify, make_response
 from utils.json_data import load_json_file
 
 version_bp = Blueprint("version", __name__)
 
 DEFAULT_VERSION_DATA = {
-    "version": "v4.4.3",
-    "version_code": 40403,
-    "update_title": "版本更新 v4.4.3",
-    "update_log": "1. 优化连接与版本检查响应速度；\n2. 预留版本更新接口与直链支持。",
-    "download_url": "",
+    "version": "v4.4.5",
+    "version_code": 40405,
+    "update_title": "版本更新 v4.4.5",
+    "update_log": "热拉上了",
+    "download_url": "https://github.com/Show-o4210/PVZH-DIY/releases/download/%E6%AD%A3%E5%BC%8F%E7%89%88/app-release.apk",
     "force_update": False,
     "release_date": "2026-07-21"
 }
@@ -21,13 +21,8 @@ def get_version_info():
     return data
 
 
-def build_no_cache_response(data_or_text, is_json=True):
-    if is_json:
-        resp = make_response(jsonify(data_or_text))
-    else:
-        resp = make_response(str(data_or_text), 200)
-        resp.headers["Content-Type"] = "text/plain; charset=utf-8"
-
+def build_no_cache_response(data):
+    resp = make_response(jsonify(data))
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
@@ -37,15 +32,8 @@ def build_no_cache_response(data_or_text, is_json=True):
 
 @version_bp.route("/api/version", methods=["GET"])
 @version_bp.route("/version", methods=["GET"])
+@version_bp.route("/version.txt", methods=["GET"])
 def get_version():
     info = get_version_info()
-    fmt = request.args.get("format", "").strip().lower()
-    if fmt in ("text", "txt"):
-        return build_no_cache_response(info.get("version", "v4.4.3"), is_json=False)
-    return build_no_cache_response(info, is_json=True)
+    return build_no_cache_response(info)
 
-
-@version_bp.route("/version.txt", methods=["GET"])
-def get_version_txt():
-    info = get_version_info()
-    return build_no_cache_response(info.get("version", "v4.4.3"), is_json=False)
