@@ -11,7 +11,7 @@
         {
           "id": "MyMod",
           "kind": "bundle",
-          "name": "休切尔的Mod贴图箱",
+          "name": "休切尔的Mod贴图箱（仅占位！）",
           "description": "这里存放我个人的一些改了贴图的作品",
           "details": "这里存放了我制作的一些有趣的内容",
           "usage": [
@@ -58,9 +58,9 @@
         {
           "id": "pvzh-DIY",
           "kind": "single",
-          "name": "PVZH卡牌DIY v4.5.0",
+          "name": "PVZH卡牌DIY v4.6.1",
           "description": "自制卡工具，由 qhsj 定制制作，用于 PVZH 卡牌内容编辑与 DIY 制作。",
-          "details": "PVZH卡牌DIY v4.5.0 是一个面向自制卡制作的辅助工具，提供了一套模板和编辑功能。\n\n该工具更偏向简单的创作用途。",
+          "details": "PVZH卡牌DIY v4.6.1 是一个面向自制卡制作的辅助工具，提供了一套模板和编辑功能。\n\n该工具更偏向简单的创作用途。",
           "usage": [
             "分为了编辑界面和资源界面两部分，编辑界面用于卡牌内容的编辑，资源界面用于管理和替换游戏资源。",
             "在编辑界面中，可以选择不同的卡牌模板，输入卡牌名称、描述、属性等信息，生成自制卡图片。",
@@ -72,12 +72,12 @@
             "建议在测试环境中使用，不要直接覆盖重要数据。",
             "如果工具无法正常运行，可以尝试更换安卓版本或模拟器环境。"
           ],
-          "version": "4.5.0",
+          "version": "4.6.1",
           "tag": "APK",
           "icon": "extension",
           "size": "67 MB",
-          "url": "https://github.com/Show-o4210/MyProject/releases/download/%E7%BD%91%E7%AB%99%E4%B8%8B%E8%BD%BD%E9%93%BE%E6%8E%A52/v4.5.0.apk",
-          "updated_at": "2026-07-22",
+          "url": "https://github.com/Show-o4210/MyProject/releases/download/v4.6.1/v4.6.1.apk",
+          "updated_at": "2026-07-23",
           "images": []
         },
         {
@@ -99,27 +99,6 @@
           "icon": "diamond",
           "size": "43.8 MB",
           "url": "https://github.com/Show-o4210/MyProject/releases/download/%E7%BD%91%E7%AB%99%E4%B8%8B%E8%BD%BD%E9%93%BE/781f8dc4b3ed4f12a8a05f5e07cb2a52086-1.apk",
-          "updated_at": "2026-07-22",
-          "images": []
-        },
-        {
-          "id": "pvzh-shuazuan-2",
-          "kind": "single",
-          "name": "PVZH 刷钻工具2",
-          "description": "PVZH 刷钻石与刷卡辅助工具2，轻量版/备用工具。",
-          "details": "PVZH 刷钻工具2 是刷钻工具的轻量备用版本，当工具1在部分安卓版本或设备上不兼容时可改用本工具。",
-          "usage": [
-            "下载 APK 文件并安装。",
-            "若工具1无法正常运行，可尝试运行本工具。"
-          ],
-          "notes": [
-            "建议在虚拟机或测试环境中运行。"
-          ],
-          "version": "1.0",
-          "tag": "APK",
-          "icon": "diamond",
-          "size": "12.7 MB",
-          "url": "https://github.com/Show-o4210/MyProject/releases/download/%E7%BD%91%E7%AB%99%E4%B8%8B%E8%BD%BD%E9%93%BE/app.apk",
           "updated_at": "2026-07-22",
           "images": []
         },
