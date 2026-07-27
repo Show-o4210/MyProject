@@ -9,12 +9,6 @@ from utils.json_data import load_json_file
 
 INDEX_FILENAME = "index_new.json"
 
-# 旧数据无 FACTION 字段时的兜底关键词（优先使用 index 内 FACTION）
-_ZOMBIE_KEYWORDS = (
-    "僵尸", "急冻魔", "霹雳舞王", "不死女妖", "无穷小子",
-    "海妖", "教授", "锈铁侠", "超尸", "摔跤狂", "Z机甲", "错误",
-)
-
 _ZOMBIE_FACTION_TOKENS = frozenset({
     "1", "僵尸", "zombie", "zombies",
 })
@@ -39,19 +33,13 @@ def _clean_name(name: Any) -> str:
     return re.sub(r"\s+", " ", str(name or "").strip())
 
 
-def _infer_faction_from_name(name_cn: str) -> int:
-    """名称关键词兜底：0=植物, 1=僵尸。"""
-    return 1 if any(kw in name_cn for kw in _ZOMBIE_KEYWORDS) else 0
-
-
-def parse_faction(value: Any, name_cn: str = "") -> int:
+def parse_faction(value: Any) -> int:
     """将 FACTION 字段规范为 0=植物 / 1=僵尸。
 
-    优先使用 index_new.json 的 FACTION（如「植物」「僵尸」），
-    也兼容数字与英文枚举；缺省时再按中文名关键词推断。
+    支持 index_new.json 使用的中英文枚举及数字值；缺失或非法值默认为植物。
     """
     if value is None or (isinstance(value, str) and not value.strip()):
-        return _infer_faction_from_name(name_cn)
+        return 0
 
     if isinstance(value, bool):
         return int(value)
@@ -69,7 +57,7 @@ def parse_faction(value: Any, name_cn: str = "") -> int:
     try:
         return 1 if int(text) == 1 else 0
     except (TypeError, ValueError):
-        return _infer_faction_from_name(name_cn or text)
+        return 0
 
 
 def faction_to_phantom(faction: int) -> str:
@@ -89,7 +77,7 @@ def to_deck_editor_cards() -> list[dict[str, Any]]:
             "name": name,
             "CardGuid": guid,
             "Guid": str(item.get("UUID", "")).strip(),
-            "Faction": parse_faction(item.get("FACTION"), name),
+            "Faction": parse_faction(item.get("FACTION")),
         })
     return cards
 
@@ -105,7 +93,7 @@ def to_level_editor_cards() -> list[dict[str, Any]]:
         cards.append({
             "guid": guid,
             "name_cn": name,
-            "faction": parse_faction(item.get("FACTION"), name),
+            "faction": parse_faction(item.get("FACTION")),
         })
     return cards
 
@@ -118,7 +106,7 @@ def to_phantom_card_index() -> list[dict[str, str]]:
         if guid is None:
             continue
         name = _clean_name(item.get("NAME_CN"))
-        faction_n = parse_faction(item.get("FACTION"), name)
+        faction_n = parse_faction(item.get("FACTION"))
         index.append({
             "GUID": str(guid),
             "UUID": str(item.get("UUID", "")).strip(),

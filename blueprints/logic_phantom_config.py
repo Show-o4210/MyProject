@@ -40,10 +40,3 @@ def load_phantom_config() -> dict[str, Any]:
     if _cached_config is None:
         _cached_config = _read_static_config()
     return _apply_card_index(_cached_config)
-
-
-def reload_phantom_config() -> dict[str, Any]:
-    """清除缓存并重新读取配置（部署更新后可用）。"""
-    global _cached_config
-    _cached_config = None
-    return load_phantom_config()

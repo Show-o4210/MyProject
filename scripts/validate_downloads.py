@@ -37,15 +37,8 @@ def main() -> int:
 
     sections = data.get("sections")
     if not isinstance(sections, list) or not sections:
-        # 兼容旧根 tools
-        if isinstance(data.get("tools"), list):
-            warnings.append("使用旧根键 tools[]，建议迁移为 sections[]")
-            sections = [
-                {"id": "tools", "name": "tools", "items": data["tools"]},
-            ]
-        else:
-            print("[ERROR] 缺少 sections[]")
-            return 1
+        print("[ERROR] 缺少 sections[]")
+        return 1
 
     seen_item_ids: set[str] = set()
     seen_section_ids: set[str] = set()

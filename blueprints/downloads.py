@@ -149,34 +149,6 @@ def load_catalog():
             })
         return normalized
 
-    legacy_tools = data.get('tools')
-    if isinstance(legacy_tools, list):
-        entries = []
-        for raw in legacy_tools:
-            item = normalize_item(raw)
-            if item:
-                entries.append(item)
-        return [
-            {
-                'id': 'mods',
-                'name': 'Mod 内容',
-                'description': '面向游玩与体验的成品 Mod。',
-                'icon': 'extension',
-                'empty_title': '暂无 Mod 作品',
-                'empty_hint': 'Mod 分区已就绪。后续将在此展示可安装的成品内容。',
-                'entries': [],
-            },
-            {
-                'id': 'tools',
-                'name': '工具与资源',
-                'description': '面向制作与运维的辅助软件与资源文件。',
-                'icon': 'build',
-                'empty_title': '暂无工具与资源',
-                'empty_hint': '工具与资源列表为空，请稍后再来。',
-                'entries': entries,
-            },
-        ]
-
     return []
 
 

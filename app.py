@@ -129,11 +129,6 @@ def favicon():
     )
 
 
-@app.route("/googleb2573588fdcd8e36.html")
-def google_verification():
-    return app.send_static_file("googleb2573588fdcd8e36.html")
-
-
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5001))
     app.run(host='0.0.0.0', port=port, debug=False)

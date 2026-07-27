@@ -3,13 +3,26 @@
         {
             "id": 1,
             "title": "工具免费开放 · 欢迎支持维护",
-            "version": "3.5",
-            "updated_at": "2026-07-20",
+            "version": "3.6",
+            "updated_at": "2026-07-27",
             "content": "本项目由个人业余时间维护，部署在 Render 免费实例上，核心功能不会上付费墙。若工具帮到了你，欢迎点击顶部导航栏中的【赞助】按钮或在首页扫码支持。\n\n注意：长时间不访问后首次唤醒可能有 30–50 秒延迟。有 Bug 或好点子欢迎走反馈中心！",
             "type": "important"
         }
     ],
     "changelogs": [
+        {
+            "date": "2026-07-27",
+            "tag": "最新",
+            "title": "项目清理与配置规范化",
+            "details": [
+                "删除不再读取的 <code>data/index.json</code>，全站统一使用 <code>data/index_new.json</code>",
+                "移除未使用的 Phantom 配置重载函数、旧配置转换，以及被 WhiteNoise 静态文件覆盖的重复路由",
+                "下载目录只接受正式的 <code>sections[]</code> 格式，校验脚本同步移除旧 <code>tools[]</code> 兼容",
+                "卡牌阵营严格读取 <code>FACTION</code> 字段，不再根据中文卡名关键词推断",
+                "精简无效安全路径和重复 Google 验证文件；保留版本、赞助、旧草稿迁移及 Unity 历史导出兼容"
+            ],
+            "is_expanded": true
+        },
         {
             "date": "2026-07-20",
             "tag": "最新",
@@ -85,7 +98,7 @@
                 "清理全部废弃代码（旧登录/论坛/幻影 AB 封包等），项目结构大幅瘦身",
                 "提取 EA API、JSON 清洗、Phantom 工具函数等共享模块，减少重复逻辑",
                 "修复 Phantom 配置 API、卡包购买鉴权、Supabase 懒加载等启动与运行时问题",
-                "卡牌索引统一为 <code>data/index.json</code>，卡组工坊 / 关卡编辑器 / 幻影工坊共用一份数据",
+                "卡牌索引统一为 <code>data/index_new.json</code>，卡组工坊 / 关卡编辑器 / 幻影工坊共用一份数据",
                 "完善项目文档，与当前代码结构对齐",
                 "新增赞助提示弹窗（可勾选「不再提醒」），首页补充 B 站关注入口"
             ],

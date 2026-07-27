@@ -1,6 +1,8 @@
 # PVZH Mod 工具箱 (PVZ Heroes Mod Tools)
 
-**最后一次更新时间： 2026-7-22**
+**最后一次更新时间：2026-07-27**
+
+**当前 Web 版本：v3.6**（APK 更新接口版本独立维护）
 
 这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心（分区 + 作品包 + 多源竞速）以及用户反馈等功能。
 
@@ -355,7 +357,7 @@ python scripts/validate_downloads.py
    若 Dashboard 自定义了 Start Command，以 Dashboard 为准；`render.yaml` 仅作模板。
 
 6. **谷歌收录与 SEO（GSC）**：
-   - 动态 `robots.txt` / `sitemap.xml`（含 `lastmod`，并编入下载中心详情页）。
+   - WhiteNoise 提供静态 `robots.txt` / `sitemap.xml`；运行 `python scripts/generate_sitemap.py` 可按下载目录刷新 `lastmod` 与详情页。
    - 母版 `canonical` + `robots=index,follow`；各工具页独立 `meta description`。
    - 全天 KeepAlive 降低爬虫撞冷启动。
    - 部署后请在 Google Search Console **重新提交** `https://pvz-h-tools.onrender.com/sitemap.xml`，并对首页、`/downloads`、`/deck-editor` 等使用「请求编入索引」。

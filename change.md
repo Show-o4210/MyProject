@@ -3,6 +3,16 @@
 
 为了使项目在线上（特别是 Render 512MB 内存限制的免费套餐下）更加稳定、高效，且保持一致的美观交互，我们进行了以下深度优化：
 
+### 20. 🧹 Web v3.6 · 未使用逻辑清理与配置规范化（2026-07-27）
+
+- **索引唯一化**：删除运行时不再读取的 `data/index.json`，全站只维护 `data/index_new.json`。
+- **阵营字段规范化**：移除中文卡名关键词推断，卡组工坊、关卡编辑器和幻影工坊严格依据 `FACTION` 字段解析阵营；缺失或非法值使用安全默认值 `0`。
+- **Phantom 清理**：删除未调用的配置重载函数，以及旧 `zh-CN` 本地化和 `skill_library` 配置重建分支；保留 API 失败时的静态配置降级与旧浏览器草稿迁移。
+- **下载配置收口**：运行时和校验脚本只接受 `sections[]`，移除旧根键 `tools[]` 的自动兼容。
+- **静态资源去重**：删除根目录 Google 验证副本和被 WhiteNoise 同名静态文件覆盖的 Flask 路由；`robots.txt`、`sitemap.xml` 与 Google 验证文件统一由 `static/` 提供。
+- **接口兼容策略**：保留版本与赞助接口的全部历史别名，并保留 Unity 历史错误导出的 PPtr 修复逻辑。
+- **安全规则精简**：移除不存在的 message/comment 路径和已被 `/feedback` 覆盖的重复规则。
+
 ### 1. 🛡️ 统一并发锁控制 (`extensions.py` / `blueprints/`)
 
 - 将原本局部定义的 `UNITY_TASK_LOCK` 移至统一的 `extensions.py` 中。
@@ -77,12 +87,12 @@
 | 读取入口 | 各模块分散引用 | 仍统一经 `utils/card_index.py` → `load_json_file("index_new.json")` |
 
 - 卡组工坊（`logic_data` → `to_deck_editor_cards`）、关卡编辑器（`to_level_editor_cards`）、幻影工坊（`to_phantom_card_index` / `card_index_meta`）均从同一新索引派生专用格式。
-- 旧文件 `data/index.json` 可保留作对照，**运行时代码已不再读取**。
+- 旧文件 `data/index.json` 已于 Web v3.6 清理，运行时与维护流程统一使用 `data/index_new.json`。
 
 **阵营识别（核心修复）**
 
 - **旧逻辑**：`infer_faction(NAME_CN)` 用「僵尸 / 急冻魔 / 霹雳舞王…」等硬编码关键词判断 → 对「网球高手」「蹦极管道工」等无关键词僵尸牌会误判为植物（实测约 **211** 张不一致）。
-- **新逻辑**：优先读取索引字段 `FACTION`（`植物` → `0`，`僵尸` → `1`）；`parse_faction()` 同时兼容数字与英文枚举（`Plant`/`Zombie`/`Plants`/`Zombies`）；仅在字段缺失时回退关键词推断。
+- **新逻辑**：只读取索引字段 `FACTION`（`植物` → `0`，`僵尸` → `1`）；`parse_faction()` 同时兼容数字与英文枚举（`Plant`/`Zombie`/`Plants`/`Zombies`），不再根据卡名关键词推断。
 - **卡组工坊前端**（`templates/deck_editor.html`）：新增 `normalizeFaction()`，加卡 / 读 bundle / 本地缓存 / 导出全链路统一为整数 `0|1`，兼容旧 localStorage 中的 `"Plant"` / `"Zombie"` 字符串。
 - **打包回填**（`logic_unity.py`）：新卡写入 `Faction` 时改用共享 `parse_faction()`，不再只认 `"Zombie"` 这一种字符串。
 - **幻影工坊**：索引同步时一并写入阵营（`Plants` / `Zombies`）；匹配提示展示 `FACTION` / `TYPE`；`to_phantom_card_index` 额外输出 `FACTION_ENUM` 供 UI 枚举绑定。
@@ -101,10 +111,9 @@
 
 为了确保 Render 部署的工具箱能够在 Google 浏览器中被完美搜索和收录，同时兼顾夜间休眠的运行策略，我们对全站进行了针对性的 SEO 调优：
 
-- **动态注入 `robots.txt` 与 `sitemap.xml`**：
-  - 移除了 [app.py](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/app.py) 中的静态 `robots.txt` 路由。
-  - 在首页蓝图 [blueprints/home.py](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/blueprints/home.py) 中新增了动态生成指令，使得站点地图和爬虫协议免于手动维护。
-  - **动态站点地图**：`sitemap.xml` 中排除了所有的后端 `/api/` 路由，并显式包含了主导航及功能页面；同时动态读取 `downloads.json`，将下载中心的每个具体 Mod 说明页也自动编入 Sitemap，引导爬虫深度抓取。
+- **静态提供 `robots.txt` 与 `sitemap.xml`**：
+  - 两个文件统一由 WhiteNoise 从 `static/` 提供，避免同路径 Flask 路由被静态中间件覆盖。
+  - `scripts/generate_sitemap.py` 根据 `downloads.json` 生成站点地图并纳入下载详情页；目录更新后应重新运行脚本。
 
 - **补全全局 SEO 元数据**：
   - 在母版 [templates/base.html](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/templates/base.html) 中将 Title、Description 与 Keywords 重构为高度精准的 PVZH 在线 Mod 辅助工具相关中文关键词，优化谷歌搜索结果的卡片展示。
@@ -272,7 +281,7 @@
 
 - `base.html`：`robots=index,follow`、`link rel=canonical`、`og:url`。
 - 主要工具页补独立 `meta_description`。
-- 动态 `sitemap.xml` 增加 `lastmod`；`robots.txt` 明确 `Disallow: /api/`、`/security/`。
+- 静态 `sitemap.xml` 包含 `lastmod`；`robots.txt` 明确 `Disallow: /api/`、`/security/`。
 - 全天保活 + 建议 GSC 重新提交 sitemap。
 
 #### 低 · favicon.ico 404

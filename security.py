@@ -57,11 +57,6 @@ SELF_PING_TOKEN = os.getenv("SELF_PING_TOKEN", "").strip()
 # 你可以按实际蓝图路径继续补充
 SHADOW_BAN_PATH_KEYWORDS = [
     "/feedback",
-    "/message",
-    "/comment",
-    "/api/feedback",
-    "/api/message",
-    "/api/comment",
 ]
 
 # 敏感接口：命中封禁时直接拒绝
