@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}致谢 - PVZH Mod 工具箱{% endblock %}
+{% block meta_description %}感谢所有支持与赞助 PVZH Mod 工具箱的朋友们。{% endblock %}
+
+{% block content %}
+<div class="thanks-page relative px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+    <!-- warm page wash (slightly different from tool routes) -->
+    <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-none"
+         aria-hidden="true">
+        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-[48rem] h-[28rem] rounded-full
+                    bg-[radial-gradient(ellipse_at_center,rgba(251,191,36,0.16)_0%,rgba(244,63,94,0.08)_40%,transparent_70%)]"></div>
+        <div class="absolute top-40 -left-20 w-72 h-72 rounded-full
+                    bg-[radial-gradient(circle,rgba(251,146,60,0.10)_0%,transparent_70%)]"></div>
+        <div class="absolute bottom-0 right-0 w-80 h-80 rounded-full
+                    bg-[radial-gradient(circle,rgba(244,63,94,0.07)_0%,transparent_70%)]"></div>
+    </div>
+
+    <!-- hero -->
+    <header class="text-center max-w-2xl mx-auto mb-10 md:mb-14">
+        <div class="inline-flex items-center justify-center w-16 h-16 md:w-[4.5rem] md:h-[4.5rem]
+                    rounded-[1.35rem] mb-5
+                    bg-gradient-to-br from-amber-100 via-orange-100 to-rose-100
+                    text-amber-600 shadow-soft border border-amber-200/50">
+            <span class="material-symbols-rounded text-[34px] md:text-[38px]"
+                  style="font-variation-settings: 'FILL' 1;">volunteer_activism</span>
+        </div>
+        <p class="text-[11px] font-bold tracking-[0.18em] uppercase text-amber-600/80 mb-2">
+            Acknowledgments
+        </p>
+        <h1 class="text-2xl md:text-4xl font-extrabold text-slate-950 tracking-tight mb-3">
+            致谢
+        </h1>
+        <p class="text-sm md:text-base text-slate-500 leading-relaxed">
+            工具箱由业余时间维护、免费开放。感谢每一位赞助、反馈与默默使用的你——
+            是你们让这套工具能继续跑下去。
+        </p>
+        {% if updated or total %}
+        <div class="mt-5 inline-flex flex-wrap items-center justify-center gap-2 text-xs font-semibold text-slate-400">
+            {% if total %}
+            <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+                         bg-white/80 border border-amber-100 text-amber-800 shadow-sm">
+                <span class="material-symbols-rounded text-[15px]"
+                      style="font-variation-settings: 'FILL' 1;">groups</span>
+                {{ total }} 位支持者
+            </span>
+            {% endif %}
+            {% if updated %}
+            <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+                         bg-white/70 border border-slate-200/80 text-slate-500">
+                <span class="material-symbols-rounded text-[15px]">schedule</span>
+                名单更新于 {{ updated }}
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </header>
+
+    <!-- wall -->
+    <section class="max-w-5xl mx-auto mb-10 md:mb-14">
+        <div class="flex items-center justify-between mb-5 px-0.5">
+            <div>
+                <h2 class="text-base md:text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100/80">
+                        <span class="material-symbols-rounded text-[18px]"
+                              style="font-variation-settings: 'FILL' 1;">favorite</span>
+                    </span>
+                    赞助者墙
+                </h2>
+                <p class="text-xs text-slate-400 mt-1.5 ml-[2.625rem]">Sponsors · names &amp; dates from the public list</p>
+            </div>
+        </div>
+
+        {% if people %}
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+            {% for p in people %}
+            <article class="group relative bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-3xl
+                            border border-amber-100/70 shadow-soft
+                            hover:shadow-soft-lg hover:border-amber-200 hover:-translate-y-0.5
+                            transition-all duration-300 p-4 md:p-5 flex flex-col items-center text-center">
+                <div class="absolute inset-x-0 top-0 h-1 rounded-t-2xl md:rounded-t-3xl
+                            bg-gradient-to-r from-amber-300/80 via-rose-300/70 to-orange-300/80
+                            opacity-80 group-hover:opacity-100 transition-opacity"></div>
+
+                {% if p.avatar %}
+                <img src="{{ url_for('static', filename='images/thanks/' + p.avatar) }}"
+                     alt="{{ p.name }}"
+                     class="w-14 h-14 md:w-16 md:h-16 rounded-2xl object-cover mt-1 mb-3
+                            ring-2 ring-amber-100 shadow-sm
+                            group-hover:ring-amber-200 transition-all"
+                     loading="lazy">
+                {% else %}
+                <div class="w-14 h-14 md:w-16 md:h-16 rounded-2xl mt-1 mb-3
+                            bg-gradient-to-br from-amber-100 to-rose-100
+                            text-amber-700 font-extrabold text-xl md:text-2xl
+                            flex items-center justify-center ring-2 ring-amber-100 shadow-sm
+                            group-hover:ring-amber-200 transition-all select-none">
+                    {{ p.initial }}
+                </div>
+                {% endif %}
+
+                <h3 class="text-sm md:text-[15px] font-extrabold text-slate-900 leading-snug break-all">
+                    {{ p.name }}
+                </h3>
+                {% if p.dates %}
+                <p class="mt-1.5 text-[10px] md:text-[11px] font-semibold text-slate-400 leading-relaxed">
+                    {% for d in p.dates %}
+                    <span class="inline-block">{{ d }}{% if not loop.last %} · {% endif %}</span>
+                    {% endfor %}
+                </p>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-3xl border border-dashed border-amber-200 bg-white/60 px-6 py-14 text-center">
+            <span class="material-symbols-rounded text-4xl text-amber-300 mb-2">sentiment_satisfied</span>
+            <p class="text-sm text-slate-500">名单稍后再来——感谢你的耐心。</p>
+        </div>
+        {% endif %}
+    </section>
+
+    {% if closing %}
+    <section class="max-w-2xl mx-auto mb-10 md:mb-12">
+        <div class="relative overflow-hidden rounded-3xl border border-rose-100/80
+                    bg-gradient-to-br from-white via-amber-50/40 to-rose-50/50
+                    shadow-soft px-6 py-8 md:px-10 md:py-10 text-center">
+            <div class="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-amber-200/20 blur-2xl" aria-hidden="true"></div>
+            <span class="material-symbols-rounded text-amber-500 text-[28px] mb-3"
+                  style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+            <p class="text-base md:text-lg font-extrabold text-slate-800 tracking-tight">
+                {{ closing }}
+            </p>
+            <p class="mt-2 text-xs text-slate-400">每一位使用者，都是这份名单里看不见的名字。</p>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- soft CTA: reuse existing support modal -->
+    <section class="max-w-xl mx-auto text-center pb-4">
+        <div class="rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-sm shadow-soft px-6 py-7">
+            <p class="text-sm text-slate-600 leading-relaxed mb-4">
+                如果你也想支持后续维护，可以扫码赞助——完全自愿，工具本身始终免费。
+            </p>
+            <button type="button" onclick="openSupportModal()"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold
+                           text-white bg-gradient-to-r from-amber-500 to-rose-500
+                           hover:from-amber-600 hover:to-rose-600 shadow-soft
+                           active:scale-[0.98] transition-all">
+                <span class="material-symbols-rounded text-[18px]"
+                      style="font-variation-settings: 'FILL' 1;">favorite</span>
+                打开赞助
+            </button>
+        </div>
+    </section>
+</div>
+{% endblock %}

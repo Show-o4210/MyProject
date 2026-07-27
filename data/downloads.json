@@ -122,9 +122,7 @@
           "size": "10 MB",
           "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/v3.apk",
           "updated_at": "2026-04-19",
-          "images": [
-            "/static/images/download/一键替换.png"
-          ]
+          "images": []
         },
         {
           "id": "pvzh-heroes",
