@@ -1,9 +1,9 @@
 {
-  "version": "v4.6.1",
-  "version_code": 40601,
-  "update_title": "版本更新 v4.6.1",
-  "update_log": "优化了些许内容，增加了更丰富的编辑样式",
-  "download_url": "https://github.com/Show-o4210/MyProject/releases/download/v4.6.1/v4.6.1.apk",
+  "version": "v4.7.2",
+  "version_code": 40702,
+  "update_title": "版本更新 v4.7.2",
+  "update_log": "优化用户体验，简化GUI内容",
+  "download_url": "https://github.com/Show-o4210/MyProject/releases/download/v4.7.2/v4.7.2.apk",
   "force_update": false,
-  "release_date": "2026-07-23"
+  "release_date": "2026-07-30"
 }
