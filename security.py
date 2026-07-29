@@ -76,6 +76,8 @@ EXCLUDED_PATH_PREFIXES = [
 EXCLUDED_EXACT_PATHS = {
     "/health",
     "/favicon.ico",
+    "/robots.txt",
+    "/sitemap.xml",
     "/version",
     "/version.txt",
     "/api/version",

@@ -29,12 +29,41 @@ DEFAULT_RECOMMENDED_TYPES = ["MonoBehaviour", "TextAsset"]
 DEFAULT_PATCH_TYPES = ["MonoBehaviour", "TextAsset"]
 DEFAULT_IMAGE_TYPES = ["Texture2D", "Sprite"]
 
+# 常见 Unity PPtr 字段名：回填前必须是 dict，不能是 JSON 字符串
+PPTR_FIELD_KEYS = {
+    "m_Script",
+    "m_GameObject",
+    "m_Father",
+    "m_Controller",
+    "m_Mesh",
+    "m_Material",
+    "m_Font",
+    "m_Texture",
+    "m_Sprite",
+    "m_Parent",
+    "m_Prefab",
+    "m_PrefabInstance",
+    "m_PrefabAsset",
+    "m_CorrespondingSourceObject",
+}
+
+
+class ClientFacingError(Exception):
+    """用户输入 / 补丁内容问题 → HTTP 4xx，避免整页 500。"""
+
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.status = int(status)
+
 
 def reject_if_too_large(max_size, label="文件"):
     content_length = request.content_length
     if content_length and content_length > max_size:
         mb = max_size // 1024 // 1024
-        raise ValueError(f"{label}过大。在线版当前限制约 {mb}MB；更大的 Bundle 建议使用本地版或仅上传补丁包。")
+        raise ClientFacingError(
+            f"{label}过大。在线版当前限制约 {mb}MB；更大的 Bundle 建议使用本地版或仅上传补丁包。",
+            status=413,
+        )
 
 
 def save_upload_to_workdir(upload, workdir, fallback_name="upload.bin"):
@@ -239,6 +268,270 @@ def parse_embedded_json(text, process_strategy="auto"):
             return text
 
 
+def _snippet_around(text, pos, radius=48):
+    """截取错误位置附近文本，方便用户定位。"""
+    if not isinstance(text, str) or pos is None or pos < 0:
+        return ""
+    start = max(0, pos - radius)
+    end = min(len(text), pos + radius)
+    chunk = text[start:end].replace("\r", "\\r").replace("\n", "\\n").replace("\t", "\\t")
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(text) else ""
+    return f"{prefix}{chunk}{suffix}"
+
+
+def format_json_parse_error(exc, raw_text, source_label="JSON"):
+    """把 JSONDecodeError / json5 异常转成可读中文说明。"""
+    msg = str(exc) if exc is not None else "未知解析错误"
+    line = getattr(exc, "lineno", None)
+    col = getattr(exc, "colno", None)
+    pos = getattr(exc, "pos", None)
+
+    # json5 有时只给 message，尽量从文案里抠位置
+    if line is None and isinstance(msg, str):
+        m = re.search(r"line\s+(\d+)", msg, re.I)
+        if m:
+            line = int(m.group(1))
+        m = re.search(r"column\s+(\d+)", msg, re.I)
+        if m:
+            col = int(m.group(1))
+
+    parts = [f"{source_label} 解析失败"]
+    if line is not None:
+        loc = f"第 {line} 行"
+        if col is not None:
+            loc += f"、第 {col} 列"
+        parts.append(loc)
+    parts.append(msg)
+
+    hint = (
+        "请检查：1) 是否漏了逗号/括号；2) 属性名是否都用双引号；"
+        "3) 是否残留尾逗号或注释（可改用 auto 模式清洗）；"
+        "4) 是否误把 PNG/二进制当成 JSON。"
+    )
+    snippet = _snippet_around(raw_text, pos) if pos is not None else ""
+    if not snippet and line is not None and isinstance(raw_text, str):
+        lines = raw_text.splitlines()
+        if 1 <= line <= len(lines):
+            snippet = lines[line - 1].strip()[:96]
+
+    body = "：".join(parts[:1]) + ("（" + "，".join(parts[1:]) + "）" if len(parts) > 1 else "")
+    if snippet:
+        body += f" 片段：{snippet}"
+    body += f" —— {hint}"
+    return body
+
+
+def parse_patch_json(raw_text, process_mode="auto", source_label="JSON"):
+    """
+    解析用户补丁中的 typetree JSON，严格校验后返回 dict。
+    失败一律抛 ClientFacingError（HTTP 400），不走 500。
+    """
+    if raw_text is None:
+        raise ClientFacingError(f"{source_label} 内容为空。")
+
+    if not isinstance(raw_text, str):
+        try:
+            raw_text = raw_text.decode("utf-8")
+        except Exception:
+            raise ClientFacingError(f"{source_label} 不是合法的文本内容（编码无法识别）。")
+
+    # 二进制误传：在 clean 之前检查原始内容（clean 会去掉控制字符）
+    raw_sample = raw_text[:240]
+    if "\x00" in raw_sample or sum(
+        1 for c in raw_sample if ord(c) < 32 and c not in "\t\n\r"
+    ) > 8:
+        raise ClientFacingError(
+            f"{source_label} 看起来像二进制数据，不是 JSON 文本。"
+            "请确认扩展名与导出格式，或重新从本站解包后再编辑。"
+        )
+
+    cleaned = clean_json_string(raw_text) if process_mode == "auto" else raw_text
+    text = cleaned.strip() if isinstance(cleaned, str) else ""
+    if not text:
+        raise ClientFacingError(
+            f"{source_label} 为空或仅含空白/不可见字符。请确认 ZIP 内该文件未损坏。"
+        )
+
+    starts_obj = text.startswith("{")
+    starts_arr = text.startswith("[")
+    ends_obj = text.rstrip().endswith("}")
+    ends_arr = text.rstrip().endswith("]")
+    if not ((starts_obj and ends_obj) or (starts_arr and ends_arr)):
+        head = text[:40].replace("\n", " ")
+        if starts_obj or starts_arr:
+            raise ClientFacingError(
+                f"{source_label} 疑似被截断或不完整（有开头括号但缺少对应结尾）。"
+                f"当前开头：{head!r}。请重新保存 JSON 后再打包。"
+            )
+        raise ClientFacingError(
+            f"{source_label} 必须以 {{...}} 或 [...] 包裹（当前开头：{head!r}）。"
+            "常见原因：文件截断、编码错误、或误传了非 JSON 文件。"
+        )
+
+    parsed = None
+    last_err = None
+    for loader in (json.loads, json5.loads):
+        try:
+            parsed = loader(text)
+            break
+        except Exception as e:
+            last_err = e
+            parsed = None
+
+    if parsed is None:
+        raise ClientFacingError(format_json_parse_error(last_err, text, source_label))
+
+    if not isinstance(parsed, dict):
+        raise ClientFacingError(
+            f"{source_label} 根节点必须是对象 {{...}}（Unity typetree），"
+            f"当前是 {type(parsed).__name__}。"
+            "数组/字符串/数字无法 save_typetree，请使用本站解包导出的 JSON。"
+        )
+
+    return parsed
+
+
+def collect_typetree_shape_issues(tree, obj_type_name=None):
+    """
+    回填前数据结构体检。
+    返回 (hard_errors: list[str], warnings: list[str])。
+    hard_errors 会阻断注入；warnings 仅用于预检提示。
+    """
+    hard = []
+    warnings = []
+
+    if not isinstance(tree, dict):
+        hard.append("根节点不是对象")
+        return hard, warnings
+
+    if not tree:
+        hard.append("JSON 对象为空，无法作为 typetree 写回")
+        return hard, warnings
+
+    # 关键类型启发式：至少应有 m_Name / m_Script / m_GameObject 之一
+    common = {"m_Name", "m_Script", "m_GameObject", "m_PathID", "m_FileID"}
+    if not (set(tree.keys()) & common) and len(tree) < 2:
+        warnings.append("字段过少且缺少常见 Unity 键，可能不是本站解包产物")
+
+    def walk(node, path=""):
+        if isinstance(node, dict):
+            # 完整 PPtr 被错误写成非 dict
+            if is_pptr_like(node):
+                return
+
+            for k, v in node.items():
+                p = f"{path}.{k}" if path else k
+
+                # MonoBehaviour 的 m_Script 必须是 PPtr dict；TextAsset 的 m_Script 是字符串
+                if k == "m_Script" and obj_type_name == "MonoBehaviour":
+                    if isinstance(v, str):
+                        if looks_like_json_text(v):
+                            try:
+                                restored = json.loads(clean_json_string(v))
+                            except Exception:
+                                try:
+                                    restored = json5.loads(clean_json_string(v))
+                                except Exception:
+                                    restored = None
+                            if not is_pptr_like(restored):
+                                hard.append(
+                                    f"{p} 在 MonoBehaviour 中必须是 PPtr "
+                                    "{m_FileID, m_PathID}，当前字符串无法还原为引用"
+                                )
+                        else:
+                            hard.append(
+                                f"{p} 在 MonoBehaviour 中必须是 PPtr 字典，不能是普通字符串"
+                            )
+                    elif isinstance(v, dict) and not is_pptr_like(v):
+                        # expand 后的嵌入 JSON 对象：对 MonoBehaviour 非法
+                        if not (
+                            set(v.keys()) <= {"m_FileID", "m_PathID", "m_FileId", "m_PathId"}
+                        ):
+                            hard.append(
+                                f"{p} 在 MonoBehaviour 中应为 PPtr 引用，"
+                                "当前是普通对象（疑似把 TextAsset 正文结构写进了 MonoBehaviour）"
+                            )
+
+                if k in PPTR_FIELD_KEYS and k != "m_Script" and isinstance(v, str) and looks_like_json_text(v):
+                    try:
+                        restored = json.loads(clean_json_string(v))
+                    except Exception:
+                        restored = None
+                    if restored is not None and not is_pptr_like(restored):
+                        warnings.append(f"{p} 字符串不像合法 PPtr，写回可能失败")
+
+                if isinstance(v, (dict, list)):
+                    walk(v, p)
+
+        elif isinstance(node, list):
+            for i, item in enumerate(node):
+                if isinstance(item, (dict, list)):
+                    walk(item, f"{path}[{i}]")
+
+    walk(tree)
+    return hard, warnings
+
+
+def prepare_typetree_for_inject(new_tree, process_mode="auto", obj_type_name=None, source_label="JSON"):
+    """
+    collapse 嵌入 JSON + 还原误导出的 PPtr 字符串，并做结构校验。
+    返回可 save_typetree 的 dict。
+
+    阻断性检查只看「restore + collapse 之后」的最终树，避免把仍可自动修复的
+    PPtr 字符串误判为 hard error。
+    """
+    if not isinstance(new_tree, dict):
+        raise ClientFacingError(f"{source_label} 根节点必须是对象。")
+
+    # 先 restore，再 collapse 嵌入 JSON，最后再 restore 一轮（嵌套历史坏导出）
+    tree = restore_pptr_fields(new_tree)
+    collapsed = transform_json_tree(tree, mode="collapse", process_strategy=process_mode)
+    collapsed = restore_pptr_fields(collapsed)
+
+    hard, _warnings = collect_typetree_shape_issues(collapsed, obj_type_name=obj_type_name)
+    if hard:
+        raise ClientFacingError(
+            f"{source_label} 数据结构不匹配，已中止注入：{hard[0]}"
+            + (f"（另有 {len(hard) - 1} 项）" if len(hard) > 1 else "")
+        )
+
+    return collapsed
+
+
+def inject_typetree_to_object(obj, new_tree, process_mode="auto", source_label="JSON"):
+    """collapse → 校验 → save_typetree，失败给出友好原因。"""
+    type_name = getattr(getattr(obj, "type", None), "name", None)
+    collapsed = prepare_typetree_for_inject(
+        new_tree,
+        process_mode=process_mode,
+        obj_type_name=type_name,
+        source_label=source_label,
+    )
+
+    try:
+        obj.save_typetree(collapsed)
+        return
+    except Exception as save_err:
+        collapsed = restore_pptr_fields(collapsed)
+        try:
+            obj.save_typetree(collapsed)
+            return
+        except Exception:
+            err_s = str(save_err)
+            hint = ""
+            if "m_FileID" in err_s or "m_PathID" in err_s or "attribute" in err_s.lower():
+                hint = (
+                    " 常见原因：PPtr 字段（如 m_Script）被写成了字符串或类型不对；"
+                    "请用本站重新解包，只改业务字段后再回填。"
+                )
+            elif "type" in err_s.lower() or "expected" in err_s.lower():
+                hint = " 常见原因：字段类型与原始 Bundle 不一致（例如数字写成了字符串）。"
+            raise ClientFacingError(
+                f"{source_label} 写入 Bundle 失败（save_typetree）：{save_err}.{hint}"
+            ) from save_err
+
+
 def transform_json_tree(tree, mode="expand", process_strategy="auto", _newline_hints=None):
     """
     expand：把「字符串形式的嵌入 JSON」解析成对象，便于正常换行编辑。
@@ -296,21 +589,9 @@ def restore_pptr_fields(tree):
     兼容旧版错误导出：曾把 m_Script 等 PPtr collapse 成 JSON 字符串。
     回填前把可识别的 PPtr 字符串还原为 dict，避免 save_typetree 失败。
     """
-    pptr_keys = {
-        "m_Script",
-        "m_GameObject",
-        "m_Father",
-        "m_Controller",
-        "m_Mesh",
-        "m_Material",
-        "m_Font",
-        "m_Texture",
-        "m_Sprite",
-    }
-
     if isinstance(tree, dict):
         for k, v in list(tree.items()):
-            if isinstance(v, str) and (k in pptr_keys or k.startswith("m_")) and looks_like_json_text(v):
+            if isinstance(v, str) and (k in PPTR_FIELD_KEYS or k.startswith("m_")) and looks_like_json_text(v):
                 try:
                     parsed = json.loads(clean_json_string(v))
                 except Exception:
@@ -448,9 +729,32 @@ def build_zip_patch_maps(zf):
 
         if file_name_only == '_index.json':
             try:
-                index_data = json.loads(read_text_from_zip(zf, name))
+                raw_index = read_text_from_zip(zf, name)
+                cleaned_index = clean_json_string(raw_index)
+                try:
+                    index_data = json.loads(cleaned_index)
+                except json.JSONDecodeError:
+                    index_data = json5.loads(cleaned_index)
+            except ClientFacingError:
+                raise
             except Exception as e:
-                raise Exception(f"解析 _index.json 失败: {e}")
+                raise ClientFacingError(
+                    format_json_parse_error(e, raw_index if 'raw_index' in locals() else '', "_index.json")
+                ) from e
+
+            if not isinstance(index_data, dict):
+                raise ClientFacingError(
+                    "_index.json 根节点必须是对象：{ \"path_id\": \"相对路径/文件名.json\", ... }"
+                )
+
+            # 规范化：值统一为字符串路径
+            bad_keys = [k for k, v in index_data.items() if not isinstance(v, str) or not str(v).strip()]
+            if bad_keys:
+                sample = ", ".join(str(k) for k in bad_keys[:5])
+                raise ClientFacingError(
+                    f"_index.json 中有 {len(bad_keys)} 个无效条目（值必须是非空路径字符串），"
+                    f"例如键：{sample}"
+                )
 
     return zip_file_map, fallback_map, index_data, entries
 
@@ -551,27 +855,68 @@ def validate_patch_against_bundle(env, zf, process_mode='auto', validate_level='
             elif lower_name.endswith('.json'):
                 if validate_level == 'full':
                     raw_json_str = read_text_from_zip(zf, actual_zip_path)
-                    cleaned_str = clean_json_string(raw_json_str) if process_mode == 'auto' else raw_json_str
-                    parsed = json.loads(cleaned_str)
-
-                    if not isinstance(parsed, (dict, list)):
-                        item["status"] = "warning"
-                        item["level"] = "warning"
-                        item["message"] = "JSON 不是对象或数组，可能无法正确 save_typetree"
+                    try:
+                        parsed = parse_patch_json(
+                            raw_json_str,
+                            process_mode=process_mode,
+                            source_label=expected_filename,
+                        )
+                    except ClientFacingError as ce:
+                        item["status"] = "error"
+                        item["level"] = "danger"
+                        item["message"] = str(ce)
                     else:
-                        item["message"] = "JSON 格式有效，可回填"
+                        hard, soft = collect_typetree_shape_issues(
+                            parsed, obj_type_name=obj.type.name
+                        )
+                        # collapse 路径再体检一次（更接近真实注入）
+                        try:
+                            prepare_typetree_for_inject(
+                                parsed,
+                                process_mode=process_mode,
+                                obj_type_name=obj.type.name,
+                                source_label=expected_filename,
+                            )
+                        except ClientFacingError as ce:
+                            hard.append(str(ce))
+
+                        if hard:
+                            item["status"] = "error"
+                            item["level"] = "danger"
+                            item["message"] = hard[0]
+                        elif soft:
+                            item["status"] = "warning"
+                            item["level"] = "warning"
+                            item["message"] = soft[0]
+                        else:
+                            item["message"] = "JSON 格式与数据结构有效，可回填"
+                else:
+                    # fast：仅做轻量扩展名/类型提示，不读全文
+                    item["message"] = "文件名与对象匹配（快速预检未解析 JSON 正文）"
 
             elif lower_name.endswith('.csv'):
                 if validate_level == 'full':
                     csv_text = read_text_from_zip(zf, actual_zip_path)
                     parsed = FormatManager.from_csv(csv_text)
 
-                    if not parsed:
+                    if not parsed or not isinstance(parsed, dict):
                         item["status"] = "warning"
                         item["level"] = "warning"
-                        item["message"] = "CSV 未解析出有效字段"
+                        item["message"] = "CSV 未解析出有效字段（需要 键,值 两列）"
                     else:
-                        item["message"] = "CSV 可解析，可回填"
+                        hard, soft = collect_typetree_shape_issues(
+                            parsed, obj_type_name=obj.type.name
+                        )
+                        if hard:
+                            item["status"] = "error"
+                            item["level"] = "danger"
+                            item["message"] = hard[0]
+                        elif soft:
+                            item["status"] = "warning"
+                            item["level"] = "warning"
+                            item["message"] = soft[0]
+                        else:
+                            item["message"] = "CSV 可解析，可回填"
 
             elif lower_name.endswith('.dat'):
                 item["status"] = "warning"
@@ -583,10 +928,14 @@ def validate_patch_against_bundle(env, zf, process_mode='auto', validate_level='
                 item["level"] = "warning"
                 item["message"] = "未知扩展名，将按 RAW 处理"
 
-        except Exception as e:
+        except ClientFacingError as e:
             item["status"] = "error"
             item["level"] = "danger"
             item["message"] = str(e)
+        except Exception as e:
+            item["status"] = "error"
+            item["level"] = "danger"
+            item["message"] = f"预检该项时出错：{e}"
 
         if item["status"] == "error":
             report["summary"]["errors"] += 1
@@ -747,7 +1096,14 @@ def inspect_bundle():
             return jsonify({"success": False, "error": "请选择 Bundle 文件"}), 400
 
         bundle_path = save_upload_to_workdir(file, workdir, "bundle")
-        env = UnityPy.load(bundle_path)
+        try:
+            env = UnityPy.load(bundle_path)
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": f"无法解析 Bundle，请确认是完整的 Unity AssetBundle。详情：{e}",
+            }), 400
+
         report = inspect_env_light(env) if inspect_depth == 'fast' else inspect_env(env)
 
         return jsonify({
@@ -756,8 +1112,8 @@ def inspect_bundle():
             "report": report
         })
 
-    except ValueError as e:
-        return jsonify({"success": False, "error": str(e)}), 413
+    except ClientFacingError as e:
+        return jsonify({"success": False, "error": str(e)}), getattr(e, "status", 400)
     except Exception as e:
         return jsonify({"success": False, "error": f"分析失败：{e}"}), 500
     finally:
@@ -832,7 +1188,7 @@ def unpack():
 
         if exported_count == 0:
             shutil.rmtree(workdir, ignore_errors=True)
-            return render_template('error.html', msg="没有导出任何对象。请切换为高级自定义，或选择更多对象类型。"), 400
+            return _client_error("没有导出任何对象。请切换为高级自定义，或选择更多对象类型。", 400)
 
         register_cleanup(workdir)
         return send_file(
@@ -842,12 +1198,12 @@ def unpack():
             download_name=f"Unpacked_{safe_name(file.filename)}.zip"
         )
 
-    except ValueError as e:
+    except ClientFacingError as e:
         shutil.rmtree(workdir, ignore_errors=True)
-        return render_template('error.html', msg=str(e)), 413
+        return _client_error(str(e), getattr(e, "status", 400))
     except Exception as e:
         shutil.rmtree(workdir, ignore_errors=True)
-        return render_template('error.html', msg=f"解包失败: {e}"), 500
+        return _client_error(f"解包失败: {e}", 500)
     finally:
         release_unity_lock()
 
@@ -874,24 +1230,49 @@ def validate_repack():
         if not orig_file or not mod_zip:
             return jsonify({"success": False, "error": "缺少原始 Bundle 或修改后的 ZIP"}), 400
 
+        # 基础文件名校验，尽早给友好提示
+        zip_name = (mod_zip.filename or "").lower()
+        if zip_name and not (
+            zip_name.endswith(".zip") or zip_name.endswith(".unity3d.zip")
+        ):
+            # 不强制扩展名（部分浏览器不带后缀），仅作软提示记录
+            pass
+
         orig_path = save_upload_to_workdir(orig_file, workdir, "original_bundle")
         zip_path = save_upload_to_workdir(mod_zip, workdir, "modified.zip")
 
-        env = UnityPy.load(orig_path)
+        try:
+            env = UnityPy.load(orig_path)
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": f"无法解析原始 Bundle，请确认文件完整且为 Unity AssetBundle。详情：{e}",
+            }), 400
 
-        with zipfile.ZipFile(zip_path, 'r') as zf:
-            report = validate_patch_against_bundle(
-                env,
-                zf,
-                process_mode=process_mode,
-                validate_level=validate_level,
-                repack_mode=repack_mode
-            )
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zf:
+                if zf.testzip() is not None:
+                    return jsonify({
+                        "success": False,
+                        "error": "ZIP 内部有损坏的条目，请重新打包补丁后再试。",
+                    }), 400
+                report = validate_patch_against_bundle(
+                    env,
+                    zf,
+                    process_mode=process_mode,
+                    validate_level=validate_level,
+                    repack_mode=repack_mode
+                )
+        except zipfile.BadZipFile:
+            return jsonify({
+                "success": False,
+                "error": "修改包不是有效的 ZIP 文件。请使用本站解包得到的 ZIP，或用系统压缩工具重新打包。",
+            }), 400
 
         return jsonify({"success": True, "report": report})
 
-    except ValueError as e:
-        return jsonify({"success": False, "error": str(e)}), 413
+    except ClientFacingError as e:
+        return jsonify({"success": False, "error": str(e)}), getattr(e, "status", 400)
     except Exception as e:
         return jsonify({"success": False, "error": f"预检失败：{e}"}), 500
     finally:
@@ -947,16 +1328,35 @@ def repack():
         if not orig_file or not mod_zip:
             return _client_error("缺少文件！请同时上传原始 Bundle 与修改后的 ZIP。", 400)
 
+        if not (orig_file.filename or "").strip():
+            return _client_error("原始 Bundle 文件名为空，请重新选择文件。", 400)
+        if not (mod_zip.filename or "").strip():
+            return _client_error("修改后的 ZIP 文件名为空，请重新选择文件。", 400)
+
         orig_path = save_upload_to_workdir(orig_file, workdir, "original_bundle")
         zip_path = save_upload_to_workdir(mod_zip, workdir, "modified.zip")
         output_bundle_path = os.path.join(workdir, f"modded_{safe_name(orig_file.filename)}")
 
+        # 空文件快速失败
+        if os.path.getsize(orig_path) == 0:
+            return _client_error("原始 Bundle 文件大小为 0，请重新上传完整文件。", 400)
+        if os.path.getsize(zip_path) == 0:
+            return _client_error("修改后的 ZIP 文件大小为 0，请重新上传。", 400)
+
         try:
             env = UnityPy.load(orig_path)
         except Exception as e:
-            return _client_error(f"无法解析原始 Bundle，请确认文件完整且为 Unity AssetBundle。详情：{e}", 400)
+            return _client_error(
+                f"无法解析原始 Bundle，请确认文件完整且为 Unity AssetBundle。详情：{e}",
+                400,
+            )
 
-        with zipfile.ZipFile(zip_path, 'r') as zf:
+        try:
+            zf_ctx = zipfile.ZipFile(zip_path, 'r')
+        except zipfile.BadZipFile:
+            return _client_error("修改包不是有效的 ZIP 文件，请重新打包后再试。", 400)
+
+        with zf_ctx as zf:
             # 预检改为可选手动：仅当前端显式要求时才阻断；默认直接尝试回填。
             if parse_bool_form('require_validate', False):
                 validate_report = validate_patch_against_bundle(
@@ -968,9 +1368,15 @@ def repack():
                 )
 
                 if not validate_report["ok"]:
+                    first_err = next(
+                        (it.get("message") for it in validate_report.get("items", [])
+                         if it.get("status") == "error"),
+                        None,
+                    )
+                    detail = f" 首个错误：{first_err}" if first_err else ""
                     return _client_error(
                         f"预检未通过，已中止打包。错误数：{validate_report['summary']['errors']}。"
-                        f"请先回到页面执行预检查看详情。",
+                        f"请先回到页面执行预检查看详情。{detail}",
                         400,
                     )
 
@@ -995,78 +1401,81 @@ def repack():
                         if obj.type.name in ["Texture2D", "Sprite"]:
                             data = obj.read()
                             with zf.open(actual_zip_path) as img_fp:
-                                pil_img = Image.open(img_fp).convert('RGBA')
+                                try:
+                                    pil_img = Image.open(img_fp).convert('RGBA')
+                                except Exception as img_err:
+                                    raise ClientFacingError(
+                                        f"无法读取 PNG 图片：{img_err}。请确认是标准 PNG。"
+                                    ) from img_err
                                 data.image = pil_img
                                 data.save()
                             modified_files_count += 1
                         else:
-                            raise Exception("试图将 PNG 回填给非贴图类型对象")
+                            raise ClientFacingError(
+                                f"PNG 只能回填到 Texture2D/Sprite，当前对象类型是 {obj.type.name}"
+                            )
 
                     elif lower_name.endswith('.json'):
                         raw_json_str = read_text_from_zip(zf, actual_zip_path)
-                        cleaned_str = clean_json_string(raw_json_str) if process_mode == 'auto' else raw_json_str
-                        try:
-                            new_tree = json.loads(cleaned_str)
-                        except json.JSONDecodeError:
-                            new_tree = json5.loads(cleaned_str)
-
-                        if not isinstance(new_tree, dict):
-                            raise Exception("JSON 根节点必须是对象（typetree dict），不能是数组或原始值")
-
-                        # 嵌入 JSON 字符串压回；MonoBehaviour 的 m_Script PPtr 保持 dict，
-                        # TextAsset 的 m_Script 对象则 dumps 回文本字符串
-                        collapsed_tree = transform_json_tree(
-                            new_tree, mode='collapse', process_strategy=process_mode
+                        new_tree = parse_patch_json(
+                            raw_json_str,
+                            process_mode=process_mode,
+                            source_label=expected_filename,
                         )
-                        # 防御：旧版误把 PPtr m_Script 导出成字符串时，尝试解析回来
-                        collapsed_tree = restore_pptr_fields(collapsed_tree)
-                        try:
-                            obj.save_typetree(collapsed_tree)
-                        except Exception as save_err:
-                            # 再做一轮 PPtr 修复后重试一次，覆盖嵌套/历史坏导出
-                            collapsed_tree = restore_pptr_fields(collapsed_tree)
-                            try:
-                                obj.save_typetree(collapsed_tree)
-                            except Exception:
-                                raise Exception(
-                                    f"save_typetree 失败（常见原因：m_Script 等 PPtr 被写成字符串，"
-                                    f"或字段类型与原始 Bundle 不匹配）：{save_err}"
-                                ) from save_err
+                        # 嵌入 JSON 压回字符串；PPtr 保持 dict；结构校验后 save_typetree
+                        inject_typetree_to_object(
+                            obj,
+                            new_tree,
+                            process_mode=process_mode,
+                            source_label=expected_filename,
+                        )
                         modified_files_count += 1
 
                     elif lower_name.endswith('.csv'):
                         csv_text = read_text_from_zip(zf, actual_zip_path)
+                        if not csv_text or not str(csv_text).strip():
+                            raise ClientFacingError(f"{expected_filename} CSV 文件为空")
                         new_tree = FormatManager.from_csv(csv_text)
 
-                        if not isinstance(new_tree, dict):
-                            raise Exception("CSV 未能解析为对象字段表")
+                        if not isinstance(new_tree, dict) or not new_tree:
+                            raise ClientFacingError(
+                                f"{expected_filename} CSV 未能解析为对象字段表"
+                                "（需要至少两列：字段名,值）"
+                            )
 
-                        collapsed_tree = transform_json_tree(
-                            new_tree, mode='collapse', process_strategy=process_mode
+                        inject_typetree_to_object(
+                            obj,
+                            new_tree,
+                            process_mode=process_mode,
+                            source_label=expected_filename,
                         )
-                        collapsed_tree = restore_pptr_fields(collapsed_tree)
-                        try:
-                            obj.save_typetree(collapsed_tree)
-                        except Exception as save_err:
-                            collapsed_tree = restore_pptr_fields(collapsed_tree)
-                            try:
-                                obj.save_typetree(collapsed_tree)
-                            except Exception:
-                                raise Exception(
-                                    f"CSV save_typetree 失败：{save_err}"
-                                ) from save_err
                         modified_files_count += 1
 
                     else:
-                        obj.set_raw_data(zf.read(actual_zip_path))
+                        # 非 json/csv/png：高危 raw，仅在文件非空时写入
+                        raw_bytes = zf.read(actual_zip_path)
+                        if not raw_bytes:
+                            raise ClientFacingError(f"{expected_filename} 原始数据为空，已跳过写入")
+                        obj.set_raw_data(raw_bytes)
                         modified_files_count += 1
 
+                except ClientFacingError as e:
+                    # 带上文件名上下文，方便前端直接展示
+                    msg = str(e)
+                    if expected_filename and expected_filename not in msg:
+                        msg = f"文件 [{expected_filename}]：{msg}"
+                    raise ClientFacingError(msg, status=getattr(e, "status", 400)) from e
                 except Exception as e:
-                    raise Exception(f"文件 [{expected_filename}] 注入失败：{e}") from e
+                    raise ClientFacingError(
+                        f"文件 [{expected_filename}] 注入失败：{e}"
+                    ) from e
 
             if modified_files_count == 0:
-                raise Exception(
-                    "没有检测到任何被修改的内容被注入，请检查文件名、_index.json 或 Bundle 是否匹配"
+                raise ClientFacingError(
+                    "没有检测到任何可注入的补丁文件。"
+                    "请检查：1) ZIP 是否来自当前 Bundle 的解包结果；"
+                    "2) 是否保留 _index.json 或文件名中的 path_id；"
+                    "3) 原始 Bundle 是否选错版本。"
                 )
 
         # UnityPy 的 save 会产生完整输出；落盘返回可减少后续复制。
@@ -1075,12 +1484,16 @@ def repack():
             saved_bytes = _save_bundle_bytes(env)
         except MemoryError:
             gc.collect()
-            raise Exception(
+            raise ClientFacingError(
                 "服务器内存不足，无法完成大 Bundle 写出。"
-                "请改用「仅补丁」ZIP（只含修改过的对象 + _index.json），或使用本地版工具。"
+                "请改用「仅补丁」ZIP（只含修改过的对象 + _index.json），或使用本地版工具。",
+                status=507,
             )
         except Exception as e:
-            raise Exception(str(e)) from e
+            raise ClientFacingError(
+                f"Bundle 写出失败：{e}。若仅改了少量对象，请使用补丁模式减小包体后重试。",
+                status=500,
+            ) from e
 
         with open(output_bundle_path, 'wb') as fp:
             fp.write(saved_bytes)
@@ -1095,9 +1508,9 @@ def repack():
             download_name=f"modded_{safe_name(orig_file.filename)}"
         )
 
-    except ValueError as e:
+    except ClientFacingError as e:
         shutil.rmtree(workdir, ignore_errors=True)
-        return _client_error(str(e), 413)
+        return _client_error(str(e), getattr(e, "status", 400))
     except zipfile.BadZipFile:
         shutil.rmtree(workdir, ignore_errors=True)
         return _client_error("修改包不是有效的 ZIP 文件，请重新打包后再试。", 400)
@@ -1114,6 +1527,10 @@ def repack():
         import traceback
         print(f"[repack] FAILED: {e}")
         traceback.print_exc()
-        return _client_error(f"打包异常中止！原因：{e}", 500)
+        # 未知异常仍返回可读 JSON/错误页，避免裸 500 堆栈页
+        return _client_error(
+            f"打包未能完成：{e}。若刚编辑过 JSON，请先点「预检」确认语法与结构。",
+            500,
+        )
     finally:
         release_unity_lock()
