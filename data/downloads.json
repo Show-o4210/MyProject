@@ -20,20 +20,11 @@
         {
           "id": "pvzh-DIY",
           "kind": "single",
-          "name": "PVZH卡牌DIY v4.6.1",
+          "name": "PVZH卡牌DIY",
           "description": "自制卡工具，由 qhsj 定制制作，用于 PVZH 卡牌内容编辑与 DIY 制作。",
-          "details": "PVZH卡牌DIY v4.6.1 是一个面向自制卡制作的辅助工具，提供了一套模板和编辑功能。\n\n该工具更偏向简单的创作用途。",
-          "usage": [
-            "分为了编辑界面和资源界面两部分，编辑界面用于卡牌内容的编辑，资源界面用于管理和替换游戏资源。",
-            "在编辑界面中，可以选择不同的卡牌模板，输入卡牌名称、描述、属性等信息，生成自制卡图片。",
-            "在资源界面中，可以选择需要替换的资源文件，可按照工具提示进行替换操作。",
-            "内置了蓝色字体和贴图文本的编辑功能，适合用于制作具有特殊效果的卡牌。"
-          ],
-          "notes": [
-            "该工具由 qhsj 定制制作，请多关注原作者。",
-            "建议在测试环境中使用，不要直接覆盖重要数据。",
-            "如果工具无法正常运行，可以尝试更换安卓版本或模拟器环境。"
-          ],
+          "details": "PVZH卡牌DIY 是一个面向自制卡制作的辅助工具，提供了一套模板和编辑功能。\n\n该工具更偏向简单的创作用途。",
+          "usage": [],
+          "notes": [],
           "version": "4.7.2",
           "tag": "APK",
           "icon": "extension",
@@ -46,15 +37,11 @@
           "id": "pvzh-shuazuan-1",
           "kind": "single",
           "name": "PVZH 刷钻工具1",
-          "description": "PVZH 刷钻石与刷卡辅助工具1，用于自动化刷卡与刷钻石资源积累。",
-          "details": "PVZH 刷钻工具1 是一个自动化处理的刷卡/刷钻替换工具，适合用于减少手动复制、覆盖、定位路径等重复操作。",
-          "usage": [
-            "下载 APK 文件并安装。",
-            "如果无法正常运行，请尝试在虚拟机或其他安卓环境中运行。"
-          ],
+          "description": "PVZH 刷钻石工具。搬运获得了作者许可",
+          "details": "给你刷钻石用的",
+          "usage": [],
           "notes": [
-            "替换前建议备份原始文件。",
-            "如果出现闪退或无效，优先检查文件版本是否匹配。"
+            "这个软件内置的设备锁会在你默认下载目录，多出的文件删掉即可刷新设备"
           ],
           "version": "1.0",
           "tag": "APK",
@@ -62,28 +49,6 @@
           "size": "43.8 MB",
           "url": "https://github.com/Show-o4210/MyProject/releases/download/%E7%BD%91%E7%AB%99%E4%B8%8B%E8%BD%BD%E9%93%BE/781f8dc4b3ed4f12a8a05f5e07cb2a52086-1.apk",
           "updated_at": "2026-07-22",
-          "images": []
-        },
-        {
-          "id": "pvzh-v3",
-          "kind": "single",
-          "name": "PVZH一键替换v3.0",
-          "description": "一键替换文件工具，用于快速替换 PVZH 刷卡文件。如果无法运行，可以尝试在虚拟机中运行。",
-          "details": "PVZH一键替换v3.0 是一个偏向自动化处理的刷卡文件替换工具，适合用于减少手动复制、覆盖、定位路径等重复操作。",
-          "usage": [
-            "下载 APK 文件并安装。",
-            "如果无法正常运行，请尝试在虚拟机或其他安卓环境中运行。"
-          ],
-          "notes": [
-            "替换前建议备份原始文件。",
-            "如果出现闪退或无效，优先检查文件版本是否匹配。"
-          ],
-          "version": "3.0",
-          "tag": "APK",
-          "icon": "swap_horiz",
-          "size": "10 MB",
-          "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/v3.apk",
-          "updated_at": "2026-04-19",
           "images": []
         },
         {
