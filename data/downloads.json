@@ -7,45 +7,7 @@
       "icon": "extension",
       "empty_title": "暂无 Mod 作品",
       "empty_hint": "Mod 分区已就绪。后续将在此展示可安装的成品内容。",
-      "items": [
-        {
-          "id": "MyMod",
-          "kind": "bundle",
-          "name": "休切尔的Mod贴图箱（仅占位！）",
-          "description": "这里存放我个人的一些改了贴图的作品",
-          "details": "这里存放了我制作的一些有趣的内容",
-          "usage": [
-            "下载zip包解压",
-            "将解压后的内容移动到游戏目录 - /storage/emulated/0/Android/data/com.ea.gp.pvzheroes/files/cache/bundles/files/autotagged/ - 中进行替换",
-            "进入游戏即可生效",
-            "若有闪退，请检查替换位置是否正确，或者在其他设备中尝试"
-          ],
-          "notes": [
-            "你可以随意二次创作，但务必保留我的署名"
-          ],
-          "version": "v1",
-          "tag": "贴图",
-          "icon": "folder_zip",
-          "size": "多文件",
-          "updated_at": "2026-07-12",
-          "series_id": "",
-          "series_order": 1,
-          "images": [],
-          "files": [
-            {
-              "id": "full",
-              "name": "完整包（推荐）",
-              "description": "全部内容",
-              "size": "2 KB",
-              "tag": "ZIP",
-              "recommended": true,
-              "updated_at": "2026-07-12",
-              "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/heroes.zip",
-              "notes": []
-            }
-          ]
-        }
-      ]
+      "items": []
     },
     {
       "id": "tools",
@@ -72,12 +34,12 @@
             "建议在测试环境中使用，不要直接覆盖重要数据。",
             "如果工具无法正常运行，可以尝试更换安卓版本或模拟器环境。"
           ],
-          "version": "4.6.1",
+          "version": "4.7.2",
           "tag": "APK",
           "icon": "extension",
           "size": "67 MB",
-          "url": "https://github.com/Show-o4210/MyProject/releases/download/v4.6.1/v4.6.1.apk",
-          "updated_at": "2026-07-23",
+          "url": "https://github.com/Show-o4210/MyProject/releases/download/v4.7.2/v4.7.2.apk",
+          "updated_at": "2026-07-30",
           "images": []
         },
         {
