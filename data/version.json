@@ -1,9 +1,9 @@
 {
-  "version": "v4.8.0",
-  "version_code": 40800,
+  "version": "v4.8.1",
+  "version_code": 40801,
   "update_title": "版本更新 v4.8.0",
-  "update_log": "优化用户体验，简化GUI内容",
-  "download_url": "https://github.com/Show-o4210/MyProject/releases/download/408000/v4.8.0.apk",
+  "update_log": "修复了4.8.0的彩带文字错位问题",
+  "download_url": "https://github.com/Show-o4210/MyProject/releases/download/408001/v4.8.1.apk",
   "force_update": false,
-  "release_date": "2026-08-11"
+  "release_date": "2026-08-12"
 }
