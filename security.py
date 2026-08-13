@@ -30,6 +30,7 @@ import time
 # 也可以在环境变量中追加：SECURITY_BLOCKED_IPS="1.1.1.1,2.2.2.2"
 DEFAULT_BLOCKED_IPS = {
     "60.27.42.212",
+    "38.180.145.148"
 }
 
 # 额外封禁 IP，方便上线后不改代码直接在 Render 环境变量里调整
