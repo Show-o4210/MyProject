@@ -1,9 +1,9 @@
 {
-  "version": "v4.8.1",
-  "version_code": 40801,
-  "update_title": "版本更新 v4.8.0",
-  "update_log": "修复了4.8.0的彩带文字错位问题",
-  "download_url": "https://github.com/Show-o4210/MyProject/releases/download/408001/v4.8.1.apk",
+  "version": "v4.9.0",
+  "version_code": 40900,
+  "update_title": "版本更新 v4.9.0",
+  "update_log": "优化各种问题体验，同时更新了热拉相关内容，所以无法自动更新是正常的，可以从官网或者Q群获取最新版",
+  "download_url": "https://pan.quark.cn/s/92d058b77b5f",
   "force_update": false,
-  "release_date": "2026-08-12"
+  "release_date": "2026-08-17"
 }
