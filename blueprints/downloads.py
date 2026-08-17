@@ -1,412 +1,124 @@
-from flask import Blueprint, render_template, redirect, request, url_for
+from flask import Blueprint, redirect, render_template, url_for
 
 from extensions import limiter
 from utils.json_data import load_json_file
 
-downloads_bp = Blueprint('downloads', __name__)
+downloads_bp = Blueprint("downloads", __name__)
 
-# 分区默认顺序：先展示产品向的 Mod，再是工具与资源
-DEFAULT_SECTION_ID = 'mods'
-
-def normalize_file(raw):
-    """规范化 bundle 子文件；无效项返回 None。"""
-    if not isinstance(raw, dict) or not raw.get('id'):
-        return None
-    url = (raw.get('url') or '').strip()
-    file_id = raw['id']
-    notes = raw.get('notes') if isinstance(raw.get('notes'), list) else []
-    return {
-        'id': file_id,
-        'name': raw.get('name') or file_id,
-        'description': raw.get('description') or '',
-        'url': url,
-        'size': raw.get('size') or '',
-        'tag': raw.get('tag') or '',
-        'updated_at': raw.get('updated_at') or '',
-        'recommended': bool(raw.get('recommended')),
-        'notes': notes,
-    }
-
-
-def normalize_item(raw):
-    """
-    规范化条目：
-    - 有非空 files → kind=bundle
-    - 否则 kind=single（兼容旧数据）
-    - bundle 的 files 内 recommended 优先排序
-    """
-    if not isinstance(raw, dict) or not raw.get('id'):
-        return None
-
-    item = dict(raw)
-    item_id = item['id']
-
-    files_raw = item.get('files')
-    files = []
-    if isinstance(files_raw, list):
-        for entry in files_raw:
-            normalized = normalize_file(entry)
-            if normalized:
-                files.append(normalized)
-
-    if files:
-        files.sort(key=lambda f: (0 if f.get('recommended') else 1))
-
-    explicit_kind = (item.get('kind') or '').strip().lower()
-    if files:
-        kind = 'bundle'
-    elif explicit_kind == 'bundle':
-        kind = 'bundle'
-    else:
-        kind = 'single'
-
-    images = item.get('images') if isinstance(item.get('images'), list) else []
-    cover = (item.get('cover') or '').strip()
-    if not cover and images:
-        first = images[0]
-        if isinstance(first, str) and first.strip():
-            cover = first.strip()
-
-    item['kind'] = kind
-    item['files'] = files
-    item['file_count'] = len(files)
-    item['images'] = images
-    item['cover'] = cover
-    item['series_id'] = (item.get('series_id') or '').strip()
-    item['series_name'] = (item.get('series_name') or '').strip()
-    try:
-        item['series_order'] = int(item['series_order']) if item.get('series_order') is not None else None
-    except (TypeError, ValueError):
-        item['series_order'] = None
-
-    item['default_download_url'] = resolve_download_url(item)
-    return item
-
-
-def resolve_download_url(item):
-    """
-    解析条目级默认下载 URL：
-    1. item.url
-    2. 首个 recommended 且有 url 的 file
-    3. 仅 1 个 file 时用该 file.url
-    4. 否则 None
-    """
-    if not isinstance(item, dict):
-        return None
-
-    direct = (item.get('url') or '').strip()
-    if direct:
-        return direct
-
-    files = item.get('files') or []
-    if not isinstance(files, list):
-        return None
-
-    for f in files:
-        if isinstance(f, dict) and f.get('recommended') and (f.get('url') or '').strip():
-            return f['url'].strip()
-
-    valid = [f for f in files if isinstance(f, dict) and (f.get('url') or '').strip()]
-    if len(valid) == 1:
-        return valid[0]['url'].strip()
-
-    return None
-
-
-def load_catalog():
-    """读取 downloads.json，返回规范化后的分区目录。
-
-    注意：分区条目列表使用键名 ``entries``（而非 items），
-    避免 Jinja2 访问 dict.items 方法导致 TypeError。
-    JSON 文件中仍使用 ``items`` 字段。
-    """
-    data = load_json_file('downloads.json', default={})
-    if not isinstance(data, dict):
-        return []
-
-    sections = data.get('sections')
-    if isinstance(sections, list) and sections:
-        normalized = []
-        for section in sections:
-            if not isinstance(section, dict) or not section.get('id'):
-                continue
-            items_raw = section.get('items') or []
-            if not isinstance(items_raw, list):
-                items_raw = []
-            entries = []
-            for raw in items_raw:
-                item = normalize_item(raw)
-                if item:
-                    entries.append(item)
-            normalized.append({
-                'id': section['id'],
-                'name': section.get('name') or section['id'],
-                'description': section.get('description') or '',
-                'icon': section.get('icon') or 'inventory_2',
-                'empty_title': section.get('empty_title') or '暂时没有可用内容',
-                'empty_hint': section.get('empty_hint') or '列表为空，请稍后再来。',
-                'entries': entries,
-            })
-        return normalized
-
-    return []
-
-
-def find_section(section_id):
-    return next((s for s in load_catalog() if s.get('id') == section_id), None)
-
-
-def find_item(item_id):
-    """按 id 查找条目，返回 (item, section) 或 (None, None)。"""
-    for section in load_catalog():
-        for item in section.get('entries') or []:
-            if item.get('id') == item_id:
-                return item, section
-    return None, None
-
-
-def find_file(item_id, file_id):
-    """在指定条目内查找子文件，返回 (file, item, section) 或 (None, None, None)。"""
-    item, section = find_item(item_id)
-    if not item:
-        return None, None, None
-    for f in item.get('files') or []:
-        if f.get('id') == file_id:
-            return f, item, section
-    return None, item, section
-
-
-def find_series_siblings(item):
-    """同 series_id 的其它作品，按 series_order、名称排序。"""
-    series_id = (item or {}).get('series_id') or ''
-    if not series_id:
-        return []
-
-    siblings = []
-    for section in load_catalog():
-        for other in section.get('entries') or []:
-            if other.get('series_id') != series_id:
-                continue
-            if other.get('id') == item.get('id'):
-                continue
-            siblings.append({
-                **other,
-                '_section_id': section.get('id'),
-                '_section_name': section.get('name'),
-            })
-
-    def sort_key(x):
-        order = x.get('series_order')
-        order_val = order if isinstance(order, int) else 10**9
-        return (order_val, (x.get('name') or '').lower())
-
-    siblings.sort(key=sort_key)
-    return siblings
-
-
-def resolve_section_id(section_id):
-    catalog = load_catalog()
-    if not catalog:
-        return DEFAULT_SECTION_ID
-    if section_id and any(s['id'] == section_id for s in catalog):
-        return section_id
-    if any(s['id'] == DEFAULT_SECTION_ID for s in catalog):
-        return DEFAULT_SECTION_ID
-    return catalog[0]['id']
-
-
-@downloads_bp.route('/downloads')
-def index():
-    catalog = load_catalog()
-    active_id = resolve_section_id(request.args.get('section'))
-    active_section = find_section(active_id) or (catalog[0] if catalog else None)
-
-    return render_template(
-        'tab_downloads.html',
-        sections=catalog,
-        active_section=active_section,
-        active_section_id=active_id,
-    )
-
-
-@downloads_bp.route('/downloads/<item_id>')
-def detail(item_id):
-    if find_section(item_id):
-        return redirect(url_for('downloads.index', section=item_id))
-
-    item, section = find_item(item_id)
-    if not item:
-        return render_template('error.html', msg="未找到该资源，可能已被下架。"), 404
-
-    series_siblings = find_series_siblings(item)
-
-    return render_template(
-        'download_detail.html',
-        tool=item,
-        section=section,
-        series_siblings=series_siblings,
-    )
-
-
-GITHUB_MIRRORS = [
+DEFAULT_DOWNLOAD_OPTIONS = [
     {
-        'id': 'ghproxy-net',
-        'name': 'Ghproxy Net',
-        'prefix': 'https://ghproxy.net/',
-        'tag': '推荐 · 稳定节点',
-        'recommended': True,
+        "id": "quark",
+        "name": "夸克网盘",
+        "description": "打开 PVZH 相关内容合集，适合直接查找和保存文件。",
+        "url": "https://pan.quark.cn/s/92d058b77b5f",
+        "icon": "cloud_download",
+        "action": "打开网盘",
     },
     {
-        'id': 'gh-proxy-com',
-        'name': 'Gh-Proxy Com',
-        'prefix': 'https://gh-proxy.com/',
-        'tag': 'Release 大文件',
-        'recommended': False,
-    },
-    {
-        'id': 'gh-ddlc',
-        'name': 'Gh DDLC',
-        'prefix': 'https://gh.ddlc.top/',
-        'tag': '社区高速源',
-        'recommended': False,
-    },
-    {
-        'id': 'akams',
-        'name': '1Panel / ghproxy',
-        'prefix': 'https://github.akams.cn/',
-        'tag': '备用节点',
-        'recommended': False,
-    },
-    {
-        'id': 'mirror-ghproxy',
-        'name': 'Mirror Ghproxy',
-        'prefix': 'https://mirror.ghproxy.com/',
-        'tag': '常用镜像点',
-        'recommended': False,
-    },
-    {
-        'id': 'edge-forks',
-        'name': 'Edge Forks',
-        'prefix': 'https://edge.forks.tools/',
-        'tag': '分发节点',
-        'recommended': False,
-    },
-    {
-        'id': 'direct',
-        'name': 'GitHub 官方直连',
-        'prefix': '',
-        'tag': '官方原源',
-        'recommended': False,
+        "id": "qq-group",
+        "name": "QQ 群",
+        "description": "加入群聊【【PVZH】Main】，获取资源、通知与使用帮助。",
+        "url": "https://qm.qq.com/q/PayU4f00iQ",
+        "icon": "group_add",
+        "action": "加入群聊",
     },
 ]
 
 
-def is_github_url(url: str) -> bool:
-    if not url:
-        return False
-    u = url.strip().lower()
-    return u.startswith('https://github.com/') or u.startswith('http://github.com/')
+def _normalize_item(raw):
+    if not isinstance(raw, dict) or not raw.get("id"):
+        return None
+
+    item = dict(raw)
+    images = item.get("images") if isinstance(item.get("images"), list) else []
+    cover = str(item.get("cover") or "").strip()
+    if not cover and images and isinstance(images[0], str):
+        cover = images[0].strip()
+
+    item["images"] = images
+    item["cover"] = cover
+    item["usage"] = item.get("usage") if isinstance(item.get("usage"), list) else []
+    item["notes"] = item.get("notes") if isinstance(item.get("notes"), list) else []
+    return item
 
 
-def build_accelerated_url(raw_url: str, mirror_id: str = None) -> str:
-    raw_url = (raw_url or '').strip()
-    if not is_github_url(raw_url):
-        return raw_url
+def load_catalog():
+    """读取下载目录，返回统一条目列表和全站共享下载方式。"""
+    data = load_json_file("downloads.json", default={})
+    if not isinstance(data, dict):
+        return [], DEFAULT_DOWNLOAD_OPTIONS
 
-    if mirror_id == 'direct':
-        return raw_url
-
-    if mirror_id:
-        for m in GITHUB_MIRRORS:
-            if m['id'] == mirror_id and m['prefix']:
-                return m['prefix'] + raw_url
-
-    # Default fallback to top recommended mirror (ghproxy-net)
-    return GITHUB_MIRRORS[0]['prefix'] + raw_url
-
-
-@downloads_bp.route('/api/download/mirrors')
-def get_download_mirrors():
-    """返回给定 URL 或 item_id/file_id 的多镜像源竞速测速列表。"""
-    from flask import jsonify
-    item_id = request.args.get('item_id')
-    file_id = request.args.get('file_id')
-    target_url = request.args.get('url', '').strip()
-
-    title = "资源文件"
-    if item_id:
-        if file_id:
-            file_entry, item, _sec = find_file(item_id, file_id)
-            if file_entry and file_entry.get('url'):
-                target_url = file_entry['url']
-                title = f"{item.get('name', '')} - {file_entry.get('name', '')}"
-        else:
-            item, _sec = find_item(item_id)
+    entries = []
+    for section in data.get("sections") or []:
+        if not isinstance(section, dict):
+            continue
+        for raw in section.get("items") or []:
+            item = _normalize_item(raw)
             if item:
-                target_url = item.get('default_download_url') or resolve_download_url(item) or ''
-                title = item.get('name', '')
+                entries.append(item)
 
-    if not target_url:
-        return jsonify({'error': '未找到有效的下载链接'}), 404
+    options = []
+    for option in data.get("download_options") or []:
+        if not isinstance(option, dict) or not option.get("id") or not option.get("url"):
+            continue
+        options.append({
+            "id": str(option["id"]),
+            "name": str(option.get("name") or option["id"]),
+            "description": str(option.get("description") or ""),
+            "url": str(option["url"]).strip(),
+            "icon": str(option.get("icon") or "open_in_new"),
+            "action": str(option.get("action") or "打开"),
+        })
 
-    is_gh = is_github_url(target_url)
-    mirrors_data = []
-
-    if is_gh:
-        for m in GITHUB_MIRRORS:
-            acc_url = m['prefix'] + target_url if m['prefix'] else target_url
-            mirrors_data.append({
-                'id': m['id'],
-                'name': m['name'],
-                'prefix': m['prefix'],
-                'url': acc_url,
-                'tag': m['tag'],
-                'recommended': m.get('recommended', False),
-            })
-
-    return jsonify({
-        'title': title,
-        'target_url': target_url,
-        'is_github': is_gh,
-        'mirrors': mirrors_data,
-    })
+    return entries, options or DEFAULT_DOWNLOAD_OPTIONS
 
 
-@downloads_bp.route('/api/download/<item_id>')
+def find_item(item_id):
+    entries, _options = load_catalog()
+    return next((item for item in entries if item.get("id") == item_id), None)
+
+
+@downloads_bp.route("/downloads")
+def index():
+    entries, options = load_catalog()
+    return render_template(
+        "tab_downloads.html",
+        entries=entries,
+        download_options=options,
+    )
+
+
+@downloads_bp.route("/downloads/<item_id>")
+def detail(item_id):
+    item = find_item(item_id)
+    if not item:
+        return render_template("error.html", msg="未找到该资源，可能已被下架。"), 404
+
+    _entries, options = load_catalog()
+    return render_template(
+        "download_detail.html",
+        tool=item,
+        download_options=options,
+    )
+
+
+def _primary_download_url():
+    _entries, options = load_catalog()
+    return options[0]["url"] if options else url_for("downloads.index")
+
+
+# 兼容已经分享出去的旧下载地址。下载内容现已统一到共享入口。
+@downloads_bp.route("/api/download/<item_id>")
 @limiter.limit("20 per minute")
 def trigger_download(item_id):
-    item, _section = find_item(item_id)
-    if not item:
-        return render_template('error.html', msg="未找到该资源，可能已被下架。"), 404
-
-    url = item.get('default_download_url') or resolve_download_url(item)
-    if not url:
-        if item.get('kind') == 'bundle':
-            return redirect(url_for('downloads.detail', item_id=item_id))
-        return render_template('error.html', msg="未找到该资源，可能已被下架。"), 404
-
-    mirror_id = request.args.get('mirror')
-    if is_github_url(url):
-        final_url = build_accelerated_url(url, mirror_id)
-        return redirect(final_url)
-
-    return redirect(url)
+    if not find_item(item_id):
+        return render_template("error.html", msg="未找到该资源，可能已被下架。"), 404
+    return redirect(_primary_download_url())
 
 
-@downloads_bp.route('/api/download/<item_id>/<file_id>')
+@downloads_bp.route("/api/download/<item_id>/<file_id>")
 @limiter.limit("20 per minute")
 def trigger_file_download(item_id, file_id):
-    file_entry, item, _section = find_file(item_id, file_id)
-    if not item:
-        return render_template('error.html', msg="未找到该资源，可能已被下架。"), 404
-    if not file_entry or not (file_entry.get('url') or '').strip():
-        return render_template('error.html', msg="未找到该文件，可能已被下架。"), 404
-
-    raw_url = file_entry['url'].strip()
-    mirror_id = request.args.get('mirror')
-    if is_github_url(raw_url):
-        final_url = build_accelerated_url(raw_url, mirror_id)
-        return redirect(final_url)
-
-    return redirect(raw_url)
-
+    if not find_item(item_id):
+        return render_template("error.html", msg="未找到该资源，可能已被下架。"), 404
+    return redirect(_primary_download_url())

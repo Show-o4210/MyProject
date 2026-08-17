@@ -1,229 +1,57 @@
 {% extends "base.html" %}
 
 {% block title %}{{ tool.name }} - 下载详情{% endblock %}
+{% block meta_description %}{{ tool.description }}{% endblock %}
 
 {% block content %}
-<div class="px-4 sm:px-6 lg:px-8 py-8 md:py-10 max-w-6xl mx-auto">
+<div class="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-5 md:py-8">
+    <a href="{{ url_for('downloads.index') }}" class="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-blue-600 transition mb-4">
+        <span class="material-symbols-rounded text-[18px]">arrow_back</span>
+        返回下载中心
+    </a>
 
-    <div class="mb-5 flex flex-wrap items-center gap-3">
-        <a href="{{ url_for('downloads.index', section=section.id if section else None) }}"
-           class="inline-flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-blue-600 transition">
-            <span class="material-symbols-rounded text-[18px]">arrow_back</span>
-            返回{% if section %}{{ section.name }}{% else %}下载中心{% endif %}
-        </a>
-        {% if section %}
-        <span class="text-slate-300">|</span>
-        <span class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full">
-            <span class="material-symbols-rounded text-[14px]">{{ section.icon }}</span>
-            {{ section.name }}
-        </span>
-        {% endif %}
-        {% if tool.kind == 'bundle' %}
-        <span class="inline-flex items-center gap-1 text-xs font-bold text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-full">
-            <span class="material-symbols-rounded text-[14px]">folder_zip</span>
-            合集 · {{ tool.file_count }} 个文件
-        </span>
-        {% endif %}
-        {% if tool.series_name or tool.series_id %}
-        <span class="inline-flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">
-            <span class="material-symbols-rounded text-[14px]">collections_bookmark</span>
-            {{ tool.series_name or tool.series_id }}
-        </span>
-        {% endif %}
-    </div>
-
-    <section class="rounded-[2rem] bg-white border border-slate-200 shadow-sm overflow-hidden mb-6">
-        <div class="relative p-5 md:p-8">
-            <div class="absolute -top-20 -right-20 w-56 h-56 bg-blue-100 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
-
-            <div class="relative z-10 flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-                <div class="max-w-3xl">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center overflow-hidden shrink-0">
-                            {% if tool.cover %}
-                            <img src="{{ tool.cover }}" alt="" class="w-full h-full object-cover">
-                            {% else %}
-                            <span class="material-symbols-rounded text-[26px]">
-                                {% if tool.icon %}{{ tool.icon }}{% elif tool.kind == 'bundle' %}folder_zip{% else %}inventory_2{% endif %}
-                            </span>
-                            {% endif %}
-                        </div>
-
-                        {% if tool.tag %}
-                        <span class="bg-blue-50 text-blue-600 text-xs font-bold px-3 py-1 rounded-full border border-blue-100">
-                            {{ tool.tag }}
-                        </span>
-                        {% endif %}
-                    </div>
-
-                    <h1 class="text-2xl md:text-4xl font-extrabold text-slate-950 tracking-tight mb-3">
-                        {{ tool.name }}
-                    </h1>
-
-                    <p class="text-sm md:text-base text-slate-500 leading-relaxed">
-                        {{ tool.description }}
-                    </p>
-                </div>
-
-                {% if tool.default_download_url %}
-                <div class="flex flex-wrap items-center gap-2.5 shrink-0">
-                    {% if tool.default_download_url.startswith('https://github.com/') or tool.default_download_url.startswith('http://github.com/') %}
-                    <button type="button"
-                            onclick="startGitHubMirrorRace({ itemId: '{{ tool.id }}', title: '{{ tool.name }}', url: '{{ tool.default_download_url }}' })"
-                            class="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-extrabold text-sm px-5 py-3 rounded-2xl shadow-md hover:shadow-lg transition active:scale-95">
-                        <span class="material-symbols-rounded text-[20px] animate-pulse">bolt</span>
-                        🚀 镜像竞速加速下载
-                    </button>
-                    {% endif %}
-                    <a href="{{ url_for('downloads.trigger_download', item_id=tool.id) }}"
-                       class="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm px-4 py-3 rounded-2xl shadow-sm transition active:scale-95">
-                        <span class="material-symbols-rounded text-[20px]">download</span>
-                        {% if tool.kind == 'bundle' %}下载推荐项{% else %}常规下载{% endif %}
-                    </a>
-                </div>
-                {% elif tool.kind == 'bundle' %}
-                <a href="#bundle-files"
-                   class="inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-sm px-5 py-3 rounded-2xl shadow-sm transition active:scale-95 shrink-0">
-                    <span class="material-symbols-rounded text-[20px]">folder_open</span>
-                    查看文件列表
-                </a>
+    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 mb-4">
+        <div class="flex items-start gap-3 sm:gap-4">
+            <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center overflow-hidden shrink-0">
+                {% if tool.cover %}
+                <img src="{{ tool.cover }}" alt="" class="w-full h-full object-cover">
+                {% else %}
+                <span class="material-symbols-rounded text-[28px]">{{ tool.icon or 'inventory_2' }}</span>
                 {% endif %}
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <h1 class="text-xl sm:text-2xl font-extrabold text-slate-950">{{ tool.name }}</h1>
+                    {% if tool.tag %}<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100">{{ tool.tag }}</span>{% endif %}
+                </div>
+                <p class="text-sm text-slate-500 leading-relaxed">{{ tool.description }}</p>
+                <div class="flex flex-wrap gap-3 mt-2 text-[11px] font-bold text-slate-400">
+                    {% if tool.version %}<span>版本 {{ tool.version }}</span>{% endif %}
+                    {% if tool.size %}<span>{{ tool.size }}</span>{% endif %}
+                    {% if tool.updated_at %}<span>更新于 {{ tool.updated_at }}</span>{% endif %}
+                </div>
             </div>
         </div>
     </section>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-        <main class="lg:col-span-8 space-y-6">
-
-            {% if tool.kind == 'bundle' and tool.files %}
-            <section id="bundle-files" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-6">
-                <h2 class="text-lg font-extrabold text-slate-900 mb-1 flex items-center">
-                    <span class="material-symbols-rounded text-violet-500 mr-2">folder_open</span>
-                    文件列表
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <main class="md:col-span-2 space-y-4">
+            <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+                <h2 class="text-base font-extrabold text-slate-900 mb-3 flex items-center gap-2">
+                    <span class="material-symbols-rounded text-blue-500 text-[21px]">article</span>内容介绍
                 </h2>
-                <p class="text-sm text-slate-500 mb-5">
-                    可按需单独下载；带「推荐」标记的一般为完整包。
-                </p>
-
-                <ul class="space-y-3">
-                    {% for f in tool.files %}
-                    <li class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-2xl border transition
-                               {% if f.recommended %}bg-violet-50/60 border-violet-100{% else %}bg-slate-50/80 border-slate-100{% endif %}">
-                        <div class="flex items-start gap-3 flex-grow min-w-0">
-                            <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0
-                                        {% if f.recommended %}bg-violet-100 text-violet-600{% else %}bg-white text-slate-500 border border-slate-200{% endif %}">
-                                <span class="material-symbols-rounded text-[22px]">
-                                    {% if f.tag and f.tag|upper == 'APK' %}android{% else %}draft{% endif %}
-                                </span>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2 mb-0.5">
-                                    <span class="font-extrabold text-slate-900 text-sm md:text-base">{{ f.name }}</span>
-                                    {% if f.recommended %}
-                                    <span class="text-[10px] font-extrabold uppercase tracking-wide px-2 py-0.5 rounded-full bg-violet-600 text-white">推荐</span>
-                                    {% endif %}
-                                    {% if f.tag %}
-                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-500 border border-slate-200">{{ f.tag }}</span>
-                                    {% endif %}
-                                </div>
-                                {% if f.description %}
-                                <p class="text-xs md:text-sm text-slate-500 leading-relaxed">{{ f.description }}</p>
-                                {% endif %}
-                                {% if f.notes %}
-                                <ul class="mt-1.5 space-y-0.5">
-                                    {% for note in f.notes %}
-                                    <li class="text-[11px] text-amber-800/90 flex gap-1 leading-relaxed">
-                                        <span class="material-symbols-rounded text-[13px] shrink-0 mt-px">info</span>
-                                        <span>{{ note }}</span>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
-                                {% endif %}
-                                <div class="flex flex-wrap gap-3 mt-1.5 text-[11px] font-semibold text-slate-400">
-                                    {% if f.size %}
-                                    <span class="inline-flex items-center gap-0.5">
-                                        <span class="material-symbols-rounded text-[14px]">hard_drive</span>
-                                        {{ f.size }}
-                                    </span>
-                                    {% endif %}
-                                    {% if f.updated_at %}
-                                    <span class="inline-flex items-center gap-0.5">
-                                        <span class="material-symbols-rounded text-[14px]">update</span>
-                                        {{ f.updated_at }}
-                                    </span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-
-                        {% if f.url %}
-                        <div class="flex items-center gap-2 shrink-0">
-                            {% if f.url.startswith('https://github.com/') or f.url.startswith('http://github.com/') %}
-                            <button type="button"
-                                    onclick="startGitHubMirrorRace({ itemId: '{{ tool.id }}', fileId: '{{ f.id }}', title: '{{ tool.name }} - {{ f.name }}', url: '{{ f.url }}' })"
-                                    class="inline-flex items-center justify-center gap-1 shrink-0 px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition active:scale-95">
-                                <span class="material-symbols-rounded text-[16px]">bolt</span>
-                                竞速加速
-                            </button>
-                            {% endif %}
-                            <a href="{{ url_for('downloads.trigger_file_download', item_id=tool.id, file_id=f.id) }}"
-                               class="inline-flex items-center justify-center gap-1.5 shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition active:scale-95
-                                      {% if f.recommended %}bg-violet-600 hover:bg-violet-700 text-white{% else %}bg-slate-900 hover:bg-slate-800 text-white{% endif %}">
-                                <span class="material-symbols-rounded text-[16px]">download</span>
-                                下载
-                            </a>
-                        </div>
-                        {% else %}
-                        <span class="text-xs font-bold text-slate-400 shrink-0">暂无链接</span>
-                        {% endif %}
-                    </li>
-                    {% endfor %}
-                </ul>
-            </section>
-            {% endif %}
-
-            {% if tool.images %}
-            <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-6">
-                <h2 class="text-lg font-extrabold text-slate-900 mb-4 flex items-center">
-                    <span class="material-symbols-rounded text-blue-500 mr-2">image</span>
-                    图片预览
-                </h2>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {% for image in tool.images %}
-                    <img src="{{ image }}"
-                         alt="{{ tool.name }} 预览图"
-                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover">
-                    {% endfor %}
-                </div>
-            </section>
-            {% endif %}
-
-            <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-6">
-                <h2 class="text-lg font-extrabold text-slate-900 mb-4 flex items-center">
-                    <span class="material-symbols-rounded text-blue-500 mr-2">article</span>
-                    {% if section and section.id == 'mods' %}内容介绍{% else %}工具介绍{% endif %}
-                </h2>
-
-                <div class="text-sm md:text-base text-slate-600 leading-relaxed whitespace-pre-line">
-                    {{ tool.details if tool.details else tool.description }}
-                </div>
+                <div class="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{{ tool.details or tool.description }}</div>
             </section>
 
             {% if tool.usage %}
-            <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-6">
-                <h2 class="text-lg font-extrabold text-slate-900 mb-4 flex items-center">
-                    <span class="material-symbols-rounded text-blue-500 mr-2">format_list_numbered</span>
-                    {% if section and section.id == 'mods' %}安装步骤{% else %}使用步骤{% endif %}
+            <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+                <h2 class="text-base font-extrabold text-slate-900 mb-3 flex items-center gap-2">
+                    <span class="material-symbols-rounded text-blue-500 text-[21px]">format_list_numbered</span>使用步骤
                 </h2>
-
-                <ol class="space-y-3">
+                <ol class="space-y-2.5">
                     {% for step in tool.usage %}
-                    <li class="flex gap-3 text-sm text-slate-600 leading-relaxed">
-                        <span class="w-6 h-6 rounded-full bg-blue-50 text-blue-600 text-xs font-extrabold flex items-center justify-center shrink-0">
-                            {{ loop.index }}
-                        </span>
+                    <li class="flex gap-2.5 text-sm text-slate-600 leading-relaxed">
+                        <span class="w-5 h-5 rounded-full bg-blue-50 text-blue-600 text-[11px] font-extrabold flex items-center justify-center shrink-0 mt-0.5">{{ loop.index }}</span>
                         <span>{{ step }}</span>
                     </li>
                     {% endfor %}
@@ -232,162 +60,38 @@
             {% endif %}
 
             {% if tool.notes %}
-            <section class="bg-amber-50 rounded-3xl border border-amber-100 p-5 md:p-6">
-                <h2 class="text-lg font-extrabold text-amber-900 mb-4 flex items-center">
-                    <span class="material-symbols-rounded text-amber-600 mr-2">warning</span>
-                    注意事项
+            <section class="bg-amber-50 rounded-2xl border border-amber-100 p-4 sm:p-5">
+                <h2 class="text-base font-extrabold text-amber-900 mb-3 flex items-center gap-2">
+                    <span class="material-symbols-rounded text-amber-600 text-[21px]">warning</span>注意事项
                 </h2>
-
                 <ul class="space-y-2">
                     {% for note in tool.notes %}
                     <li class="flex gap-2 text-sm text-amber-800 leading-relaxed">
-                        <span class="material-symbols-rounded text-[18px] shrink-0">check_circle</span>
-                        <span>{{ note }}</span>
+                        <span class="material-symbols-rounded text-[17px] shrink-0 mt-0.5">check_circle</span><span>{{ note }}</span>
                     </li>
                     {% endfor %}
                 </ul>
             </section>
             {% endif %}
-
-            {% if series_siblings %}
-            <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-6">
-                <h2 class="text-lg font-extrabold text-slate-900 mb-1 flex items-center">
-                    <span class="material-symbols-rounded text-blue-500 mr-2">collections_bookmark</span>
-                    同系列其它作品
-                </h2>
-                <p class="text-sm text-slate-500 mb-4">
-                    {{ tool.series_name or tool.series_id }}
-                </p>
-                <ul class="space-y-2">
-                    {% for sib in series_siblings %}
-                    <li>
-                        <a href="{{ url_for('downloads.detail', item_id=sib.id) }}"
-                           class="flex items-center justify-between gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/80 hover:border-blue-200 hover:bg-blue-50/40 transition">
-                            <div class="min-w-0">
-                                <div class="font-bold text-slate-900 text-sm truncate">{{ sib.name }}</div>
-                                <div class="text-xs text-slate-400 font-semibold mt-0.5 flex flex-wrap gap-2">
-                                    {% if sib.kind == 'bundle' %}
-                                    <span>合集 · {{ sib.file_count }} 文件</span>
-                                    {% else %}
-                                    <span>单文件</span>
-                                    {% endif %}
-                                    {% if sib.tag %}<span>{{ sib.tag }}</span>{% endif %}
-                                </div>
-                            </div>
-                            <span class="material-symbols-rounded text-slate-400 shrink-0">chevron_right</span>
-                        </a>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </section>
-            {% endif %}
-
         </main>
 
-        <aside class="lg:col-span-4 space-y-6">
-            <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
-                <h2 class="text-lg font-extrabold text-slate-900 mb-4 flex items-center">
-                    <span class="material-symbols-rounded text-blue-500 mr-2">info</span>
-                    文件信息
-                </h2>
-
-                <div class="space-y-3 text-sm">
-                    {% if section %}
-                    <div class="flex items-center justify-between gap-4">
-                        <span class="text-slate-500">分区</span>
-                        <span class="font-bold text-slate-900">{{ section.name }}</span>
-                    </div>
-                    {% endif %}
-
-                    <div class="flex items-center justify-between gap-4">
-                        <span class="text-slate-500">形态</span>
-                        <span class="font-bold text-slate-900">
-                            {% if tool.kind == 'bundle' %}作品包 / 合集{% else %}单文件{% endif %}
-                        </span>
-                    </div>
-
-                    {% if tool.kind == 'bundle' %}
-                    <div class="flex items-center justify-between gap-4">
-                        <span class="text-slate-500">子文件</span>
-                        <span class="font-bold text-slate-900">{{ tool.file_count }} 个</span>
-                    </div>
-                    {% endif %}
-
-                    {% if tool.version %}
-                    <div class="flex items-center justify-between gap-4">
-                        <span class="text-slate-500">版本</span>
-                        <span class="font-bold text-slate-900">{{ tool.version }}</span>
-                    </div>
-                    {% endif %}
-
-                    {% if tool.tag %}
-                    <div class="flex items-center justify-between gap-4">
-                        <span class="text-slate-500">类型</span>
-                        <span class="font-bold text-slate-900">{{ tool.tag }}</span>
-                    </div>
-                    {% endif %}
-
-                    {% if tool.size %}
-                    <div class="flex items-center justify-between gap-4">
-                        <span class="text-slate-500">大小</span>
-                        <span class="font-bold text-slate-900">{{ tool.size }}</span>
-                    </div>
-                    {% endif %}
-
-                    {% if tool.updated_at %}
-                    <div class="flex items-center justify-between gap-4">
-                        <span class="text-slate-500">更新日期</span>
-                        <span class="font-bold text-slate-900">{{ tool.updated_at }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-            </section>
-
-            <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
-                <h2 class="text-lg font-extrabold text-slate-900 mb-4 flex items-center">
-                    <span class="material-symbols-rounded text-blue-500 mr-2">download</span>
-                    下载选项
-                </h2>
-
-                {% if tool.kind == 'bundle' %}
-                <p class="text-sm text-slate-500 leading-relaxed mb-4">
-                    {% if tool.default_download_url %}
-                    推荐项与多镜像源加速；也可在左侧列表中单独选择分卷。
-                    {% else %}
-                    请从左侧文件列表中选择需要的文件下载。
-                    {% endif %}
-                </p>
-                {% else %}
-                <p class="text-sm text-slate-500 leading-relaxed mb-4">
-                    支持 GitHub 多镜像源自动测速与极速加速下载。
-                </p>
-                {% endif %}
-
-                {% if tool.default_download_url %}
+        <aside>
+            <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sticky top-20">
+                <h2 class="text-base font-extrabold text-slate-900 mb-1">获取全部内容</h2>
+                <p class="text-xs text-slate-500 leading-relaxed mb-3">不再区分单独文件，请选择一种统一获取方式。</p>
                 <div class="space-y-2.5">
-                    {% if tool.default_download_url.startswith('https://github.com/') or tool.default_download_url.startswith('http://github.com/') %}
-                    <button type="button"
-                            onclick="startGitHubMirrorRace({ itemId: '{{ tool.id }}', title: '{{ tool.name }}', url: '{{ tool.default_download_url }}' })"
-                            class="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-extrabold text-sm px-4 py-3 rounded-2xl shadow-md transition active:scale-95">
-                        <span class="material-symbols-rounded text-[20px]">bolt</span>
-                        🚀 镜像竞速加速下载
-                    </button>
-                    {% endif %}
-                    <a href="{{ url_for('downloads.trigger_download', item_id=tool.id) }}"
-                       class="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-sm px-4 py-2.5 rounded-2xl shadow-sm transition active:scale-95">
-                        <span class="material-symbols-rounded text-[20px]">download</span>
-                        {% if tool.kind == 'bundle' %}常规下载推荐项{% else %}常规下载{% endif %}
+                    {% for option in download_options %}
+                    <a href="{{ option.url }}" target="_blank" rel="noopener noreferrer"
+                       class="flex items-center gap-2.5 w-full p-3 rounded-xl border transition active:scale-[0.98] {% if option.id == 'quark' %}bg-blue-600 hover:bg-blue-700 border-blue-600 text-white{% else %}bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-800{% endif %}">
+                        <span class="material-symbols-rounded text-[20px]">{{ option.icon }}</span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block text-sm font-extrabold">{{ option.action }}</span>
+                            <span class="block text-[10px] opacity-75 truncate">{{ option.name }}</span>
+                        </span>
+                        <span class="material-symbols-rounded text-[18px]">open_in_new</span>
                     </a>
+                    {% endfor %}
                 </div>
-                {% elif tool.kind == 'bundle' %}
-                <a href="#bundle-files"
-                   class="w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-sm px-5 py-3 rounded-2xl shadow-sm transition active:scale-95">
-                    <span class="material-symbols-rounded text-[20px]">folder_open</span>
-                    查看文件列表
-                </a>
-                {% else %}
-                <p class="text-sm text-slate-400 font-semibold">暂无下载链接</p>
-                {% endif %}
             </section>
         </aside>
     </div>

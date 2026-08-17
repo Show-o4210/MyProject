@@ -1,14 +1,23 @@
 {
-  "sections": [
+  "download_options": [
     {
-      "id": "mods",
-      "name": "Mod 内容",
-      "description": "面向游玩与体验的成品 Mod：自制卡包、英雄改动、关卡包、贴图合集等。",
-      "icon": "extension",
-      "empty_title": "暂无 Mod 作品",
-      "empty_hint": "Mod 分区已就绪。后续将在此展示可安装的成品内容。",
-      "items": []
+      "id": "quark",
+      "name": "夸克网盘",
+      "description": "打开 PVZH 相关内容合集，适合直接查找和保存文件。",
+      "url": "https://pan.quark.cn/s/92d058b77b5f",
+      "icon": "cloud_download",
+      "action": "打开网盘"
     },
+    {
+      "id": "qq-group",
+      "name": "QQ 群",
+      "description": "加入群聊【【PVZH】Main】，获取资源、通知与使用帮助。",
+      "url": "https://qm.qq.com/q/PayU4f00iQ",
+      "icon": "group_add",
+      "action": "加入群聊"
+    }
+  ],
+  "sections": [
     {
       "id": "tools",
       "name": "工具与资源",
@@ -29,7 +38,6 @@
           "tag": "APK",
           "icon": "extension",
           "size": "68 MB",
-          "url": "https://github.com/Show-o4210/MyProject/releases/download/408001/v4.8.1.apk",
           "updated_at": "2026-08-12",
           "images": []
         },
@@ -45,7 +53,6 @@
           "tag": "APK",
           "icon": "extension",
           "size": "12 MB",
-          "url": "https://github.com/Show-o4210/MyProject/releases/download/%E7%BD%91%E7%AB%99%E4%B8%8B%E8%BD%BD%E9%93%BE/card_maker.apk",
           "updated_at": "2026-08-12",
           "images": []
         },
@@ -63,7 +70,6 @@
           "tag": "APK",
           "icon": "diamond",
           "size": "43.8 MB",
-          "url": "https://github.com/Show-o4210/MyProject/releases/download/%E7%BD%91%E7%AB%99%E4%B8%8B%E8%BD%BD%E9%93%BE/781f8dc4b3ed4f12a8a05f5e07cb2a52086-1.apk",
           "updated_at": "2026-07-22",
           "images": []
         },
@@ -87,7 +93,6 @@
           "tag": "ZIP",
           "icon": "folder_zip",
           "size": "2 KB",
-          "url": "https://uuftmiripdmlisyzwqku.supabase.co/storage/v1/object/public/workshop-downloads/heroes.zip",
           "updated_at": "2026-04-19",
           "images": []
         }

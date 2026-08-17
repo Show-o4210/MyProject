@@ -1,366 +1,83 @@
-# PVZH Mod 工具箱 (PVZ Heroes Mod Tools)
+# PVZH Mod 工具箱
 
-**最后一次更新时间：2026-07-27**
+一个面向《植物大战僵尸：英雄》（Plants vs. Zombies Heroes）的在线 Mod 辅助工具站，基于 Flask、UnityPy 和 Supabase 开发。
 
-**当前 Web 版本：v3.6**（APK 更新接口版本独立维护）
+项目目前提供：
 
-这是一个基于 **Flask + UnityPy + Supabase** 开发的《植物大战僵尸：英雄》(Plants vs. Zombies Heroes, PVZH) 在线 Mod 辅助工具箱。项目采用 Flask 蓝图 (Blueprint) 模块化架构，提供了卡组编辑、关卡编辑、Unity AB 包解包回填、幻影卡牌工坊、卡包购买、卡牌发送、下载中心（分区 + 作品包 + 多源竞速）以及用户反馈等功能。
+- Unity AssetBundle 检查、解包、校验与回填
+- 卡组编辑器和关卡编辑器
+- 幻影卡牌工坊
+- 卡牌发送与卡包购买辅助工具
+- 使用紧凑内容列表，并通过夸克网盘或 QQ 群统一获取资源的下载中心
+- 意见反馈、赞助名单、版本查询和基础安全审计
 
-该项目已针对 Render 免费套餐进行了优化部署配置（串行处理锁、WhiteNoise 静态资源、全天 KeepAlive、Gunicorn 单 worker 等）。详情见 [`change.md`](file:///C:/Users/15731/Desktop/pvzh%E5%B7%A5%E5%85%B7%E5%8C%85/web/MyProject/change.md) §19。
+## 快速开始
 
----
+建议使用 Python 3.12。
 
-## 🗺️ 项目整体架构与模块关系
-
-项目主要由 **路由与控制层**、**业务逻辑层**、**数据资产层** 和 **安全与基础设施** 四大部分组成。以下是项目各模块之间的依赖与数据流向关系：
-
-```mermaid
-graph TD
-    %% 入口与配置
-    Entry[app.py 主入口] --> Config[config.py 配置]
-    Entry --> Sec[security.py 安全拦截]
-    Entry --> Limiter[extensions.py 限流器]
-    
-    %% 蓝图模块
-    Entry --> BP_Home[blueprints/home.py 首页]
-    Entry --> BP_Down[blueprints/downloads.py 下载中心]
-    Entry --> BP_Feed[blueprints/feedback.py 反馈]
-    Entry --> BP_Deck[blueprints/deck_editor.py 卡组编辑]
-    Entry --> BP_Level[blueprints/level_editor.py 关卡编辑]
-    Entry --> BP_Phantom[blueprints/phantom.py 幻影工坊]
-    Entry --> BP_Sender[blueprints/card_sender.py 卡牌发送]
-    Entry --> BP_Buyer[blueprints/pack_buyer.py 卡包购买]
-    Entry --> BP_Unity[blueprints/unity.py 通用Unity工具]
-
-    %% 业务逻辑层依赖
-    BP_Deck --> Logic_Unity[logic_unity.py Unity卡组修改]
-    BP_Deck --> Logic_Data[logic_data.py 数据载入单例]
-    BP_Level --> Logic_Level[logic_level_editor.py 关卡底包读写]
-    BP_Phantom --> Logic_PhConfig[blueprints/logic_phantom_config.py 幻影配置]
-    BP_Sender --> Logic_EA[logic_ea_api.py EA PopCap接口]
-    BP_Buyer --> Logic_EA
-    
-    %% 反馈业务与数据库
-    BP_Feed --> Svc_Feed[services/feedback.py 反馈业务]
-    Svc_Feed --> DB[database.py Supabase客户端]
-    Svc_Feed --> Sec
-    Sec --> DB
-    
-    %% 底层数据与公用工具
-    Logic_Data --> Utils_Index[utils/card_index.py 统一卡牌索引]
-    Logic_PhConfig --> Utils_Index
-    Logic_Level --> Utils_Index
-    Utils_Index --> Utils_Json[utils/json_data.py JSON读取]
-    
-    %% 数据资产层
-    Utils_Json -.-> Data_Index[data/index_new.json 卡牌元数据]
-    Logic_Unity -.-> Data_Recipe[data/recipe_decks_1 / recipe_definitions_1 卡组底包]
-    Logic_Level -.-> Data_Assets[data/data_assets_36 关卡底包]
-    BP_Buyer -.-> Data_NameId[data/name_id_cost.txt 卡包配置]
-    BP_Home -.-> Data_News[data/news.json 新闻公告]
-    BP_Down -.-> Data_Down[data/downloads.json 下载目录]
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+python app.py
 ```
 
----
+默认访问地址为 <http://127.0.0.1:5001>。反馈和安全日志依赖 Supabase；未配置 Supabase 时，其余不依赖数据库的页面和工具仍可使用。
 
-## 📂 目录结构与核心文件解析
+Windows 下也可以运行 `开始.bat`，但首次运行前仍需安装依赖并配置 `.env`。
 
-```
-MyProject/
-├── app.py                      # 应用主入口，注册蓝图，配置 Flask-APScheduler 定时自唤醒任务
-├── config.py                   # 全局配置类，加载环境变量，设置最大文件上传限制 (150MB)
-├── database.py                 # Supabase 客户端懒加载封装，避免启动时强依赖
-├── security.py                 # 安全拦截拦截器，提供黑名单 IP 封禁、提交接口的“影子封禁”、安全日志写入
-├── extensions.py               # 限流扩展，使用 Flask-Limiter 对接口请求频率基于 visitor_ip_key 进行客户端真实 IP 限制，提供 Unity 并发任务锁短排队机制
-├── logic_data.py               # 卡组和卡牌数据的内存管理单例 (DataManager)
-├── logic_ea_api.py             # 封装了与 PopCap/EA 服务器交互的 commitSoftPurchase 接口
-├── logic_level_editor.py       # 关卡编辑业务逻辑，使用 UnityPy 解析和打包 data_assets_36 底包
-├── logic_unity.py              # 卡组打包业务逻辑，使用 UnityPy 修改底包中卡牌数量并重新生成 zip
-├── blueprints/                 # 路由及蓝图实现目录
-│   ├── home.py                 # 首页及主导航路由，展示 news.json 中的公告和更新日志
-│   ├── downloads.py            # 下载中心：分区目录、single/bundle 与子文件下载
-│   ├── feedback.py             # 意见反馈路由（薄层：HTTP 解析 / 限流 / 统一 JSON 响应）
-│   ├── deck_editor.py          # 卡组编辑器接口，支持前端初始化载入和自定义修改后的一键打包下载
-│   ├── level_editor.py         # 关卡编辑器接口，支持读取 AB 关卡配置列表、提取 JSON 以及回填打包
-│   ├── phantom.py              # 幻影卡牌工坊主页及 API
-│   ├── logic_phantom_config.py # 幻影工坊的配置加载，从 data/index_new.json 中注入卡牌数据
-│   ├── card_sender.py          # 卡牌发送 API，通过模拟 EA 协议直接向绑定账户注入全卡牌
-│   ├── pack_buyer.py           # 自定义卡包购买 API，支持在网页端购买指定的卡包 SKU (读取 name_id_cost.txt)
-│   └── unity.py                # 通用 Unity 包管理工具，支持在线对 Unity AB 包进行深入解析、解包和补丁回填
-├── services/                   # 业务服务层（与蓝图解耦的可复用逻辑）
-│   └── feedback.py             # 反馈校验、payload 组装、写入 Supabase feedbacks 表
-├── sql/                        # 数据库 schema / 运维脚本
-│   ├── feedbacks.sql           # Supabase feedbacks 表重建脚本（含 RLS 与 GRANT）
-│   └── security_logs.sql       # Supabase security_logs 审计表重建脚本（anon 仅 INSERT）
-├── data/                       # 核心静态数据与 Unity 底包目录
-│   ├── index_new.json          # 全站卡牌索引 (GUID, UUID, NAME_CN, TEXTURE_NAME, TYPE, FACTION, NAME_EN)
-│   ├── data_assets_36          # 官方关卡关配置底包 (Unity AssetBundle)
-│   ├── recipe_decks_1          # 官方卡组配置底包 1 (Unity MonoBehaviour)
-│   ├── recipe_definitions_1    # 官方卡组配置底包 2 (Unity MonoBehaviour)
-│   ├── decks.json              # 关卡编辑器使用的预置卡组库
-│   ├── downloads.json          # 下载中心分区目录（sections → items，支持 single / bundle）
-│   ├── news.json               # 首页的通知和版本更新公告
-│   ├── name_id_cost.txt        # 官方卡包 SKU 及其钻石售价对照表
-│   └── 笔记卡组名称.txt         # 英雄卡组与对应内部 ID 映射描述
-├── docs/                       # 设计与进度文档
-│   ├── downloads-refactor-log.md   # 下载中心重构进度对照
-│   └── downloads-bundle-plan.md    # 作品包（Bundle）方案与阶段说明
-├── scripts/                    # 运维 / 校验脚本
-│   └── validate_downloads.py   # 校验 downloads.json 结构与约定
-├── static/                     # 前端静态资源目录 (CSS, JS, 图片, 幻影工坊资源)
-├── templates/                  # Jinja2 模板目录
-│   ├── base.html               # 页面基类模板，包含顶部导航和全局依赖样式引入
-│   ├── index.html              # 首页公告模板
-│   ├── deck_editor.html        # 卡组编辑器页面 (Vue3 + Tailwind)
-│   ├── level_editor.html       # 关卡编辑器页面 (Vue3 + UI 交互)
-│   ├── tab_unity.html          # 通用 Unity 解析与解包调试页面
-│   ├── tab_downloads.html      # 下载中心列表（分区 Tab + 卡片）
-│   ├── card_sender.html        # 一键送卡交互页面
-│   ├── pack_buyer.html         # 在线买卡包交互页面
-│   ├── phantom.html            # 幻影工坊制作页面
-│   ├── feedback.html           # 意见反馈页面（原生 form + fetch，不依赖 Vue）
-│   └── download_detail.html    # 下载详情（single / bundle 文件列表）
-├── utils/                      # 通用工具函数目录
-│   ├── card_index.py           # 统一读取 index_new.json 的卡牌信息，并转换为对应模块的专用格式
-│   ├── json_clean.py           # JSON 字符串防御清洗，去除控制字符及 BOM 头，兼容中文符号
-│   └── json_data.py            # 辅助读取项目根目录下 data 内 JSON 文件的快捷函数
-├── 开始.bat                     # 本地快速启动脚本
-└── requirements.txt            # 项目 Python 依赖声明
-```
+## 配置
 
----
+复制 `.env.example` 为 `.env`，按需填写：
 
-## 🛠️ 核心业务逻辑说明
+| 变量 | 用途 | 是否必需 |
+| --- | --- | --- |
+| `SUPABASE_URL` | Supabase 项目地址 | 仅反馈与安全日志需要 |
+| `SUPABASE_KEY` | Supabase anon key | 仅反馈与安全日志需要 |
+| `SECURITY_ADMIN_TOKEN` | 查询安全统计接口的鉴权令牌 | 可选 |
+| `SECURITY_BLOCKED_IPS` | 额外 IP 黑名单，英文逗号分隔 | 可选 |
+| `SECURITY_TRUSTED_IPS` | 可信 IP，英文逗号分隔 | 可选 |
+| `SELF_PING_URL` | Render 自唤醒地址，应指向 `/health` | 部署时可选 |
+| `SELF_PING_TOKEN` | 自唤醒请求令牌 | 可选 |
+| `PVZH_*` | EA/PopCap 客户端参数 | 使用送卡或买包功能时可选 |
+| `SITE_BASE_URL` | sitemap 使用的公网根地址 | 自定义域名时建议设置 |
 
-### 1. Unity 资源回填与打包机制
+不要提交真实 `.env`、访问令牌或用户凭据。
 
-#### 1a. 卡组 / 关卡业务打包 (`logic_unity.py` / `logic_level_editor.py`)
+## 常用维护命令
 
-- **解包**：使用 `UnityPy.load()` 载入 AssetBundle 文件，提取 `MonoBehaviour` 或 `TextAsset` 的 typetree 信息。
-- **回填**：卡组工坊在内存底包上替换 `CardGuid`、`NumCopies`、`Faction` 等字段后 `save_typetree()`，再写入 zip；关卡编辑器同理处理 `data_assets_36`。
-- **注意**：业务打包路径**不**走通用 AB 工具的 `transform_json_tree` expand/collapse，直接读写 typetree。
+```powershell
+# 检查 Python 语法
+python -m compileall -q .
 
-#### 1b. 通用 AB 工作台 (`blueprints/unity.py` + `templates/tab_unity.html`)
-
-面向用户上传的任意 Bundle：结构检查、轻量解包、补丁预检与回填。
-
-| 路由 | 作用 |
-|------|------|
-| `POST /unity/inspect` | 分析 Bundle 对象列表（fast / deep） |
-| `POST /unpack` | 按预设导出 JSON/CSV/PNG zip（含 `_index.json`） |
-| `POST /unity/validate-repack` | 补丁 zip 与原始 Bundle 匹配预检 |
-| `POST /repack` | 将补丁注入原始 Bundle 并下载 |
-
-- **嵌入 JSON 处理**（`transform_json_tree`）：对 `m_Data` / `m_RawData` / **TextAsset 的 `m_Script` 文本** 等「字符串里嵌 JSON」的字段做 expand（导出为可正常换行的嵌套对象）与 collapse（再写回字符串）。
-- **`m_Script` 双语义**：MonoBehaviour 里是 PPtr 字典 `{ m_FileID, m_PathID }`，只按**值形态** `is_pptr_like` 保护、禁止 stringify；TextAsset 里是正文，必须 expand，否则 `json.dumps` 会二次转义成一整行 `{\\r\\n \\"1\\":...}`。
-- **兼容**：`restore_pptr_fields()` 可把历史错误导出中已字符串化的 PPtr 还原为 dict。
-- **并发**：与全站共用 `UNITY_TASK_LOCK`，避免 Render 512MB 下多路 UnityPy 同时跑爆内存。
-
-### 2. EA API 代理流程 (`logic_ea_api.py`)
-
-- **授权方式**：用户在网页端填写 `EADP-AUTH-TOKEN` 和 `EADP-PERSONA-ID`，系统无缝代理直接发包。
-- **发送逻辑**：构建带时间戳的伪造客户端请求头，向 PopCap 远程服务器的 `commitSoftPurchase` 接口发送对应的 `Sku`（例如购买卡包的 SKU 或发送特定全卡牌的 `deckRecipe` 协议包）。
-
-### 3. 全局安全及日志审计 (`security.py` + `app.py` 自唤醒)
-
-- **流量限制**：接入 `Flask-Limiter` 限流策略（基于客户端真实 IP），防止恶意的 API 扫描或频繁提交攻击。
-- **真实访客 IP**：`get_visitor_info()` / `visitor_ip_key()` 统一解析 IP（优先 `CF-Connecting-IP`，其次 `X-Forwarded-For`，最后 `remote_addr`），反馈限流、安全拦截以及全站 API 限流共用同一套 key，彻底解决在 Render 反代后由于 remote_addr 均为 127.0.0.1 导致全站共享同一个限流桶而误触 429 的问题。
-- **黑名单拦截**：在 `before_request` 钩子中命中黑名单时，敏感接口 403、提交类接口影子封禁、普通页面伪装 404。可通过 `SECURITY_BLOCKED_IPS` 追加。
-- **影子封禁 (Shadow Ban)**：对恶意留言/反馈返回与正常成功一致的契约 `{"ok": true, "message": "提交成功"}`，实际不进入业务写入。
-- **记录审计**：命中规则写入 Supabase `security_logs`；`/security/stats`（Header：`X-Admin-Token`）查看当日抽样。建表脚本见 [`sql/security_logs.sql`](sql/security_logs.sql)（**anon 仅 INSERT**）。若日志出现 `permission denied for table security_logs` / `42501`，几乎总是表未建或未 GRANT，而不是 Render URL 配错。
-- **日志降噪**：非拦截类「脚本 UA」事件按 IP+reason 节流；Supabase 连续写失败时降低刷屏频率。
-- **自唤醒（KeepAlive）**：`app.py` **全天** 每 14 分钟请求公网 URL，防止 Render Free 休眠（并降低 Googlebot 夜间冷启动失败）。
-  - 默认目标：`/health`（安全白名单路径，不参与可疑 UA 扫描）
-  - 专用 UA：`PVZH-KeepAlive/1.0`；可选头 `X-Self-Ping-Token`（与 `SELF_PING_TOKEN` 一致）
-  - 出站经负载均衡回环时，日志里可能看到 Render 出站 IP（历史案例：`74.220.49.7`）+ 旧版 `python-requests` UA——**那是自唤醒，不是外部攻击**，切勿加入 `SECURITY_BLOCKED_IPS`
-  - 可选 `SECURITY_TRUSTED_IPS`：对确认可信的 IP 跳过脚本 UA 告警（云厂商 IP 会变，优先依赖 KeepAlive UA）
-- **静态资源**：`WhiteNoise` 托管 `/static/`，保证 `Content-Length`；勿被 access log 里的 `200 0` 误导（旧 Gunicorn/sendfile 假象）。
-- **security_logs 写入**：`insert(..., returning=minimal)`，与「anon 仅 INSERT」策略一致。
-
-### 4. 意见反馈模块 (`blueprints/feedback.py` + `services/feedback.py`)
-
-**路由**
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/feedback` | 反馈页 |
-| POST | `/api/feedback/submit` | 提交反馈（限流：每 IP **3 次/小时**） |
-
-**分层**
-
-- 蓝图：解析 JSON、限流、统一响应；不直接拼业务 payload。
-- `services/feedback.py`：类型白名单（`bug` / `feature` / `other`）、内容长度校验（内容 ≤500、联系方式 ≤100）、组装 `ua_info`、写入 `feedbacks` 表。
-
-**关键约定（2026-07-17 修复）**
-
-- 表策略：**anon 只有 INSERT、没有 SELECT**。
-- 后端 **必须** `insert(row, returning=ReturnMethod.minimal)`。  
-  若使用默认 `representation`，PostgREST 会在插入后 SELECT 回读 → 失败；线上常被误认为「接口 404」。
-- 表不存在 / schema 未刷新 → `code: TABLE_NOT_FOUND`；环境变量缺失 → `CONFIG_ERROR`；权限 → `PERMISSION_DENIED`。
-
-**统一 API 契约**
-
-```json
-// 成功 200
-{ "ok": true, "message": "提交成功" }
-
-// 校验失败 400
-{ "ok": false, "error": "...", "code": "VALIDATION_ERROR" }
-
-// 写入/配置失败 500 或 503
-{ "ok": false, "error": "...", "code": "STORAGE_ERROR|TABLE_NOT_FOUND|PERMISSION_DENIED|CONFIG_ERROR" }
-
-// 限流 429（extensions 全局 handler，含 error 字段）
-{ "ok": false, "error": "操作太频繁啦！...", "code": "RATE_LIMITED", ... }
-```
-
-**前端**：`templates/feedback.html` 使用原生 HTML form + `fetch`，不依赖 Vue CDN；按 `ok` / `error` / `message` 展示结果。
-
-**Supabase 建表**：在 Dashboard → SQL Editor 中执行仓库内 [`sql/feedbacks.sql`](sql/feedbacks.sql)（会 `DROP` 旧表后重建）。权限策略：
-
-- `anon` / `authenticated`：仅允许 **INSERT**（`status` 必须为 `pending`）
-- 不对 anon 开放 **SELECT**，避免反馈列表被公开拉取
-- Dashboard / `service_role` 可完整管理
-
-表字段：`id`, `type`, `content`, `contact`, `ua_info` (jsonb), `status`, `created_at`。
-
-后端 `.env` / Render 中 `SUPABASE_KEY` 使用 **anon key** 即可（与 INSERT 策略匹配）。
-
-### 5. 下载中心 (`blueprints/downloads.py` + `data/downloads.json`)
-
-下载中心按 **用途分区**，条目支持 **单文件** 与 **作品包（合集）** 两种形态，适合 Mod 多文件 / 分卷分发，而不做成通用网盘。
-
-**分区（`sections`）**
-
-| id | 名称 | 定位 |
-|----|------|------|
-| `mods` | Mod 内容 | 面向游玩/体验的成品（卡包、英雄改动、关卡包等） |
-| `tools` | 工具与资源 | 面向制作/运维（辅助软件、替换工具、底包、素材） |
-
-**条目形态**
-
-| kind | 含义 | 下载方式 |
-|------|------|----------|
-| `single` | 一个条目一个直链（`url`） | `/api/download/<item_id>` |
-| `bundle` | 作品包，一层 `files[]` 子文件 | 子文件：`/api/download/<item_id>/<file_id>`；推荐项可用条目级 API |
-
-**路由**
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/downloads` | 列表；`?section=mods\|tools` 切换 Tab（默认 `mods`） |
-| GET | `/downloads/<item_id>` | 详情；若 `item_id` 为分区 id 则跳到对应 Tab |
-| GET | `/api/download/<item_id>` | 默认目标 302（`url` / `recommended` 子文件 / 唯一 file）；限流 |
-| GET | `/api/download/<item_id>/<file_id>` | 子文件 302；限流 |
-
-**数据约定（摘要）**
-
-- JSON：`sections[].items[]`；运行时分区列表键名为 `entries`（避免 Jinja 与 `dict.items` 冲突）。
-- bundle 仅允许 **一层** `files`；`recommended: true` 的子文件作为「下载推荐项」默认入口。
-- 可选：`series_id` / `series_name` / `series_order` 同系列互链；`images[]` 首张作列表封面。
-- 存储命名建议：`workshop-downloads/{mods|tools}/{item_id}/{file_id}.ext`。
-
-**校验与文档**
-
-```bash
+# 校验下载中心数据
 python scripts/validate_downloads.py
+
+# 重新生成静态 sitemap（Render 构建时也会执行）
+python scripts/generate_sitemap.py
 ```
 
-设计与进度对照：[`docs/downloads-refactor-log.md`](docs/downloads-refactor-log.md)、[`docs/downloads-bundle-plan.md`](docs/downloads-bundle-plan.md)。
+## 项目结构
 
-**维护提示**：上架内容主要改 `data/downloads.json`；勿在模板里写 `section.items`，应使用 `section.entries`。
+```text
+MyProject/
+├─ app.py                 # Flask 入口、蓝图注册、健康检查和定时自唤醒
+├─ blueprints/            # 页面与 API 路由
+├─ services/              # 可复用业务服务
+├─ utils/                 # JSON、卡牌索引等通用工具
+├─ templates/             # Jinja2 页面模板
+├─ static/                # CSS、JavaScript、图片及静态 SEO 文件
+├─ data/                  # 运行时 JSON、卡牌索引和 Unity 底包
+├─ scripts/               # 数据校验与 sitemap 生成脚本
+├─ sql/                   # Supabase 建表及权限脚本
+└─ docs/                  # 项目维护文档
+```
 
----
+更详细的模块关系见 [架构说明](docs/architecture.md)。下载内容维护见 [下载中心维护指南](docs/downloads.md)，部署与运维见 [部署说明](docs/deployment.md)，历史变更见 [CHANGELOG](docs/CHANGELOG.md)。
 
-## 🚀 本地开发与快速启动
+## 部署
 
-### 准备工作
+仓库包含 `render.yaml`。Render 构建阶段会安装依赖并生成 sitemap，运行阶段使用单 Gunicorn worker 与 4 个线程，以适应免费实例的内存限制。部署前请在平台配置环境变量，并执行 `sql/` 中所需的 Supabase 脚本。
 
-请确保本地已安装 Python 3.9+ 环境。
-
-1. **克隆或拷贝项目到本地**，打开命令行进入项目根目录：
-
-   ```bash
-   cd MyProject
-   ```
-
-2. **安装项目所需依赖**：
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **配置环境变量**：
-   在项目根目录下创建 `.env`（可参考 `.env.example`），填写 Supabase 等配置：
-
-   ```ini
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_KEY=your-supabase-anon-key
-
-   # 可选：安全审计统计鉴权
-   SECURITY_ADMIN_TOKEN=your-random-secure-token
-
-   # 可选：黑名单 / 可信 IP（英文逗号分隔）
-   SECURITY_BLOCKED_IPS=1.2.3.4,5.6.7.8
-   # SECURITY_TRUSTED_IPS=
-
-   # 自唤醒：务必指向 /health，勿指向首页 /
-   SELF_PING_URL=https://your-app-name.onrender.com/health
-   # SELF_PING_TOKEN=your-random-self-ping-token
-   ```
-
-4. **（首次 / 重建）初始化反馈表**：
-   在 Supabase SQL Editor 执行 `sql/feedbacks.sql`。会删除并重建 `public.feedbacks` 及 RLS；若有旧数据请先导出。
-
-5. **（首次 / 重建）初始化安全审计表**：
-   在 Supabase SQL Editor 执行 `sql/security_logs.sql`。会删除并重建 `public.security_logs` 及 RLS（anon 仅 INSERT）。若 Render 日志出现 `permission denied for table security_logs`，几乎都是这张表未正确授权。
-
-6. **启动服务**：
-   - 双击根目录下的 `开始.bat`；
-   - 或者使用命令行直接运行：
-
-     ```bash
-     python app.py
-     ```
-
-   默认本地服务将运行在 `http://127.0.0.1:5001` 上。
-
----
-
-## 🌐 线上部署注意事项 (以 Render 平台为例)
-
-针对 **Render Free Tier (免费套餐)** 的限制，本项目在代码中加入了以下设计：
-
-1. **Unity 处理串行锁 (`UNITY_TASK_LOCK`)**：
-   大体积 AssetBundle 的并发解包/回填可能打爆 512MB 内存。全站共用线程锁；忙时返回 `HTTP 429` 提示稍后重试。
-
-2. **临时目录自动清理**：
-   解包/回填使用 `tempfile.mkdtemp(prefix=unity_tool_)`；`cleanup_old_temp` 清理超过约 30 分钟的残留，响应结束后 `after_this_request` 再清本次工作区。
-
-3. **自唤醒 KeepAlive**：
-   进程内 APScheduler **全天** 每 14 分钟 GET `SELF_PING_URL`（默认 `…/health`），UA 为 `PVZH-KeepAlive/1.0`。Render 环境变量若仍指向首页 `/`，请改为 `/health`，避免无意义的安全告警与首页流量。
-
-4. **Supabase 表初始化（部署检查清单）**：
-   - [ ] 已执行 `sql/feedbacks.sql`
-   - [ ] 已执行 `sql/security_logs.sql`
-   - [ ] `SUPABASE_KEY` 使用 **anon key**（与两表 INSERT 策略一致）
-   - [ ] 反馈写入使用 `returning=minimal`（代码已处理；勿改回 representation）
-   - [ ] `SECURITY_ADMIN_TOKEN` 已设置（需要时才查 `/security/stats`）
-
-5. **Render Start Command（务必与 Dashboard 一致）**：
-   Free 套餐 **单 worker**；线程分担 I/O；`max-requests` 不要设太小（旧值 50 会频繁换 worker）：
-
-   ```bash
-   gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --max-requests 500 --max-requests-jitter 50 --access-logfile - --error-logfile -
-   ```
-
-   若 Dashboard 自定义了 Start Command，以 Dashboard 为准；`render.yaml` 仅作模板。
-
-6. **谷歌收录与 SEO（GSC）**：
-   - WhiteNoise 提供静态 `robots.txt` / `sitemap.xml`；运行 `python scripts/generate_sitemap.py` 可按下载目录刷新 `lastmod` 与详情页。
-   - 母版 `canonical` + `robots=index,follow`；各工具页独立 `meta description`。
-   - 全天 KeepAlive 降低爬虫撞冷启动。
-   - 部署后请在 Google Search Console **重新提交** `https://pvz-h-tools.onrender.com/sitemap.xml`，并对首页、`/downloads`、`/deck-editor` 等使用「请求编入索引」。
-
----
-
+详细注意事项见 [docs/deployment.md](docs/deployment.md)。
