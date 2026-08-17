@@ -42,6 +42,23 @@
           "images": []
         },
         {
+          "id": "txt2D",
+          "kind": "single",
+          "name": "卡牌贴图素材",
+          "description": "包含了原版所有卡牌的贴图素材，对于大部分内容进行了拼接，是透明背景的。",
+          "details": "包含了原版所有卡牌的贴图素材，对于大部分内容进行了拼接，是透明背景的。",
+          "usage": [
+            "下载 ZIP 文件并解压。"
+          ],
+          "notes": [],
+          "version": "1.0",
+          "tag": "ZIP",
+          "icon": "folder_zip",
+          "size": "250 MB",
+          "updated_at": "2026-08-18",
+          "images": []
+        },
+        {
           "id": "Card_maker",
           "kind": "single",
           "name": "本地card_mod编辑器",
