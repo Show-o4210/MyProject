@@ -25,8 +25,7 @@ _STATIC_SITEMAP_PAGES = [
     {"path": "/deck-editor", "changefreq": "weekly", "priority": "0.8"},
     {"path": "/editor", "changefreq": "weekly", "priority": "0.8"},
     {"path": "/phantom", "changefreq": "weekly", "priority": "0.8"},
-    {"path": "/card-sender", "changefreq": "monthly", "priority": "0.7"},
-    {"path": "/pack-buyer", "changefreq": "monthly", "priority": "0.7"},
+    {"path": "/ea-tools", "changefreq": "monthly", "priority": "0.8"},
     {"path": "/feedback", "changefreq": "monthly", "priority": "0.5"},
     {"path": "/tools", "changefreq": "monthly", "priority": "0.5"},
 ]

@@ -1,4 +1,5 @@
 import logging
+import json
 import os
 import time
 from typing import Any
@@ -66,3 +67,48 @@ def post_soft_purchase(
         headers=cleaned_headers,
         timeout=timeout or DEFAULT_REQUEST_TIMEOUT,
     )
+
+
+def parse_upstream_body(response: requests.Response) -> tuple[Any, str]:
+    """Safely return both a JSON-compatible body and a bounded raw-text source."""
+    try:
+        response_text = response.text or ""
+    except Exception:
+        try:
+            response_text = (response.content or b"")[:8000].decode(
+                "utf-8", errors="replace"
+            )
+        except Exception:
+            response_text = ""
+
+    try:
+        response_body: Any = response.json()
+    except Exception:
+        try:
+            response_body = json.loads(response_text) if response_text else ""
+        except Exception:
+            response_body = response_text
+
+    return response_body, response_text
+
+
+def soft_purchase(
+    payload: dict[str, Any],
+    token: str,
+    persona_id: str,
+    *,
+    client_version: str | None = None,
+    content_version: str | None = None,
+    platform: str | None = None,
+) -> tuple[requests.Response, Any, str, dict[str, str]]:
+    """Execute the shared EA soft-purchase flow used by account operations."""
+    headers = build_pvzh_headers(
+        token,
+        persona_id,
+        client_version=client_version,
+        content_version=content_version,
+        platform=platform,
+    )
+    response = post_soft_purchase(payload, headers, timeout=DEFAULT_REQUEST_TIMEOUT)
+    response_body, response_text = parse_upstream_body(response)
+    return response, response_body, response_text, headers

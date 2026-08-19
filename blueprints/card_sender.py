@@ -1,15 +1,11 @@
-import json
 import logging
-from typing import Any
 
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, redirect, request, jsonify, url_for
 import requests
 
 from extensions import limiter
 from logic_ea_api import (
-    DEFAULT_REQUEST_TIMEOUT,
-    build_pvzh_headers,
-    post_soft_purchase,
+    soft_purchase,
 )
 
 card_sender_bp = Blueprint('card_sender', __name__)
@@ -43,35 +39,9 @@ def build_cards(count: int) -> dict:
     return {str(cid): count for cid in CARD_IDS}
 
 
-def _parse_upstream_body(response: requests.Response) -> tuple[Any, str]:
-    """安全解析上游响应，避免 .text / json 解码异常变成 500。"""
-    try:
-        response_text = response.text or ""
-    except Exception:
-        try:
-            response_text = (response.content or b"")[:8000].decode("utf-8", errors="replace")
-        except Exception:
-            response_text = ""
-
-    response_json: Any = None
-    try:
-        response_json = response.json()
-    except Exception:
-        try:
-            response_json = json.loads(response_text) if response_text else None
-        except Exception:
-            response_json = None
-
-    return response_json if response_json is not None else response_text, response_text
-
-
 @card_sender_bp.route('/card-sender')
 def card_sender_page():
-    return render_template(
-        'card_sender.html',
-        current_tab='card_sender',
-        card_ids_count=len(CARD_IDS),
-    )
+    return redirect(url_for('ea_tools.ea_tools_page', operation='cards'), code=302)
 
 
 @card_sender_bp.route('/api/send-cards', methods=['POST'])
@@ -86,6 +56,9 @@ def send_cards():
     eadp_token = str(data.get('token') or '').strip()
     persona_id = str(data.get('persona_id') or '').strip()
     card_count = data.get('card_count', 999999)
+    client_version = str(data.get('client_version') or '').strip() or None
+    content_version = str(data.get('content_version') or '').strip() or None
+    platform = str(data.get('platform') or '').strip() or None
 
     if not eadp_token:
         return jsonify({"success": False, "error": "EADP-AUTH-TOKEN 不能为空"}), 400
@@ -109,11 +82,15 @@ def send_cards():
         "KeyName": "default",
     }
 
-    headers = build_pvzh_headers(eadp_token, persona_id)
-
     try:
-        response = post_soft_purchase(payload, headers, timeout=DEFAULT_REQUEST_TIMEOUT)
-        response_body, response_text = _parse_upstream_body(response)
+        response, response_body, response_text, headers = soft_purchase(
+            payload,
+            eadp_token,
+            persona_id,
+            client_version=client_version,
+            content_version=content_version,
+            platform=platform,
+        )
         success = response.status_code == 200
 
         return jsonify({
@@ -122,6 +99,14 @@ def send_cards():
             "response": response_body,
             "raw_response": (response_text or "")[:2000],
             "total_cards": len(CARD_IDS) * card_count,
+            "request_meta": {
+                "operation": "send_cards",
+                "sku": "deckRecipe",
+                "platform": headers["X-Pvzh-Platform"],
+                "client_version": headers["X-Pvzh-Client-Version"],
+                "content_version": headers["X-Pvzh-Content-Version"],
+                "utc_ms": headers["X-Pvzh-UTC"],
+            },
             "error": None if success else (
                 f"上游返回 HTTP {response.status_code}，请检查 Token / Persona ID 是否过期，或稍后重试"
             ),

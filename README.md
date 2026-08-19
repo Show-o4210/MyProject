@@ -7,7 +7,7 @@
 - Unity AssetBundle 检查、解包、校验与回填
 - 卡组编辑器和关卡编辑器
 - 幻影卡牌工坊
-- 卡牌发送与卡包购买辅助工具
+- 可扩展的 EA 账号工具工作台（卡牌发送、卡包购买）
 - 使用紧凑内容列表，并通过夸克网盘或 QQ 群统一获取资源的下载中心
 - 意见反馈、赞助名单、版本查询和基础安全审计
 
@@ -24,6 +24,8 @@ python app.py
 ```
 
 默认访问地址为 <http://127.0.0.1:5001>。反馈和安全日志依赖 Supabase；未配置 Supabase 时，其余不依赖数据库的页面和工具仍可使用。
+
+EA 账号工具统一入口为 `/ea-tools`。`/card-sender` 与 `/pack-buyer` 仅作为旧链接兼容入口，分别跳转到工作台中的送卡和买包操作；对应业务 API 仍保持独立，便于单独校验和限流。
 
 Windows 下也可以运行 `开始.bat`，但首次运行前仍需安装依赖并配置 `.env`。
 
@@ -73,6 +75,8 @@ MyProject/
 ├─ sql/                   # Supabase 建表及权限脚本
 └─ docs/                  # 项目维护文档
 ```
+
+EA/PopCap 请求的 Header、上游调用和响应解析集中在 `logic_ea_api.py`。新增 EA API 业务时，应复用该公共层，并为每个业务保留独立的输入校验与 API 路由；统一页面入口由 `blueprints/ea_tools.py` 和 `templates/ea_tools.html` 承载。
 
 更详细的模块关系见 [架构说明](docs/architecture.md)。下载内容维护见 [下载中心维护指南](docs/downloads.md)，部署与运维见 [部署说明](docs/deployment.md)，历史变更见 [CHANGELOG](docs/CHANGELOG.md)。
 

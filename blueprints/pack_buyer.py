@@ -4,7 +4,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, request, url_for
 
 from extensions import limiter
 from logic_ea_api import (
@@ -12,9 +12,7 @@ from logic_ea_api import (
     DEFAULT_CLIENT_VERSION,
     DEFAULT_CONTENT_VERSION,
     DEFAULT_PLATFORM,
-    DEFAULT_REQUEST_TIMEOUT,
-    build_pvzh_headers,
-    post_soft_purchase,
+    soft_purchase,
 )
 
 pack_buyer_bp = Blueprint('pack_buyer', __name__)
@@ -87,17 +85,6 @@ def clean_field(value: Any, default: str, pattern: re.Pattern) -> str:
     return text
 
 
-def parse_upstream_body(response: requests.Response) -> Tuple[Any, str]:
-    response_text = response.text or ''
-    try:
-        return response.json(), response_text
-    except Exception:
-        try:
-            return json.loads(response_text), response_text
-        except Exception:
-            return response_text, response_text
-
-
 def stringify_body(body: Any) -> str:
     if isinstance(body, (dict, list)):
         try:
@@ -131,7 +118,7 @@ def humanize_pack_error(status_code: int, body: Any) -> str:
 
 @pack_buyer_bp.route('/pack-buyer')
 def pack_buyer_page():
-    return render_template('pack_buyer.html', current_tab='pack_buyer')
+    return redirect(url_for('ea_tools.ea_tools_page', operation='packs'), code=302)
 
 
 @pack_buyer_bp.route('/api/packs', methods=['GET'])
@@ -201,19 +188,15 @@ def buy_pack():
         "KeyName": None,
     }
 
-    headers = build_pvzh_headers(
-        token,
-        persona_id,
-        client_version=client_version,
-        content_version=content_version,
-        platform=platform,
-    )
-    utc_ms = headers["X-Pvzh-UTC"]
-
     try:
-        response = post_soft_purchase(payload, headers, timeout=DEFAULT_REQUEST_TIMEOUT)
-
-        response_body, response_text = parse_upstream_body(response)
+        response, response_body, response_text, headers = soft_purchase(
+            payload,
+            token,
+            persona_id,
+            client_version=client_version,
+            content_version=content_version,
+            platform=platform,
+        )
         success = response.status_code == 200
         error_message = None if success else humanize_pack_error(response.status_code, response_body)
 
@@ -230,7 +213,7 @@ def buy_pack():
                 "platform": platform,
                 "client_version": client_version,
                 "content_version": content_version,
-                "utc_ms": utc_ms,
+                "utc_ms": headers["X-Pvzh-UTC"],
             },
         })
 
@@ -238,5 +221,7 @@ def buy_pack():
         return jsonify({"success": False, "error": "请求超时，请稍后重试"}), 504
     except requests.ConnectionError:
         return jsonify({"success": False, "error": "网络连接失败，服务器无法连接 PVZH 接口"}), 503
-    except Exception as e:
-        return jsonify({"success": False, "error": f"请求失败: {str(e)}"}), 500
+    except requests.RequestException as e:
+        return jsonify({"success": False, "error": f"上游请求失败: {type(e).__name__}"}), 502
+    except Exception:
+        return jsonify({"success": False, "error": "服务器处理失败，请稍后重试"}), 500

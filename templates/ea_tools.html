@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}EA 账号工具 - PVZH Mod 工具箱{% endblock %}
+{% block meta_description %}PVZH EA 账号工具工作台：统一填写 EADP Token 与 Persona ID，发送卡牌或购买游戏卡包。{% endblock %}
+{% block canonical %}https://pvz-h-tools.onrender.com/ea-tools{% endblock %}
+
+{% block content %}
+<div id="ea-tools-app" class="px-4 sm:px-6 lg:px-8 py-7 md:py-10 max-w-6xl mx-auto" v-cloak>
+    <section class="relative overflow-hidden rounded-[2rem] bg-slate-950 text-white p-6 md:p-9 mb-6 shadow-xl">
+        <div class="absolute -top-20 -right-12 w-64 h-64 rounded-full bg-blue-500/20 blur-3xl pointer-events-none"></div>
+        <div class="relative flex flex-col md:flex-row md:items-end md:justify-between gap-5">
+            <div>
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-xs font-bold text-blue-200 mb-4">
+                    <span class="material-symbols-rounded text-[16px]">cloud_sync</span>
+                    EA API Workspace
+                </div>
+                <h1 class="text-2xl md:text-4xl font-extrabold tracking-tight mb-3">EA 账号工具</h1>
+                <p class="text-sm md:text-base text-slate-300 max-w-2xl leading-relaxed">一次填写账号认证信息，在同一个工作台中使用多个 EA API 业务。认证信息仅用于当前页面请求，不会持久化保存。</p>
+            </div>
+            <div class="text-xs text-slate-400 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 whitespace-nowrap">每个业务每分钟最多 5 次</div>
+        </div>
+    </section>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <aside class="lg:col-span-4 space-y-5">
+            <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-6">
+                <h2 class="font-extrabold text-slate-900 flex items-center mb-5">
+                    <span class="material-symbols-rounded text-blue-500 mr-2">verified_user</span>账号认证
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1.5">EADP-AUTH-TOKEN <span class="text-red-500">*</span></label>
+                        <input v-model.trim="account.token" type="password" autocomplete="off" placeholder="输入 Token" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 font-mono text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1.5">EADP-PERSONA-ID <span class="text-red-500">*</span></label>
+                        <input v-model.trim="account.persona_id" type="text" autocomplete="off" placeholder="输入 Persona ID" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 font-mono text-sm">
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-6">
+                <button @click="showAdvanced = !showAdvanced" class="w-full flex items-center justify-between text-left">
+                    <h2 class="font-extrabold text-slate-900 flex items-center"><span class="material-symbols-rounded text-blue-500 mr-2">tune</span>请求环境</h2>
+                    <span class="material-symbols-rounded text-slate-400" v-text="showAdvanced ? 'expand_less' : 'expand_more'"></span>
+                </button>
+                <p class="text-xs text-slate-400 mt-2">全部业务共享，通常保持默认即可。</p>
+                <div v-show="showAdvanced" class="space-y-3 mt-4">
+                    <input v-model.trim="account.client_version" aria-label="Client Version" placeholder="Client Version" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono text-sm">
+                    <input v-model.trim="account.content_version" aria-label="Content Version" placeholder="Content Version" class="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono text-xs">
+                    <select v-model="account.platform" aria-label="Platform" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm">
+                        <option value="Android">Android</option><option value="iOS">iOS</option>
+                    </select>
+                    <button @click="loadSettings" class="text-xs font-bold text-blue-600 hover:text-blue-700">恢复后端默认设置</button>
+                </div>
+            </section>
+        </aside>
+
+        <main class="lg:col-span-8">
+            <div class="bg-slate-100 p-1.5 rounded-2xl grid grid-cols-2 gap-1.5 mb-5" role="tablist">
+                <button @click="switchOperation('cards')" :class="operation === 'cards' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'" class="rounded-xl px-4 py-3 font-extrabold text-sm transition flex items-center justify-center gap-2" role="tab">
+                    <span class="material-symbols-rounded text-[20px]">send</span>发送卡牌
+                </button>
+                <button @click="switchOperation('packs')" :class="operation === 'packs' ? 'bg-white text-pink-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'" class="rounded-xl px-4 py-3 font-extrabold text-sm transition flex items-center justify-center gap-2" role="tab">
+                    <span class="material-symbols-rounded text-[20px]">shopping_cart</span>购买卡包
+                </button>
+            </div>
+
+            <section v-if="operation === 'cards'" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-7">
+                <div class="flex items-start justify-between gap-4 mb-6">
+                    <div><h2 class="text-xl font-extrabold text-slate-900">批量发送卡牌</h2><p class="text-sm text-slate-500 mt-1">为全部 {{ card_ids_count }} 个有效卡牌 ID 设置相同数量。</p></div>
+                    <span class="material-symbols-rounded text-blue-500 bg-blue-50 rounded-2xl p-3">style</span>
+                </div>
+                <label class="block text-sm font-bold text-slate-700 mb-2">每张卡牌数量</label>
+                <input v-model.number="cards.card_count" type="number" min="1" max="999999" class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 font-bold">
+                <div class="mt-3 bg-blue-50 border border-blue-100 rounded-2xl p-4 text-sm text-blue-800">预计发送 <strong v-text="cardTotal.toLocaleString()"></strong> 张卡牌。该操作会直接修改目标账号库存，请确认 Persona ID 正确。</div>
+                <button @click="sendCards" :disabled="loading" class="mt-6 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-extrabold py-3.5 rounded-2xl transition">
+                    <span v-text="loading ? '正在发送…' : '发送卡牌'"></span>
+                </button>
+            </section>
+
+            <section v-else class="space-y-5">
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-7">
+                    <div class="flex items-start justify-between gap-4 mb-5">
+                        <div><h2 class="text-xl font-extrabold text-slate-900">购买卡包</h2><p class="text-sm text-slate-500 mt-1">从列表选择，或手动填写准确的 SKU 与价格。</p></div>
+                        <span class="material-symbols-rounded text-pink-500 bg-pink-50 rounded-2xl p-3">redeem</span>
+                    </div>
+                    <div class="grid sm:grid-cols-3 gap-3">
+                        <div class="sm:col-span-2"><label class="block text-xs font-bold text-slate-600 mb-1.5">卡包 SKU</label><input v-model.trim="packsForm.sku" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl font-mono text-sm"></div>
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1.5">ExpectedCost</label><input v-model.number="packsForm.cost" type="number" min="1" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl"></div>
+                    </div>
+                    <button @click="buyPack" :disabled="loading" class="mt-5 w-full bg-pink-500 hover:bg-pink-600 disabled:bg-slate-400 text-white font-extrabold py-3.5 rounded-2xl transition"><span v-text="loading ? '正在购买…' : '购买卡包'"></span></button>
+                </div>
+
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                        <div class="font-extrabold text-slate-800">卡包列表 <span class="text-xs text-slate-400 ml-1" v-text="packs.length + ' 项'"></span></div>
+                        <input v-model.trim="searchKeyword" placeholder="搜索名称 / SKU" class="px-3 py-2 border border-slate-200 rounded-xl text-sm sm:w-64">
+                    </div>
+                    <div class="overflow-auto max-h-80">
+                        <table class="w-full text-sm"><thead class="bg-slate-50 sticky top-0"><tr><th class="text-left px-4 py-3">名称</th><th class="text-left px-4 py-3">SKU</th><th class="text-right px-4 py-3">花费</th></tr></thead>
+                        <tbody><tr v-for="pack in filteredPacks" :key="pack.sku" @click="selectPack(pack)" class="border-t border-slate-100 hover:bg-pink-50 cursor-pointer"><td class="px-4 py-3 font-medium" v-text="pack.name"></td><td class="px-4 py-3 font-mono text-xs text-slate-500" v-text="pack.sku"></td><td class="px-4 py-3 text-right font-bold text-pink-600" v-text="pack.cost"></td></tr></tbody></table>
+                        <div v-if="!loadingPacks && !filteredPacks.length" class="text-center text-sm text-slate-400 py-8">没有找到卡包</div>
+                    </div>
+                </div>
+            </section>
+
+            <div v-if="error" class="mt-5 bg-red-50 border border-red-200 rounded-2xl p-4 text-sm font-medium text-red-700" v-text="error"></div>
+            <div v-if="warnings.length" class="mt-5 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800"><div v-for="message in warnings" :key="message" v-text="message"></div></div>
+            <section v-if="result" class="mt-5 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between"><h3 class="font-extrabold text-slate-800">响应结果</h3><span :class="result.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'" class="px-3 py-1 rounded-full text-xs font-bold" v-text="result.success ? '成功' : '失败'"></span></div>
+                <pre class="m-5 bg-slate-950 text-green-400 p-4 rounded-2xl overflow-auto text-xs max-h-96" v-text="formattedResponse"></pre>
+            </section>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% raw %}<script>
+const { createApp, ref, computed, onMounted } = Vue;
+createApp({ setup() {
+    const operation = ref('{% endraw %}{{ initial_operation }}{% raw %}');
+    const account = ref({ token: '', persona_id: '', client_version: '', content_version: '', platform: 'Android' });
+    const cards = ref({ card_count: 999999 });
+    const packsForm = ref({ sku: '', cost: null });
+    const packs = ref([]), searchKeyword = ref(''), result = ref(null), error = ref(null), warnings = ref([]);
+    const loading = ref(false), loadingPacks = ref(false), showAdvanced = ref(false);
+    const cardIdCount = {% endraw %}{{ card_ids_count }}{% raw %};
+    const cardTotal = computed(() => Math.max(0, Number(cards.value.card_count) || 0) * cardIdCount);
+    const filteredPacks = computed(() => { const q = searchKeyword.value.toLowerCase(); return !q ? packs.value : packs.value.filter(p => String(p.name || '').toLowerCase().includes(q) || String(p.sku || '').toLowerCase().includes(q)); });
+    const formattedResponse = computed(() => JSON.stringify(result.value, null, 2));
+    const readJson = async response => { const text = await response.text(); try { return JSON.parse(text); } catch (_) { return { success: false, error: text || `请求失败（HTTP ${response.status}）` }; } };
+    const switchOperation = value => { operation.value = value; result.value = null; error.value = null; warnings.value = []; history.replaceState(null, '', `/ea-tools?operation=${value}`); };
+    const validateAccount = () => { if (!account.value.token) error.value = '请填写 EADP-AUTH-TOKEN'; else if (!account.value.persona_id) error.value = '请填写 EADP-PERSONA-ID'; return !error.value; };
+    const requestBody = extra => ({ ...account.value, ...extra });
+    const submit = async (url, body) => { result.value = null; error.value = null; warnings.value = []; if (!validateAccount()) return; loading.value = true; try { const response = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) }); const data = await readJson(response); result.value = data; warnings.value = data.warnings || []; if (!data.success) error.value = data.error || `请求失败（HTTP ${response.status}）`; } catch (e) { error.value = `网络错误：${e.message}`; } finally { loading.value = false; } };
+    const sendCards = () => { error.value = null; const count = Number(cards.value.card_count); if (!Number.isInteger(count) || count < 1 || count > 999999) { error.value = '每张卡牌数量必须是 1 到 999999 的整数'; return; } submit('/api/send-cards', requestBody({ card_count: count })); };
+    const buyPack = () => { error.value = null; if (!packsForm.value.sku || Number(packsForm.value.cost) <= 0) { error.value = '请选择卡包，或填写有效的 SKU 和 ExpectedCost'; return; } submit('/api/buy-pack', requestBody(packsForm.value)); };
+    const selectPack = pack => { packsForm.value.sku = pack.sku; packsForm.value.cost = pack.cost; };
+    const loadSettings = async () => { try { const data = await readJson(await fetch('/api/pack-settings')); if (data.success) Object.assign(account.value, { client_version: data.client_version, content_version: data.content_version, platform: data.platform }); } catch (_) {} };
+    const loadPacks = async () => { loadingPacks.value = true; try { const data = await readJson(await fetch('/api/packs')); if (data.success) packs.value = data.packs || []; } finally { loadingPacks.value = false; } };
+    onMounted(() => { loadSettings(); loadPacks(); });
+    return { operation, account, cards, packsForm, packs, searchKeyword, result, error, warnings, loading, loadingPacks, showAdvanced, cardTotal, filteredPacks, formattedResponse, switchOperation, sendCards, buyPack, selectPack, loadSettings };
+}}).mount('#ea-tools-app');
+</script>{% endraw %}
+{% endblock %}
