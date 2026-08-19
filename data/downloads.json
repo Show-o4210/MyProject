@@ -74,20 +74,20 @@
           "images": []
         },
         {
-          "id": "pvzh-shuazuan-1",
+          "id": "pvzh-shuazuan",
           "kind": "single",
-          "name": "PVZH 刷钻工具1",
-          "description": "PVZH 刷钻石工具。搬运获得了作者许可",
+          "name": "PVZH 刷钻工具",
+          "description": "PVZH 刷钻石工具。之前那个锁设备还加固，我自己做了一个新的",
           "details": "给你刷钻石用的",
           "usage": [],
           "notes": [
-            "这个软件内置的设备锁会在你默认下载目录，多出的文件删掉即可刷新设备"
+            "项目开源在https://github.com/Show-o4210/uxyy"
           ],
           "version": "1.0",
           "tag": "APK",
           "icon": "diamond",
-          "size": "43.8 MB",
-          "updated_at": "2026-07-22",
+          "size": "20 MB",
+          "updated_at": "2026-08-19",
           "images": []
         },
         {
