@@ -2,6 +2,8 @@
 import os
 import json
 import ntpath
+import glob
+import re
 import UnityPy
 
 class LevelEditorLogic:
@@ -11,14 +13,41 @@ class LevelEditorLogic:
         self.data_dir = os.path.join(self.base_dir, "data")
         self.out_dir = os.path.join(self.base_dir, "out")
         
-        self.input_ab_path = os.path.join(self.data_dir, "data_assets_36")
-        self.output_ab_path = os.path.join(self.out_dir, "data_assets_36")
-        
         # 确保输出目录存在
         os.makedirs(self.out_dir, exist_ok=True)
 
+    def _resolve_input_ab_path(self):
+        """Return the data_assets_* bundle with the greatest numeric suffix."""
+        candidates = []
+        for path in glob.glob(os.path.join(self.data_dir, "data_assets_*")):
+            if not os.path.isfile(path):
+                continue
+            match = re.fullmatch(r"data_assets_(\d+)", os.path.basename(path))
+            if match:
+                candidates.append((int(match.group(1)), path))
+
+        if not candidates:
+            raise FileNotFoundError("找不到 data/data_assets_* 原文件！")
+        return max(candidates, key=lambda item: item[0])[1]
+
+    @property
+    def input_ab_path(self):
+        return self._resolve_input_ab_path()
+
+    @property
+    def asset_filename(self):
+        return os.path.basename(self.input_ab_path)
+
+    @property
+    def output_ab_path(self):
+        return os.path.join(self.out_dir, self.asset_filename)
+
     def check_ab_exists(self):
-        return os.path.exists(self.input_ab_path)
+        try:
+            self._resolve_input_ab_path()
+            return True
+        except FileNotFoundError:
+            return False
 
     # ================= 数据字典读取 =================
     def get_card_index(self):
@@ -76,7 +105,7 @@ class LevelEditorLogic:
     def get_all_level_ids(self):
         """获取 AB 包内所有关卡 ID"""
         if not self.check_ab_exists():
-            raise FileNotFoundError("找不到 data/data_assets_36 原文件！")
+            raise FileNotFoundError("找不到 data/data_assets_* 原文件！")
         
         level_ids = []
         env = UnityPy.load(self.input_ab_path)
@@ -91,7 +120,7 @@ class LevelEditorLogic:
     def load_level_config(self, level_id):
         """根据关卡 ID 提取 JSON 配置"""
         if not self.check_ab_exists():
-            raise FileNotFoundError("找不到 data/data_assets_36 原文件！")
+            raise FileNotFoundError("找不到 data/data_assets_* 原文件！")
 
         env = UnityPy.load(self.input_ab_path)
         for obj in env.objects:

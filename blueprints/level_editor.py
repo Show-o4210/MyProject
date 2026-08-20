@@ -82,7 +82,8 @@ def pack_level():
             release_unity_lock()
             return jsonify({"status": "error", "message": "缺少必要的参数"}), 400
             
-        out_path = os.path.join(workdir, "data_assets_36")
+        asset_filename = logic.asset_filename
+        out_path = os.path.join(workdir, asset_filename)
         # 执行打包逻辑
         logic.pack_level_config(level_id, config_dict, output_path=out_path)
         
@@ -99,7 +100,7 @@ def pack_level():
         return send_file(
             out_path, 
             as_attachment=True, 
-            download_name="data_assets_36",
+            download_name=asset_filename,
             mimetype="application/octet-stream"
         )
     except Exception as e:

@@ -868,7 +868,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = downloadUrl;
-                    a.download = 'data_assets_36'; // 这个文件名和你后端 send_file 指定的对应
+                    const disposition = res.headers.get('Content-Disposition') || '';
+                    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+                    const plainName = disposition.match(/filename="?([^";]+)"?/i);
+                    const assetFilename = encodedName
+                        ? decodeURIComponent(encodedName[1])
+                        : (plainName ? plainName[1] : 'data_assets');
+                    a.download = assetFilename;
                     document.body.appendChild(a);
                     a.click();
                     
