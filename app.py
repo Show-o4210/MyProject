@@ -122,11 +122,11 @@ app.register_blueprint(sponsors_bp)
 
 @app.route("/favicon.ico")
 def favicon():
-    """浏览器默认请求 /favicon.ico；占位 SVG，消除 404 日志噪音。"""
+    """提供站点品牌 favicon，并为旧浏览器保留标准根路径。"""
     return send_from_directory(
         app.static_folder,
-        "favicon.svg",
-        mimetype="image/svg+xml",
+        "favicon.ico",
+        mimetype="image/x-icon",
         max_age=60 * 60 * 24 * 30,
     )
 
