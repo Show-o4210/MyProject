@@ -92,6 +92,58 @@ def parse_upstream_body(response: requests.Response) -> tuple[Any, str]:
     return response_body, response_text
 
 
+EA_SYNC_URL = (
+    "https://pvz-heroes.awspopcap.com/persistence/v1/inventory/sync"
+)
+
+
+def post_inventory_sync(
+    headers: dict[str, str],
+    timeout: int | None = None,
+) -> requests.Response:
+    cleaned_headers = {}
+    for k, v in (headers or {}).items():
+        v_str = str(v)
+        try:
+            v_str.encode('latin-1')
+        except UnicodeEncodeError:
+            logger.warning("问题 header: %s=%r", k, v_str)
+            v_str = v_str.encode('ascii', errors='ignore').decode()
+        cleaned_headers[k] = v_str
+
+    return requests.post(
+        EA_SYNC_URL,
+        json={},
+        headers=cleaned_headers,
+        timeout=timeout or DEFAULT_REQUEST_TIMEOUT,
+    )
+
+
+def sync_inventory(
+    token: str,
+    persona_id: str,
+    *,
+    client_version: str | None = None,
+    content_version: str | None = None,
+    platform: str | None = None,
+) -> tuple[requests.Response, Any, str, dict[str, str]]:
+    """Execute inventory sync to inspect account details and unopened booster packs."""
+    headers = build_pvzh_headers(
+        token,
+        persona_id,
+        client_version=client_version,
+        content_version=content_version,
+        platform=platform,
+    )
+    headers["X-Pvzh-Sync-Guid"] = "9c818dd8-4462-45ef-9b8b-4b517dc76bef"
+    headers["User-Agent"] = "BestHTTP"
+    headers["TE"] = "identity"
+
+    response = post_inventory_sync(headers, timeout=DEFAULT_REQUEST_TIMEOUT)
+    response_body, response_text = parse_upstream_body(response)
+    return response, response_body, response_text, headers
+
+
 def soft_purchase(
     payload: dict[str, Any],
     token: str,

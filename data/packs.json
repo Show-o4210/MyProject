@@ -1,0 +1,86 @@
+[
+  {
+    "index": 1,
+    "category": "核心补充包",
+    "name": "高级补充包 (1包)",
+    "sku": "onegoldbooster",
+    "cost": 100
+  },
+  {
+    "index": 2,
+    "category": "核心补充包",
+    "name": "高级补充包 (70连抽)",
+    "sku": "70goldboosters",
+    "cost": 5000
+  },
+  {
+    "index": 3,
+    "category": "核心补充包",
+    "name": "银河补充包 (1包)",
+    "sku": "cosmicpack",
+    "cost": 100
+  },
+  {
+    "index": 4,
+    "category": "核心补充包",
+    "name": "银河补充包 (12连抽)",
+    "sku": "cosmicpack12",
+    "cost": 1000
+  },
+  {
+    "index": 5,
+    "category": "核心补充包",
+    "name": "化石补充包 (1包)",
+    "sku": "Set3pack",
+    "cost": 100
+  },
+  {
+    "index": 6,
+    "category": "核心补充包",
+    "name": "化石补充包 (12连抽)",
+    "sku": "Set3pack12",
+    "cost": 1000
+  },
+  {
+    "index": 7,
+    "category": "核心补充包",
+    "name": "三叠纪补充包 (1包)",
+    "sku": "Set4pack",
+    "cost": 100
+  },
+  {
+    "index": 8,
+    "category": "核心补充包",
+    "name": "三叠纪补充包 (12连抽)",
+    "sku": "Set4pack12",
+    "cost": 1000
+  },
+  {
+    "index": 9,
+    "category": "限定英雄包",
+    "name": "至尊大王英雄包 (1包)",
+    "sku": "HP1_HugeGigantacus",
+    "cost": 200
+  },
+  {
+    "index": 10,
+    "category": "限定英雄包",
+    "name": "至尊大王英雄包 (11连抽)",
+    "sku": "HP11_HugeGigantacus",
+    "cost": 2000
+  },
+  {
+    "index": 11,
+    "category": "限定英雄包",
+    "name": "贝塔胡萝卜蒂娜英雄包 (1包)",
+    "sku": "HP1_BetaCarrotina",
+    "cost": 200
+  },
+  {
+    "index": 12,
+    "category": "限定英雄包",
+    "name": "贝塔胡萝卜蒂娜英雄包 (11连抽)",
+    "sku": "HP11_BetaCarrotina",
+    "cost": 2000
+  }
+]

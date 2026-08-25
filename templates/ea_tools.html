@@ -57,12 +57,15 @@
         </aside>
 
         <main class="lg:col-span-8">
-            <div class="bg-slate-100 p-1.5 rounded-2xl grid grid-cols-2 gap-1.5 mb-5" role="tablist">
-                <button @click="switchOperation('cards')" :class="operation === 'cards' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'" class="rounded-xl px-4 py-3 font-extrabold text-sm transition flex items-center justify-center gap-2" role="tab">
+            <div class="bg-slate-100 p-1.5 rounded-2xl grid grid-cols-3 gap-1.5 mb-5" role="tablist">
+                <button @click="switchOperation('cards')" :class="operation === 'cards' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'" class="rounded-xl px-3 py-3 font-extrabold text-sm transition flex items-center justify-center gap-1.5" role="tab">
                     <span class="material-symbols-rounded text-[20px]">send</span>发送卡牌
                 </button>
-                <button @click="switchOperation('packs')" :class="operation === 'packs' ? 'bg-white text-pink-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'" class="rounded-xl px-4 py-3 font-extrabold text-sm transition flex items-center justify-center gap-2" role="tab">
+                <button @click="switchOperation('packs')" :class="operation === 'packs' ? 'bg-white text-pink-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'" class="rounded-xl px-3 py-3 font-extrabold text-sm transition flex items-center justify-center gap-1.5" role="tab">
                     <span class="material-symbols-rounded text-[20px]">shopping_cart</span>购买卡包
+                </button>
+                <button @click="switchOperation('inventory')" :class="operation === 'inventory' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'" class="rounded-xl px-3 py-3 font-extrabold text-sm transition flex items-center justify-center gap-1.5" role="tab">
+                    <span class="material-symbols-rounded text-[20px]">inventory_2</span>查验卡包
                 </button>
             </div>
 
@@ -79,7 +82,7 @@
                 </button>
             </section>
 
-            <section v-else class="space-y-5">
+            <section v-else-if="operation === 'packs'" class="space-y-5">
                 <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-7">
                     <div class="flex items-start justify-between gap-4 mb-5">
                         <div><h2 class="text-xl font-extrabold text-slate-900">购买卡包</h2><p class="text-sm text-slate-500 mt-1">从列表选择，或手动填写准确的 SKU 与价格。</p></div>
@@ -95,12 +98,67 @@
                 <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                     <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
                         <div class="font-extrabold text-slate-800">卡包列表 <span class="text-xs text-slate-400 ml-1" v-text="packs.length + ' 项'"></span></div>
-                        <input v-model.trim="searchKeyword" placeholder="搜索名称 / SKU" class="px-3 py-2 border border-slate-200 rounded-xl text-sm sm:w-64">
+                        <input v-model.trim="searchKeyword" placeholder="搜索分类 / 名称 / SKU" class="px-3 py-2 border border-slate-200 rounded-xl text-sm sm:w-64">
                     </div>
-                    <div class="overflow-auto max-h-80">
-                        <table class="w-full text-sm"><thead class="bg-slate-50 sticky top-0"><tr><th class="text-left px-4 py-3">名称</th><th class="text-left px-4 py-3">SKU</th><th class="text-right px-4 py-3">花费</th></tr></thead>
-                        <tbody><tr v-for="pack in filteredPacks" :key="pack.sku" @click="selectPack(pack)" class="border-t border-slate-100 hover:bg-pink-50 cursor-pointer"><td class="px-4 py-3 font-medium" v-text="pack.name"></td><td class="px-4 py-3 font-mono text-xs text-slate-500" v-text="pack.sku"></td><td class="px-4 py-3 text-right font-bold text-pink-600" v-text="pack.cost"></td></tr></tbody></table>
+                    <div class="overflow-auto max-h-96">
+                        <table class="w-full text-sm"><thead class="bg-slate-50 sticky top-0"><tr><th class="text-left px-4 py-3">分类</th><th class="text-left px-4 py-3">名称</th><th class="text-left px-4 py-3">SKU</th><th class="text-right px-4 py-3">花费</th></tr></thead>
+                        <tbody><tr v-for="pack in filteredPacks" :key="pack.sku" @click="selectPack(pack)" class="border-t border-slate-100 hover:bg-pink-50 cursor-pointer"><td class="px-4 py-3 font-bold text-xs text-slate-400" v-text="pack.category || '通用'"></td><td class="px-4 py-3 font-medium" v-text="pack.name"></td><td class="px-4 py-3 font-mono text-xs text-slate-500" v-text="pack.sku"></td><td class="px-4 py-3 text-right font-bold text-pink-600" v-text="pack.cost"></td></tr></tbody></table>
                         <div v-if="!loadingPacks && !filteredPacks.length" class="text-center text-sm text-slate-400 py-8">没有找到卡包</div>
+                    </div>
+                </div>
+            </section>
+
+            <section v-else class="space-y-5">
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-7">
+                    <div class="flex items-start justify-between gap-4 mb-5">
+                        <div>
+                            <h2 class="text-xl font-extrabold text-slate-900">查验账号库存与待开启卡包</h2>
+                            <p class="text-sm text-slate-500 mt-1">同步账号实时数据，查验钻石、火花以及当前停留在账号中未开启的卡包数量。</p>
+                        </div>
+                        <span class="material-symbols-rounded text-emerald-500 bg-emerald-50 rounded-2xl p-3">inventory_2</span>
+                    </div>
+                    <button @click="syncInventory" :disabled="loading" class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-extrabold py-3.5 rounded-2xl transition">
+                        <span v-text="loading ? '正在同步查询…' : '查询当前账号库存与未开卡包'"></span>
+                    </button>
+                </div>
+
+                <div v-if="inventorySummary" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 md:p-7 space-y-5">
+                    <h3 class="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                        <span class="material-symbols-rounded text-emerald-500">analytics</span>账号资产概览
+                    </h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
+                            <div class="text-xs text-slate-500 font-bold mb-1">钻石余额</div>
+                            <div class="text-lg font-extrabold text-amber-600" v-text="inventorySummary.gems.toLocaleString()"></div>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
+                            <div class="text-xs text-slate-500 font-bold mb-1">火花 (Sparks)</div>
+                            <div class="text-lg font-extrabold text-indigo-600" v-text="inventorySummary.sparks.toLocaleString()"></div>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
+                            <div class="text-xs text-slate-500 font-bold mb-1">解锁英雄数</div>
+                            <div class="text-lg font-extrabold text-blue-600" v-text="inventorySummary.heroes_count + ' / 22'"></div>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
+                            <div class="text-xs text-slate-500 font-bold mb-1">未开启卡包</div>
+                            <div class="text-lg font-extrabold text-emerald-600" v-text="inventorySummary.unopened_total + ' 包'"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="text-sm font-extrabold text-slate-800 mb-3">待开启卡包明细</h4>
+                        <div v-if="inventorySummary.unopened_packs.length" class="grid sm:grid-cols-2 gap-2.5">
+                            <div v-for="item in inventorySummary.unopened_packs" :key="item.type_id" class="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+                                <div>
+                                    <div class="font-bold text-slate-800 text-sm" v-text="item.name"></div>
+                                    <div class="text-xs font-mono text-emerald-700" v-text="item.type_id"></div>
+                                </div>
+                                <span class="bg-emerald-600 text-white text-xs font-extrabold px-3 py-1.5 rounded-full" v-text="item.count + ' 包'"></span>
+                            </div>
+                        </div>
+                        <div v-else class="text-center text-slate-400 py-6 text-sm bg-slate-50 rounded-2xl">
+                            当前账号没有待开启的卡包
+                        </div>
                     </div>
                 </div>
             </section>
@@ -125,23 +183,25 @@ createApp({ setup() {
     const cards = ref({ card_count: 999999 });
     const packsForm = ref({ sku: '', cost: null });
     const packs = ref([]), searchKeyword = ref(''), result = ref(null), error = ref(null), warnings = ref([]);
+    const inventorySummary = ref(null);
     const loading = ref(false), loadingPacks = ref(false), showAdvanced = ref(false);
     const cardIdCount = {% endraw %}{{ card_ids_count }}{% raw %};
     const cardTotal = computed(() => Math.max(0, Number(cards.value.card_count) || 0) * cardIdCount);
-    const filteredPacks = computed(() => { const q = searchKeyword.value.toLowerCase(); return !q ? packs.value : packs.value.filter(p => String(p.name || '').toLowerCase().includes(q) || String(p.sku || '').toLowerCase().includes(q)); });
+    const filteredPacks = computed(() => { const q = searchKeyword.value.toLowerCase(); return !q ? packs.value : packs.value.filter(p => String(p.name || '').toLowerCase().includes(q) || String(p.sku || '').toLowerCase().includes(q) || String(p.category || '').toLowerCase().includes(q)); });
     const formattedResponse = computed(() => JSON.stringify(result.value, null, 2));
     const readJson = async response => { const text = await response.text(); try { return JSON.parse(text); } catch (_) { return { success: false, error: text || `请求失败（HTTP ${response.status}）` }; } };
     const switchOperation = value => { operation.value = value; result.value = null; error.value = null; warnings.value = []; history.replaceState(null, '', `/ea-tools?operation=${value}`); };
     const validateAccount = () => { if (!account.value.token) error.value = '请填写 EADP-AUTH-TOKEN'; else if (!account.value.persona_id) error.value = '请填写 EADP-PERSONA-ID'; return !error.value; };
     const requestBody = extra => ({ ...account.value, ...extra });
-    const submit = async (url, body) => { result.value = null; error.value = null; warnings.value = []; if (!validateAccount()) return; loading.value = true; try { const response = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) }); const data = await readJson(response); result.value = data; warnings.value = data.warnings || []; if (!data.success) error.value = data.error || `请求失败（HTTP ${response.status}）`; } catch (e) { error.value = `网络错误：${e.message}`; } finally { loading.value = false; } };
+    const submit = async (url, body) => { result.value = null; error.value = null; warnings.value = []; if (!validateAccount()) return; loading.value = true; try { const response = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) }); const data = await readJson(response); result.value = data; warnings.value = data.warnings || []; if (data.inventory) inventorySummary.value = data.inventory; if (!data.success) error.value = data.error || `请求失败（HTTP ${response.status}）`; } catch (e) { error.value = `网络错误：${e.message}`; } finally { loading.value = false; } };
     const sendCards = () => { error.value = null; const count = Number(cards.value.card_count); if (!Number.isInteger(count) || count < 1 || count > 999999) { error.value = '每张卡牌数量必须是 1 到 999999 的整数'; return; } submit('/api/send-cards', requestBody({ card_count: count })); };
     const buyPack = () => { error.value = null; if (!packsForm.value.sku || Number(packsForm.value.cost) <= 0) { error.value = '请选择卡包，或填写有效的 SKU 和 ExpectedCost'; return; } submit('/api/buy-pack', requestBody(packsForm.value)); };
+    const syncInventory = () => { inventorySummary.value = null; submit('/api/sync-inventory', requestBody({})); };
     const selectPack = pack => { packsForm.value.sku = pack.sku; packsForm.value.cost = pack.cost; };
     const loadSettings = async () => { try { const data = await readJson(await fetch('/api/pack-settings')); if (data.success) Object.assign(account.value, { client_version: data.client_version, content_version: data.content_version, platform: data.platform }); } catch (_) {} };
     const loadPacks = async () => { loadingPacks.value = true; try { const data = await readJson(await fetch('/api/packs')); if (data.success) packs.value = data.packs || []; } finally { loadingPacks.value = false; } };
     onMounted(() => { loadSettings(); loadPacks(); });
-    return { operation, account, cards, packsForm, packs, searchKeyword, result, error, warnings, loading, loadingPacks, showAdvanced, cardTotal, filteredPacks, formattedResponse, switchOperation, sendCards, buyPack, selectPack, loadSettings };
+    return { operation, account, cards, packsForm, packs, searchKeyword, result, error, warnings, inventorySummary, loading, loadingPacks, showAdvanced, cardTotal, filteredPacks, formattedResponse, switchOperation, sendCards, buyPack, syncInventory, selectPack, loadSettings };
 }}).mount('#ea-tools-app');
 </script>{% endraw %}
 {% endblock %}

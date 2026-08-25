@@ -9,7 +9,7 @@ ea_tools_bp = Blueprint("ea_tools", __name__)
 @ea_tools_bp.route("/ea-tools")
 def ea_tools_page():
     operation = request.args.get("operation", "cards").strip().lower()
-    if operation not in {"cards", "packs"}:
+    if operation not in {"cards", "packs", "inventory"}:
         operation = "cards"
     return render_template(
         "ea_tools.html",

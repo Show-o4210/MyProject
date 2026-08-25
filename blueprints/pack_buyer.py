@@ -13,12 +13,13 @@ from logic_ea_api import (
     DEFAULT_CONTENT_VERSION,
     DEFAULT_PLATFORM,
     soft_purchase,
+    sync_inventory,
 )
 
 pack_buyer_bp = Blueprint('pack_buyer', __name__)
 
-PACK_DATA_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), 'data', 'name_id_cost.txt'
+PACK_JSON_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'data', 'packs.json'
 )
 
 SAFE_VERSION_RE = re.compile(r"^[0-9A-Za-z._-]{1,64}$")
@@ -27,43 +28,13 @@ SAFE_PLATFORM_RE = re.compile(r"^[0-9A-Za-z._ -]{1,32}$")
 
 
 def load_packs_from_file() -> List[Dict[str, Any]]:
-    packs: List[Dict[str, Any]] = []
-    if not os.path.exists(PACK_DATA_FILE):
-        return packs
-
-    try:
-        with open(PACK_DATA_FILE, 'r', encoding='utf-8') as f:
-            lines = [line.strip() for line in f.readlines()]
-
-        i = 0
-        while i < len(lines):
-            if not lines[i].startswith('['):
-                i += 1
-                continue
-
-            block = lines[i:i + 4]
-            if len(block) < 4:
-                break
-
-            try:
-                index = int(block[0].strip('[]'))
-                name = block[1].split(':', 1)[1].strip()
-                sku = block[2].split(':', 1)[1].strip()
-                cost = int(block[3].split(':', 1)[1].strip())
-                packs.append({
-                    'index': index,
-                    'name': name,
-                    'sku': sku,
-                    'cost': cost,
-                })
-            except (ValueError, IndexError) as e:
-                print(f"解析卡包数据出错: {e}")
-            i += 4
-
-        return packs
-    except Exception as e:
-        print(f"读取卡包文件失败: {e}")
-        return packs
+    if os.path.exists(PACK_JSON_FILE):
+        try:
+            with open(PACK_JSON_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"读取 packs.json 失败: {e}")
+    return []
 
 
 def find_pack_by_sku(sku: str) -> Optional[Dict[str, Any]]:
@@ -225,3 +196,88 @@ def buy_pack():
         return jsonify({"success": False, "error": f"上游请求失败: {type(e).__name__}"}), 502
     except Exception:
         return jsonify({"success": False, "error": "服务器处理失败，请稍后重试"}), 500
+
+
+@pack_buyer_bp.route('/api/sync-inventory', methods=['POST'])
+@limiter.limit("5 per minute")
+def sync_inventory_route():
+    """查询账号库存及未开启卡包列表。"""
+    data = request.get_json(silent=True) or {}
+
+    token = str(data.get('token', '')).strip()
+    persona_id = str(data.get('persona_id', '')).strip()
+
+    client_version = clean_field(data.get('client_version'), DEFAULT_CLIENT_VERSION, SAFE_VERSION_RE)
+    content_version = clean_field(data.get('content_version'), DEFAULT_CONTENT_VERSION, SAFE_CONTENT_VERSION_RE)
+    platform = clean_field(data.get('platform'), DEFAULT_PLATFORM, SAFE_PLATFORM_RE)
+
+    if not token:
+        return jsonify({"success": False, "error": "EADP-AUTH-TOKEN 不能为空"}), 400
+    if not persona_id:
+        return jsonify({"success": False, "error": "EADP-PERSONA-ID 不能为空"}), 400
+
+    try:
+        response, response_body, response_text, headers = sync_inventory(
+            token,
+            persona_id,
+            client_version=client_version,
+            content_version=content_version,
+            platform=platform,
+        )
+        success = response.status_code == 200
+
+        inventory_summary = None
+        if success and isinstance(response_body, dict):
+            unopened_raw = response_body.get('UnopenedBoosterPacks') or []
+            grouped_packs = {}
+            for pack in unopened_raw:
+                p_type = pack.get('PackTypeId', '未知卡包')
+                grouped_packs[p_type] = grouped_packs.get(p_type, 0) + 1
+
+            pack_type_map = {
+                'cosmicpack': '银河补充包',
+                'DoomAndBloom': '末日与绽放包',
+                'Hero_HugeGigantacus_Pack': '至尊大王英雄包',
+                'Hero_BetaCarrotina_Pack': '贝塔胡萝卜蒂娜英雄包',
+                'goldPack': '高级补充包',
+                'Set3pack': '化石补充包',
+                'Set4pack': '三叠纪补充包',
+            }
+
+            pack_list = []
+            for p_type, count in grouped_packs.items():
+                cn_name = pack_type_map.get(p_type, p_type)
+                pack_list.append({
+                    'type_id': p_type,
+                    'name': cn_name,
+                    'count': count
+                })
+
+            inventory_summary = {
+                'gems': response_body.get('totalGemBalance', 0),
+                'sparks': response_body.get('Sparks', 0),
+                'heroes_count': len(response_body.get('Heroes') or {}),
+                'total_cards': response_body.get('totalNumCards', 0),
+                'unopened_total': len(unopened_raw),
+                'unopened_packs': pack_list,
+            }
+
+        error_message = None if success else f"查询失败（HTTP {response.status_code}）"
+
+        return jsonify({
+            "success": success,
+            "error": error_message,
+            "status_code": response.status_code,
+            "inventory": inventory_summary,
+            "response": response_body,
+            "raw_response": response_text[:4000],
+        })
+
+    except requests.Timeout:
+        return jsonify({"success": False, "error": "请求超时，请稍后重试"}), 504
+    except requests.ConnectionError:
+        return jsonify({"success": False, "error": "网络连接失败，服务器无法连接 PVZH 接口"}), 503
+    except requests.RequestException as e:
+        return jsonify({"success": False, "error": f"上游请求失败: {type(e).__name__}"}), 502
+    except Exception as e:
+        return jsonify({"success": False, "error": f"服务器处理失败: {e}"}), 500
