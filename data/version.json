@@ -1,9 +1,9 @@
 {
-  "version": "v4.10.0",
-  "version_code": 41000,
-  "update_title": "版本更新 v4.10.0",
-  "update_log": "导出功能新增裁剪，包含自动、手动和原本的整张图导出",
+  "version": "v4.11.0",
+  "version_code": 41100,
+  "update_title": "版本更新 v4.11.0",
+  "update_log": "优化体验，加入更新日志",
   "download_url": "https://pan.quark.cn/s/92d058b77b5f",
   "force_update": false,
-  "release_date": "2026-09-03"
+  "release_date": "2026-09-06"
 }
