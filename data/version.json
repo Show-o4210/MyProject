@@ -4,6 +4,6 @@
   "update_title": "版本更新 v4.12.0",
   "update_log": "新增文本加粗、斜体、自由颜色",
   "download_url": "https://pan.quark.cn/s/92d058b77b5f",
-  "force_update": false,
+  "force_update": true,
   "release_date": "2026-09-27"
 }
