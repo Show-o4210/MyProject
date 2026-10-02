@@ -1,9 +1,9 @@
 {
-  "version": "v4.12.0",
-  "version_code": 41200,
-  "update_title": "版本更新 v4.12.0",
-  "update_log": "新增文本加粗、斜体、自由颜色",
+  "version": "v4.13.0",
+  "version_code": 41300,
+  "update_title": "版本更新 v4.13.0",
+  "update_log": "1. 新增精选作品浏览、放大与署名收藏，首期由休切尔的头像占位，欢迎投稿。\n2. 新增保存状态蓝点、普通单卡与英雄独立草稿。\n3. 新增有限历史快照，单卡可导入工作台继续编辑。\n4. 素材按内容识别，删除前可查看工程引用。\n5. 文字格式栏覆盖预览，切换页面不再挤压编辑区。\n6. 软件更新优先 Vercel，失败时由 Render 兜底。",
   "download_url": "https://pan.quark.cn/s/92d058b77b5f",
   "force_update": true,
-  "release_date": "2026-09-27"
+  "release_date": "2026-10-03"
 }
