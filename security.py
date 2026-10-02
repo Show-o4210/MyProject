@@ -4,6 +4,7 @@ from database import get_supabase
 import datetime
 import os
 import re
+import threading
 import time
 
 """
@@ -18,7 +19,7 @@ import time
 2. 不再把 Edg/148.0.0.0 当成恶意特征，因为这可能误伤正常浏览器。
 3. 对留言/反馈等提交类接口采用“影子封禁”：返回成功，但实际不进入业务逻辑。
 4. 对后台、统计、上传等敏感接口硬拦截。
-5. 所有命中都写入 security_logs，方便你后续取证。
+5. 命中写入 security_logs，同一 IP+reason 按时间窗口去重，方便取证并限制写入。
 6. 进程内自唤醒（KeepAlive）不得被当成外部脚本攻击。
 """
 
@@ -111,9 +112,10 @@ SUSPICIOUS_UA_PATTERNS = {
     },
 }
 
-# 同一 IP+reason 的“仅记录”事件最小间隔（秒），避免自唤醒/扫描刷爆日志与 Supabase
+# 所有事件按同一 IP+reason 限制写入间隔（秒，至少 1 秒），包括拦截事件
 LOG_DEDUP_SECONDS = int(os.getenv("SECURITY_LOG_DEDUP_SECONDS", "300"))
 _recent_log_keys: dict[str, float] = {}
+_recent_log_lock = threading.Lock()
 
 # Supabase 权限失败时降噪：连续失败时降低打印频率
 _supabase_log_fail_count = 0
@@ -222,23 +224,23 @@ def contains_abuse_text(text):
     return False
 
 
-def _should_skip_dedup_log(ip: str, reason: str, blocked: bool) -> bool:
-    """拦截事件不去重；仅记录事件按 IP+reason 节流。"""
-    if blocked:
+def _should_skip_dedup_log(ip: str, reason: str) -> bool:
+    """所有事件按 IP+reason 节流；原子预留窗口，失败时也不立即重试。"""
+    with _recent_log_lock:
+        now = time.monotonic()
+        interval = max(1, LOG_DEDUP_SECONDS)
+        key = f"{ip}|{reason}"
+        last = _recent_log_keys.get(key)
+        if last is not None and (now - last) < interval:
+            return True
+        _recent_log_keys[key] = now
+        # 清理过期记录；Supabase 网络请求在锁外执行
+        if len(_recent_log_keys) > 2000:
+            cutoff = now - interval
+            stale = [k for k, t in _recent_log_keys.items() if t < cutoff]
+            for k in stale:
+                _recent_log_keys.pop(k, None)
         return False
-    now = time.time()
-    key = f"{ip}|{reason}"
-    last = _recent_log_keys.get(key)
-    if last is not None and (now - last) < LOG_DEDUP_SECONDS:
-        return True
-    _recent_log_keys[key] = now
-    # 简单清理，避免字典无限增长
-    if len(_recent_log_keys) > 2000:
-        cutoff = now - LOG_DEDUP_SECONDS
-        stale = [k for k, t in _recent_log_keys.items() if t < cutoff]
-        for k in stale:
-            _recent_log_keys.pop(k, None)
-    return False
 
 
 def _format_supabase_error(err) -> str:
@@ -261,7 +263,7 @@ def log_security_event(ip, user_agent, reason, severity="medium", blocked=True):
     """记录安全事件到 Supabase。表不存在或字段不匹配时只打印，不影响网站运行。"""
     global _supabase_log_fail_count, _supabase_log_last_warn
 
-    if _should_skip_dedup_log(ip, reason, blocked):
+    if _should_skip_dedup_log(ip, reason):
         return None
 
     try:
