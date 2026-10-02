@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Unity 资源工具箱 - PVZH Mod 工具箱{% endblock %}
-{% block meta_description %}在线 Unity AssetBundle 解包、预检与回填工具，支持 PVZ Heroes 关卡/资源包 JSON·CSV·PNG 安全导出与重打包。{% endblock %}
+{% block meta_description %}在线 Unity AssetBundle 解包与回填工具，支持 PVZ Heroes 关卡/资源包 JSON·CSV·PNG 安全导出与重打包。{% endblock %}
 
 {% block content %}
 <div id="unity-tool-app" class="px-4 sm:px-6 lg:px-8 py-8 md:py-10 max-w-7xl mx-auto" v-cloak>
@@ -277,41 +277,21 @@
                 <div class="mb-6">
                     <h2 class="text-xl font-extrabold text-slate-950 flex items-center">
                         <span class="material-symbols-rounded text-blue-500 mr-2">library_add</span>
-                        预检与回填
+                        Bundle 回填
                     </h2>
                     <p class="text-sm text-slate-500 mt-2">
-                        选好文件后可直接合成。预检为可选手动步骤，用于提前检查补丁是否匹配，不再作为打包前置条件。
+                        上传原始 Bundle 和修改后的 ZIP，直接回填；失败时会显示具体原因。
                     </p>
                 </div>
 
                 <form ref="repackForm" action="/repack" method="post" enctype="multipart/form-data" class="space-y-5">
-                    <input type="hidden" name="repack_mode" :value="repackMode">
-                    <input type="hidden" name="validate_level" :value="validateLevel">
-
-                    <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-3">回填方式</label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label class="rounded-2xl border p-4 cursor-pointer transition" :class="repackMode === 'patch' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-white border-slate-200 text-slate-600'">
-                                <input type="radio" v-model="repackMode" value="patch" class="mr-2 accent-green-600">
-                                <span class="font-extrabold text-sm">补丁包回填，推荐</span>
-                                <span class="block text-xs mt-1 opacity-75">只保留修改过的文件和 _index.json。</span>
-                            </label>
-
-                            <label class="rounded-2xl border p-4 cursor-pointer transition" :class="repackMode === 'full' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-white border-slate-200 text-slate-600'">
-                                <input type="radio" v-model="repackMode" value="full" class="mr-2 accent-amber-600">
-                                <span class="font-extrabold text-sm">完整 ZIP 回填，高级</span>
-                                <span class="block text-xs mt-1 opacity-75">兼容旧流程，但更吃内存。</span>
-                            </label>
-                        </div>
-                    </div>
-
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-2">1. 原始 Bundle</label>
                         <input
                             type="file"
                             name="original_bundle"
                             required
-                            @change="validationReport = null; onFileHint($event, 'repackBundle')"
+                            @change="onFileHint($event, 'repackBundle')"
                             class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 transition cursor-pointer border border-slate-200 rounded-2xl p-3 bg-slate-50"
                         >
                         <p v-if="fileHints.repackBundle" class="text-xs text-slate-500 mt-2" v-text="fileHints.repackBundle"></p>
@@ -324,7 +304,7 @@
                             name="modified_zip"
                             required
                             accept=".zip,application/zip"
-                            @change="validationReport = null; onFileHint($event, 'patchZip')"
+                            @change="onFileHint($event, 'patchZip')"
                             class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition cursor-pointer border border-orange-100 rounded-2xl p-3 bg-orange-50/40"
                         >
                         <p v-if="fileHints.patchZip" class="text-xs text-slate-500 mt-2" v-text="fileHints.patchZip"></p>
@@ -345,39 +325,20 @@
                             </label>
                         </div>
 
-                        <label class="block text-sm font-bold text-slate-700 mb-3">预检强度（仅手动预检时生效）</label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label class="inline-flex items-center text-sm font-bold text-slate-700 cursor-pointer bg-white border border-slate-200 rounded-xl px-3 py-2">
-                                <input type="radio" v-model="validateLevel" value="fast" class="mr-2 accent-blue-600">
-                                快速预检
-                            </label>
-
-                            <label class="inline-flex items-center text-sm font-bold text-slate-700 cursor-pointer bg-white border border-slate-200 rounded-xl px-3 py-2">
-                                <input type="radio" v-model="validateLevel" value="full" class="mr-2 accent-blue-600">
-                                完整预检
-                            </label>
-                        </div>
                     </div>
 
                     <div class="bg-green-50 border border-green-100 rounded-2xl p-4 text-sm text-green-800 leading-relaxed">
-                        补丁包示例：<span class="font-mono">_index.json</span> + 改过的 <span class="font-mono">MonoBehaviour/Card_123.json</span> 或 <span class="font-mono">Images/Card_456.png</span>。不需要把完整导出包全部传回服务器。
+                        <p>ZIP 应来自本站导出结果，或保留正确的 <span class="font-mono">path_id / _index.json</span> 对应关系。</p>
+                        <p>支持 JSON（兼容 JSON5）、CSV、PNG 和 DAT / raw 补丁。建议只上传修改过的文件；图片过大或补丁超出在线资源上限会中止任务。</p>
+                        <p>回填失败会返回具体原因。请保留原始 Bundle 备份；原始二进制替换可能损坏资源。</p>
+                        <p>补丁包示例：<span class="font-mono">_index.json</span> + 改过的 <span class="font-mono">MonoBehaviour/Card_123.json</span> 或 <span class="font-mono">Images/Card_456.png</span>。不需要把完整导出包全部传回服务器。</p>
                     </div>
 
                     <div class="flex flex-col sm:flex-row gap-3">
                         <button
                             type="button"
-                            @click="validateRepack"
-                            :disabled="loading.validate || loading.repack"
-                            class="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 disabled:bg-slate-100 text-slate-700 font-extrabold px-5 py-3 rounded-2xl transition active:scale-95"
-                        >
-                            <span class="material-symbols-rounded" :class="loading.validate ? 'animate-spin' : ''" v-text="loading.validate ? 'progress_activity' : 'fact_check'"></span>
-                            手动预检（可选）
-                        </button>
-
-                        <button
-                            type="button"
                             @click="submitRepack"
-                            :disabled="loading.repack || loading.validate"
+                            :disabled="loading.repack"
                             class="inline-flex items-center justify-center gap-2 bg-slate-950 hover:bg-black disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-extrabold px-5 py-3 rounded-2xl transition active:scale-95"
                         >
                             <span class="material-symbols-rounded" :class="loading.repack ? 'animate-spin' : ''" v-text="loading.repack ? 'progress_activity' : 'auto_fix_high'"></span>
@@ -386,79 +347,6 @@
                     </div>
                 </form>
 
-                <div v-if="validationReport" class="mt-6 space-y-5">
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div class="rounded-2xl p-4 border" :class="validationReport.ok ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'">
-                            <div class="text-xs font-bold" :class="validationReport.ok ? 'text-green-600' : 'text-red-600'">预检状态</div>
-                            <div class="text-lg font-extrabold mt-1" :class="validationReport.ok ? 'text-green-800' : 'text-red-800'" v-text="validationReport.ok ? '通过' : '未通过'"></div>
-                        </div>
-
-                        <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                            <div class="text-xs font-bold text-slate-400">将修改</div>
-                            <div class="text-2xl font-extrabold text-slate-950 mt-1" v-text="validationReport.summary.will_modify"></div>
-                        </div>
-
-                        <div class="bg-amber-50 rounded-2xl p-4 border border-amber-100">
-                            <div class="text-xs font-bold text-amber-600">警告</div>
-                            <div class="text-2xl font-extrabold text-amber-800 mt-1" v-text="validationReport.summary.warnings"></div>
-                        </div>
-
-                        <div class="bg-red-50 rounded-2xl p-4 border border-red-100">
-                            <div class="text-xs font-bold text-red-600">错误</div>
-                            <div class="text-2xl font-extrabold text-red-800 mt-1" v-text="validationReport.summary.errors"></div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                        <div class="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                            <h3 class="font-extrabold text-slate-900 text-sm">预检明细</h3>
-                            <span class="text-xs text-slate-400" v-text="validationReport.validate_level === 'full' ? '完整预检' : '快速预检'"></span>
-                        </div>
-
-                        <div class="max-h-96 overflow-auto">
-                            <table class="w-full text-sm">
-                                <thead class="bg-slate-50 text-slate-500 sticky top-0">
-                                    <tr>
-                                        <th class="text-left px-4 py-3">状态</th>
-                                        <th class="text-left px-4 py-3">类型</th>
-                                        <th class="text-left px-4 py-3">文件</th>
-                                        <th class="text-left px-4 py-3">说明</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody class="divide-y divide-slate-100">
-                                    <tr v-for="item in validationReport.items" :key="item.path_id + item.file + item.message">
-                                        <td class="px-4 py-3">
-                                            <span
-                                                class="text-xs font-extrabold px-2 py-1 rounded-full"
-                                                :class="{
-                                                    'bg-green-100 text-green-700': item.status === 'ok',
-                                                    'bg-amber-100 text-amber-700': item.status === 'warning',
-                                                    'bg-red-100 text-red-700': item.status === 'error'
-                                                }"
-                                                v-text="item.status"
-                                            ></span>
-                                        </td>
-                                        <td class="px-4 py-3 text-slate-600" v-text="item.type"></td>
-                                        <td class="px-4 py-3 font-mono text-xs text-slate-500" v-text="item.file"></td>
-                                        <td class="px-4 py-3 text-slate-600" v-text="item.message"></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div v-if="validationReport.unmatched_files.length" class="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-                        <h3 class="font-extrabold text-amber-900 mb-2 flex items-center">
-                            <span class="material-symbols-rounded mr-2">warning</span>
-                            未匹配文件
-                        </h3>
-
-                        <ul class="text-xs text-amber-800 space-y-1 font-mono max-h-36 overflow-auto">
-                            <li v-for="file in validationReport.unmatched_files" :key="file" v-text="file"></li>
-                        </ul>
-                    </div>
-                </div>
             </section>
 
             <section v-if="globalError" class="bg-red-50 border border-red-100 rounded-3xl p-5">
@@ -486,7 +374,7 @@
             const modes = [
                 { id: 'inspect', title: '结构检查', subtitle: '快速 / 深度', icon: 'search' },
                 { id: 'unpack', title: '解包导出', subtitle: '推荐 / 高级', icon: 'unarchive' },
-                { id: 'repack', title: '预检回填', subtitle: '补丁优先', icon: 'library_add' }
+                { id: 'repack', title: 'Bundle 回填', subtitle: '补丁优先', icon: 'library_add' }
             ];
 
             const unpackPresets = [
@@ -514,7 +402,6 @@
 
             const inspectDepth = ref('fast');
             const inspectReport = ref(null);
-            const validationReport = ref(null);
             const globalError = ref('');
 
             const unpackPreset = ref('recommended');
@@ -523,8 +410,6 @@
             const includeImages = ref(false);
             const showAdvancedUnpack = ref(false);
 
-            const repackMode = ref('patch');
-            const validateLevel = ref('fast');
 
             const fileHints = ref({
                 inspect: '',
@@ -535,7 +420,6 @@
 
             const loading = ref({
                 inspect: false,
-                validate: false,
                 repack: false
             });
 
@@ -640,52 +524,6 @@
                 }
             };
 
-            const validateRepack = async () => {
-                globalError.value = '';
-                validationReport.value = null;
-
-                if (!repackForm.value) {
-                    globalError.value = '回填表单未初始化';
-                    return;
-                }
-
-                const formData = new FormData(repackForm.value);
-                formData.set('repack_mode', repackMode.value);
-                formData.set('validate_level', validateLevel.value);
-
-                const originalBundle = formData.get('original_bundle');
-                const modifiedZip = formData.get('modified_zip');
-                if (!originalBundle || !originalBundle.name || !modifiedZip || !modifiedZip.name) {
-                    globalError.value = '请同时选择原始 Bundle 和修改后的 ZIP';
-                    return;
-                }
-
-                loading.value.validate = true;
-
-                try {
-                    const response = await fetch('/unity/validate-repack', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-Requested-With': 'fetch',
-                            'Accept': 'application/json'
-                        }
-                    });
-
-                    const data = await response.json();
-
-                    if (!response.ok || !data.success) {
-                        throw new Error(data.error || '预检失败');
-                    }
-
-                    validationReport.value = data.report;
-                } catch (err) {
-                    globalError.value = err.message;
-                } finally {
-                    loading.value.validate = false;
-                }
-            };
-
             const submitRepack = async () => {
                 if (!repackForm.value) {
                     globalError.value = '回填表单未初始化';
@@ -698,12 +536,6 @@
                 if (!originalBundle || !originalBundle.name || !modifiedZip || !modifiedZip.name) {
                     globalError.value = '请同时选择原始 Bundle 和修改后的 ZIP';
                     return;
-                }
-
-                if (validationReport.value && !validationReport.value.ok) {
-                    if (!confirm('当前预检未通过，仍要继续合成吗？合成过程不再自动阻断。')) {
-                        return;
-                    }
                 }
 
                 loading.value.repack = true;
@@ -742,11 +574,6 @@
 
                         formData.delete('types');
                         selectedTypes.value.forEach(typeName => formData.append('types', typeName));
-                    }
-
-                    if (formElement === repackForm.value) {
-                        formData.set('repack_mode', repackMode.value);
-                        formData.set('validate_level', validateLevel.value);
                     }
 
                     const response = await fetch(formElement.action, {
@@ -831,15 +658,12 @@
                 repackForm,
                 inspectDepth,
                 inspectReport,
-                validationReport,
                 globalError,
                 unpackPreset,
                 targetFormat,
                 selectedTypes,
                 includeImages,
                 showAdvancedUnpack,
-                repackMode,
-                validateLevel,
                 fileHints,
                 loading,
                 activePresetTitle,
@@ -847,7 +671,6 @@
                 onFileHint,
                 selectPreset,
                 inspectBundle,
-                validateRepack,
                 submitRepack,
                 handleAsyncDownload
             };

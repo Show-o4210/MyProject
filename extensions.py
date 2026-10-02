@@ -18,7 +18,7 @@ limiter = Limiter(
     strategy="fixed-window",
 )
 
-# Unity 任务锁：忙时短暂排队，避免用户连点/预检刚结束立刻回填时直接 429。
+# Unity 任务锁：忙时短暂排队，避免用户连续提交 Unity 操作时直接 429。
 # 最长等待秒数（免费机内存仍只允许真正并发 1 个 Unity 任务）。
 UNITY_LOCK_WAIT_SECONDS = 25
 
@@ -86,7 +86,7 @@ def acquire_unity_lock(json_response=False, wait_seconds=None):
     """
     获取全局 Unity 任务锁。
 
-    - 先非阻塞尝试；失败则在 wait_seconds 内短排队（覆盖连点/预检→回填竞态）。
+    - 先非阻塞尝试；失败则在 wait_seconds 内短排队（容纳连续提交的 Unity 操作）。
     - 仍拿不到则 429，不长时间占着 worker 干等。
     """
     if wait_seconds is None:
