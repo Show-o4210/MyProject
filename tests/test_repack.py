@@ -174,6 +174,38 @@ class ZipBudgetTests(unittest.TestCase):
             self.assertEqual(caught.exception.status, 413)
             self.assertEqual(limits.load_patch_json('{"value": "standard JSON"}', "补丁")["value"], "standard JSON")
 
+    def test_legacy_trailing_commas_use_standard_json_budget(self):
+        text = '{"items": [{"a": 1,}, 2,],}'
+        with patch.object(limits, "JSON5_MAX_BYTES", 8), patch.object(limits.json5, "loads") as json5_parse:
+            self.assertEqual(limits.load_patch_json(text, "补丁"), {"items": [{"a": 1}, 2]})
+            json5_parse.assert_not_called()
+
+    def test_trailing_comma_compat_preserves_strings_and_escaped_quotes(self):
+        expected = {"text": 'literal ,] and ,} and \\"quoted\\" and \\\\', "items": [1, 2]}
+        text = json.dumps(expected, ensure_ascii=False)[:-1] + ',\n}'
+        with patch.object(limits.json5, "loads") as json5_parse:
+            self.assertEqual(limits.load_patch_json(text, "补丁"), expected)
+            json5_parse.assert_not_called()
+
+    def test_nonstandard_json5_still_parses_original_strings_and_comments(self):
+        text = "{message: ',}', values: [1,], /* ,} */}"
+        self.assertEqual(limits.load_patch_json(text, "补丁"), {"message": ',}', "values": [1]})
+
+    def test_trailing_commas_do_not_bypass_structure_and_byte_limits(self):
+        text = '{"items": [[1,],],}'
+        for setting, cap in (("JSON_MAX_DEPTH", 2), ("JSON_MAX_NODES", 3), ("JSON_MAX_BYTES", 8)):
+            with self.subTest(setting=setting), patch.object(limits, setting, cap), \
+                    patch.object(limits, "_strip_json_trailing_commas") as normalize:
+                with self.assertRaises(limits.ClientFacingError) as caught:
+                    limits.load_patch_json(text, "补丁")
+                self.assertEqual(caught.exception.status, 413)
+                normalize.assert_not_called()
+
+    def test_other_malformed_json_is_still_rejected(self):
+        for text in ('{"a": 1,,}', '[,]', '{"a":,}', '[1,,]'):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                limits.load_patch_json(text, "补丁")
+
     def test_pillow_protection_is_retained(self):
         raw = small_png()
         with patch.object(Image, "MAX_IMAGE_PIXELS", 2):

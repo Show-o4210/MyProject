@@ -28,7 +28,7 @@ CSV_MAX_ROWS = 20000
 CSV_MAX_COLUMNS = 32
 CSV_MAX_FIELD_CHARS = 128 * 1024
 JSON_MAX_DEPTH = 64
-JSON_MAX_NODES = 100000
+JSON_MAX_NODES = 500000  # 真实 card_data_1 展开后 241267 节点，保留约两倍余量。
 PNG_MAX_BYTES = 16 * MIB
 IMAGE_MAX_SIDE = 4096
 IMAGE_MAX_PIXELS = 4 * 1024 * 1024
@@ -200,18 +200,56 @@ def check_json_tree(tree, label):
             stack.append((iter(values), depth + 1))
 
 
+def _strip_json_trailing_commas(text):
+    """兼容旧文本补丁的尾逗号；保留双引号字符串及转义内容。"""
+    quoted = escaped = False
+    parts = []
+    start = 0
+    for index, char in enumerate(text):
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char == ',':
+            following = index + 1
+            while following < len(text) and text[following] in " \t\r\n":
+                following += 1
+            if following < len(text) and text[following] in '}]':
+                preceding = index - 1
+                while preceding >= 0 and text[preceding] in " \t\r\n":
+                    preceding -= 1
+                # 只移除值后的尾逗号，不修复空元素、缺失值或连续逗号。
+                if preceding < 0 or text[preceding] in '{[,:':
+                    continue
+                parts.append(text[start:index])
+                start = index + 1
+    if not parts:
+        return text
+    parts.append(text[start:])
+    return ''.join(parts)
+
+
 def load_patch_json(text, label):
     check_json_text(text, label)
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
-        # JSON5 是纯 Python 解析，预算更低；大文件请保存为标准 JSON。
-        if len(text.encode("utf-8")) > JSON5_MAX_BYTES:
-            raise limit_error(f"{label} 需要 JSON5 解析，但超过 {JSON5_MAX_BYTES // 1024} KiB；请保存为标准 JSON")
         try:
-            parsed = json5.loads(text)
-        except RecursionError as exc:
-            raise limit_error(f"{label} JSON5 嵌套过于复杂") from exc
+            # 仅尾逗号的旧 JSON 仍用标准解析器，沿用 JSON 大小/深度/节点预算。
+            parsed = json.loads(_strip_json_trailing_commas(text))
+        except json.JSONDecodeError:
+            # 其余 JSON5 仍解析原文，避免修改单引号/注释等 JSON5 内容。
+            if len(text.encode("utf-8")) > JSON5_MAX_BYTES:
+                raise limit_error(f"{label} 需要 JSON5 解析，但超过 {JSON5_MAX_BYTES // 1024} KiB；请保存为标准 JSON")
+            try:
+                parsed = json5.loads(text)
+            except RecursionError as exc:
+                raise limit_error(f"{label} JSON5 嵌套过于复杂") from exc
     check_json_tree(parsed, label)
     return parsed
 
