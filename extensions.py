@@ -9,8 +9,8 @@ from werkzeug.exceptions import TooManyRequests
 from security import visitor_ip_key
 
 # 初始化全局拦截器
-# 必须用 visitor_ip_key：Render/反代后 remote_addr 几乎都是 127.0.0.1，
-# 若用 get_remote_address 会导致全站共用一个限流桶，正常用户误触 429。
+# Render 公网入口后 remote_addr 通常是代理地址；通过唯一 resolver 获取客户端 IP。
+# CF header 无效时保守降级到 remote_addr，不从 X-Forwarded-For 创建身份。
 limiter = Limiter(
     key_func=visitor_ip_key,
     default_limits=["2000 per day", "400 per hour"],

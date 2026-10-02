@@ -2,6 +2,7 @@
 from flask import request, jsonify, make_response
 from database import get_supabase
 import datetime
+import ipaddress
 import os
 import re
 import threading
@@ -27,6 +28,28 @@ import time
 # 基础配置
 # =========================
 
+def normalize_ip(value):
+    """只接受单个 IPv4/IPv6；统一文本表示，不接受作用域、端口或地址链。"""
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value or "%" in value:
+        return None
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    # IPv4 的 mapped IPv6 表示也必须命中相同的名单和限流桶。
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+        address = address.ipv4_mapped
+    return str(address)
+
+
+def parse_ip_list(value):
+    """环境变量名单与请求使用同一规范；忽略无效地址。"""
+    return {ip for item in value.split(",") if (ip := normalize_ip(item)) is not None}
+
+
 # 明确封禁 IP：本次辱骂留言来源
 # 也可以在环境变量中追加：SECURITY_BLOCKED_IPS="1.1.1.1,2.2.2.2"
 DEFAULT_BLOCKED_IPS = {
@@ -35,21 +58,13 @@ DEFAULT_BLOCKED_IPS = {
 }
 
 # 额外封禁 IP，方便上线后不改代码直接在 Render 环境变量里调整
-EXTRA_BLOCKED_IPS = {
-    ip.strip()
-    for ip in os.getenv("SECURITY_BLOCKED_IPS", "").split(",")
-    if ip.strip()
-}
+EXTRA_BLOCKED_IPS = parse_ip_list(os.getenv("SECURITY_BLOCKED_IPS", ""))
 
 BLOCKED_IPS = DEFAULT_BLOCKED_IPS | EXTRA_BLOCKED_IPS
 
 # 可信 IP（不参与脚本 UA 告警 / 不封禁）：可选
 # 例：Render 出站自唤醒 IP 曾是 74.220.49.7，但云厂商 IP 会变，优先靠 UA/Token
-TRUSTED_IPS = {
-    ip.strip()
-    for ip in os.getenv("SECURITY_TRUSTED_IPS", "").split(",")
-    if ip.strip()
-}
+TRUSTED_IPS = parse_ip_list(os.getenv("SECURITY_TRUSTED_IPS", ""))
 
 # 与 app.py keep_awake 约定一致
 SELF_PING_UA_PREFIX = "PVZH-KeepAlive/"
@@ -141,37 +156,28 @@ def is_excluded_path(path):
     return any(path.startswith(prefix) for prefix in EXCLUDED_PATH_PREFIXES)
 
 
+def resolve_client_ip():
+    """
+    当前 Render public Web Service 的唯一客户端 IP 规则。
+    公网入口经 Cloudflare 写入 CF-Connecting-IP；部署信任边界见 docs/deployment.md。
+    无效/缺失时只降级到直接连接地址，绝不采用客户端可保留的 X-Forwarded-For。
+    """
+    return (
+        normalize_ip(request.headers.get("CF-Connecting-IP"))
+        or normalize_ip(request.remote_addr)
+        or "unknown"
+    )
+
+
 def get_visitor_info():
-    """
-    获取访问者 IP 与 UA。
-
-    优先级：
-    1. CF-Connecting-IP：如果你套了 Cloudflare，这是最有价值的真实访客 IP。
-    2. X-Forwarded-For：常见代理头，但可被伪造，取第一个。
-    3. request.remote_addr：Flask 看到的直接连接来源。
-    """
-    cf_ip = request.headers.get("CF-Connecting-IP", "").strip()
-    x_forwarded_for = request.headers.get("X-Forwarded-For", "").strip()
-    remote_addr = request.remote_addr or "unknown"
-
-    if cf_ip:
-        ip = cf_ip
-    elif x_forwarded_for:
-        ip = x_forwarded_for.split(",")[0].strip()
-    else:
-        ip = remote_addr
-
+    """安全检查、审计和反馈归属共用的规范 IP 与 UA。"""
     user_agent = request.headers.get("User-Agent", "") or ""
-    return ip, user_agent
+    return resolve_client_ip(), user_agent
 
 
 def visitor_ip_key():
-    """
-    Flask-Limiter 用的 key：与 get_visitor_info 同一套真实访客 IP。
-    避免在 Render / 反向代理后所有人共享 remote_addr。
-    """
-    ip, _ = get_visitor_info()
-    return ip or "unknown"
+    """Flask-Limiter 与安全检查、反馈和审计共用同一个规范 IP。"""
+    return resolve_client_ip()
 
 
 def is_self_ping_request(user_agent: str) -> bool:

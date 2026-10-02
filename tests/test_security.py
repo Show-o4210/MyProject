@@ -104,16 +104,16 @@ class SecurityAuditTests(unittest.TestCase):
         self.assertEqual(self.execute.call_count, 3)
 
     def test_repeated_forwarded_blocked_ips_are_deduplicated(self):
-        for forwarding_headers in (
-            {"CF-Connecting-IP": self.BLOCKED_IP},
-            {"X-Forwarded-For": f"{self.BLOCKED_IP}, 192.0.2.10"},
+        for peer, forwarding_headers in (
+            ("192.0.2.10", {"CF-Connecting-IP": self.BLOCKED_IP}),
+            (self.BLOCKED_IP, {"X-Forwarded-For": "192.0.2.10, 192.0.2.11"}),
         ):
             with self.subTest(headers=forwarding_headers):
                 security._recent_log_keys.clear()
                 self.db.reset_mock()
                 for _ in range(20):
                     response = self.request(
-                        "/admin", ip="192.0.2.10",
+                        "/admin", ip=peer,
                         headers={**self.HEADERS, **forwarding_headers},
                     )
                     self.assertEqual(response.status_code, 403)
