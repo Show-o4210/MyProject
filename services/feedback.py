@@ -36,9 +36,15 @@ def _normalize_payload(data: dict[str, Any] | None) -> dict[str, str]:
     if not data or not isinstance(data, dict):
         raise FeedbackValidationError("请求体不能为空")
 
-    fb_type = str(data.get("type") or "other").strip().lower()
-    content = str(data.get("content") or "").strip()
-    contact = str(data.get("contact") or "").strip()
+    fields = {"type": "other", "content": "", "contact": ""}
+    for name, default in fields.items():
+        value = data.get(name, default)
+        if not isinstance(value, str):
+            raise FeedbackValidationError(f"{name} 必须是字符串")
+        fields[name] = value.strip()
+    fb_type = (fields["type"] or "other").lower()
+    content = fields["content"]
+    contact = fields["contact"]
 
     if fb_type not in ALLOWED_TYPES:
         raise FeedbackValidationError("反馈类型无效")

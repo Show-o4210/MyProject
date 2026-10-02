@@ -66,7 +66,7 @@
                             结构检查
                         </h2>
                         <p class="text-sm text-slate-500 mt-2">
-                            默认快速检查只统计对象类型和 Path ID，不深读字段；需要名称与可编辑性细节时再切换深度检查。
+                            轻量检查统计对象数量、类型和 Path ID，并提示常用导出格式；列表名称使用对象编号，不逐项探测字段。在线版适合常规 Bundle，大型或异常复杂资源请使用本地工具。
                         </p>
                     </div>
                 </div>
@@ -82,23 +82,6 @@
                             class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-5 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition cursor-pointer border border-slate-200 rounded-2xl p-3 bg-slate-50"
                         >
                         <p v-if="fileHints.inspect" class="text-xs text-slate-500 mt-2" v-text="fileHints.inspect"></p>
-                    </div>
-
-                    <div class="bg-slate-50 rounded-2xl border border-slate-100 p-4">
-                        <label class="block text-sm font-bold text-slate-700 mb-3">检查深度</label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label class="rounded-2xl border p-4 cursor-pointer transition" :class="inspectDepth === 'fast' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-slate-200 text-slate-600'">
-                                <input type="radio" v-model="inspectDepth" value="fast" class="mr-2 accent-blue-600">
-                                <span class="font-extrabold text-sm">快速检查</span>
-                                <span class="block text-xs mt-1 opacity-75">低内存，只看类型统计与 Path ID。</span>
-                            </label>
-
-                            <label class="rounded-2xl border p-4 cursor-pointer transition" :class="inspectDepth === 'deep' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-slate-200 text-slate-600'">
-                                <input type="radio" v-model="inspectDepth" value="deep" class="mr-2 accent-blue-600">
-                                <span class="font-extrabold text-sm">深度检查</span>
-                                <span class="block text-xs mt-1 opacity-75">读取名称与 typetree，更准确但更吃内存。</span>
-                            </label>
-                        </div>
                     </div>
 
                     <button
@@ -120,7 +103,7 @@
 
                         <div class="bg-blue-50 rounded-2xl p-4 border border-blue-100">
                             <div class="text-xs font-bold text-blue-500">检查模式</div>
-                            <div class="text-lg font-extrabold text-blue-800 mt-1" v-text="inspectReport.depth === 'deep' ? '深度' : '快速'"></div>
+                            <div class="text-lg font-extrabold text-blue-800 mt-1">轻量</div>
                         </div>
 
                         <div
@@ -246,7 +229,7 @@
                                 <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                                     <label v-for="typeName in exportTypeOptions" :key="typeName" class="flex items-center gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 cursor-pointer">
                                         <input type="checkbox" name="types" :value="typeName" v-model="selectedTypes" class="accent-blue-600">
-                                        <span v-text="typeName === '__all__' ? '全部对象' : typeName"></span>
+                                        <span v-text="typeName"></span>
                                     </label>
                                 </div>
                             </div>
@@ -363,16 +346,15 @@
 {% endblock %}
 
 {% block scripts %}
-{% raw %}
 <script>
-    const { createApp, ref, computed, watch } = Vue;
+    const { createApp, ref, computed } = Vue;
 
     createApp({
         setup() {
             const activeMode = ref('inspect');
 
             const modes = [
-                { id: 'inspect', title: '结构检查', subtitle: '快速 / 深度', icon: 'search' },
+                { id: 'inspect', title: '结构检查', subtitle: '轻量统计', icon: 'search' },
                 { id: 'unpack', title: '解包导出', subtitle: '推荐 / 高级', icon: 'unarchive' },
                 { id: 'repack', title: 'Bundle 回填', subtitle: '补丁优先', icon: 'library_add' }
             ];
@@ -384,23 +366,12 @@
                 { id: 'advanced', title: '高级自定义', icon: 'tune', desc: '手动选择对象类型、格式与图片导出。' }
             ];
 
-            const exportTypeOptions = [
-                'MonoBehaviour',
-                'TextAsset',
-                'Texture2D',
-                'Sprite',
-                'GameObject',
-                'Material',
-                'AnimationClip',
-                'AudioClip',
-                '__all__'
-            ];
+            const exportTypeOptions = {{ export_type_options | tojson }};
 
             const inspectFile = ref(null);
             const unpackForm = ref(null);
             const repackForm = ref(null);
 
-            const inspectDepth = ref('fast');
             const inspectReport = ref(null);
             const globalError = ref('');
 
@@ -483,12 +454,6 @@
                 }
             };
 
-            watch(selectedTypes, (newVal) => {
-                if (newVal.includes('__all__') && newVal.length > 1) {
-                    selectedTypes.value = ['__all__'];
-                }
-            });
-
             const inspectBundle = async () => {
                 globalError.value = '';
                 inspectReport.value = null;
@@ -503,7 +468,6 @@
                 try {
                     const formData = new FormData();
                     formData.append('bundle', inspectFile.value.files[0]);
-                    formData.append('inspect_depth', inspectDepth.value);
 
                     const response = await fetch('/unity/inspect', {
                         method: 'POST',
@@ -656,7 +620,6 @@
                 inspectFile,
                 unpackForm,
                 repackForm,
-                inspectDepth,
                 inspectReport,
                 globalError,
                 unpackPreset,
@@ -677,5 +640,4 @@
         }
     }).mount('#unity-tool-app');
 </script>
-{% endraw %}
 {% endblock %}

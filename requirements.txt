@@ -1,4 +1,4 @@
-Flask
+Flask>=3.1
 UnityPy>=1.20.26
 Pillow
 gunicorn

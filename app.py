@@ -10,6 +10,7 @@ from whitenoise import WhiteNoise
 from config import Config
 from extensions import init_limiter
 from security import init_security_handlers
+from utils.json_requests import init_small_json_limits
 from blueprints.unity import unity_bp
 from blueprints.home import home_bp
 from blueprints.deck_editor import deck_editor_bp
@@ -39,6 +40,7 @@ app.wsgi_app = WhiteNoise(
     max_age=60 * 60 * 24 * 7,
 )
 
+init_small_json_limits(app)
 init_security_handlers(app)
 
 

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, send_file, jsonify, after_this_request
+from flask import Blueprint, Response, render_template, request, send_file, jsonify, after_this_request
 import UnityPy
 import json
 import json5
@@ -13,7 +13,7 @@ import shutil
 import gc
 from PIL import Image
 from werkzeug.exceptions import RequestEntityTooLarge
-from utils import patch_limits
+from utils import patch_limits, export_limits
 from utils.patch_limits import (
     ClientFacingError, load_patch_json, check_json_tree, open_patch_zip, open_patch_image,
 )
@@ -62,10 +62,32 @@ def reject_if_too_large(max_size, label="文件"):
         )
 
 
-def save_upload_to_workdir(upload, workdir, fallback_name="upload.bin"):
-    filename = safe_name(upload.filename or fallback_name)
-    path = os.path.join(workdir, filename)
-    upload.save(path)
+def save_inspect_export_upload(upload, workdir, budget):
+    path = os.path.join(workdir, "input.bundle")
+    multipart_bytes = 0
+    for _, part in request.files.items(multi=True):
+        position = part.stream.tell()
+        part.stream.seek(0, os.SEEK_END)
+        multipart_bytes += part.stream.tell()
+        part.stream.seek(position)
+    # 也计入重复字段或额外文件的框架暂存，不能只计算选中的 Bundle。
+    budget.set_disk_size("multipart", multipart_bytes)
+    size = 0
+    with open(path, "wb") as output:
+        while True:
+            chunk = upload.stream.read(64 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > MAX_BUNDLE_SIZE:
+                raise export_limits.exceeded("Bundle 上传超过 140 MiB")
+            budget.set_disk_size("upload", size)
+            output.write(chunk)
+    if not size:
+        raise ClientFacingError("Bundle 文件为空，请重新上传。")
+    with open(path, "rb") as source:
+        if source.read(4) == b"PK\x03\x04":
+            raise ClientFacingError("请上传 Bundle 文件，ZIP 请先解压后再选择 Bundle。")
     return path
 
 
@@ -594,86 +616,36 @@ def guess_export_modes(type_name):
     return []
 
 
-def get_object_display_name(obj):
-    try:
-        if obj.type.name in ["Texture2D", "Sprite"]:
-            data = obj.read()
-            return getattr(data, 'name', '') or f"Object_{obj.path_id}"
-
-        tree = obj.read_typetree()
-        if isinstance(tree, dict):
-            return tree.get("m_Name") or f"Object_{obj.path_id}"
-
-    except Exception:
-        pass
-
-    return f"Object_{obj.path_id}"
-
-
 def inspect_env_light(env):
     objects = []
     type_counts = {}
+    entry_bytes = 0
 
-    for obj in env.objects:
-        type_name = obj.type.name
-        type_counts[type_name] = type_counts.get(type_name, 0) + 1
-
-        objects.append({
-            "path_id": str(obj.path_id),
-            "type": type_name,
-            "name": f"Object_{obj.path_id}",
-            "editable": type_name in LIGHT_EDITABLE_TYPES,
-            "export_modes": guess_export_modes(type_name),
-            "depth": "fast"
-        })
-
-    return {
-        "total_objects": len(objects),
-        "type_counts": type_counts,
-        "objects": objects,
-        "depth": "fast"
-    }
-
-
-def inspect_env(env):
-    objects = []
-    type_counts = {}
-
-    for obj in env.objects:
-        type_name = obj.type.name
+    for obj in export_limits.iter_objects(env):
+        if len(objects) >= export_limits.REPORT_MAX_ENTRIES:
+            raise export_limits.exceeded("检查报告条目过多")
+        type_name = export_limits.check_name(obj.type.name)
+        path_id = export_limits.check_name(str(obj.path_id))
         type_counts[type_name] = type_counts.get(type_name, 0) + 1
 
         item = {
-            "path_id": str(obj.path_id),
+            "path_id": path_id,
             "type": type_name,
-            "name": get_object_display_name(obj),
-            "editable": False,
-            "export_modes": [],
-            "depth": "deep"
+            "name": export_limits.check_name(f"Object_{path_id}"),
+            "editable": type_name in LIGHT_EDITABLE_TYPES,
+            "export_modes": guess_export_modes(type_name),
+            "depth": "fast"
         }
-
-        if type_name in ["Texture2D", "Sprite"]:
-            item["editable"] = True
-            item["export_modes"] = ["png"]
-
-        else:
-            try:
-                tree = obj.read_typetree()
-                if tree:
-                    item["editable"] = True
-                    item["export_modes"] = ["json", "csv"]
-                else:
-                    item["export_modes"] = []
-            except Exception:
-                item["export_modes"] = []
-
+        entry_bytes += len(export_limits.encode_report(item)) + 1
+        if entry_bytes > export_limits.REPORT_MAX_BYTES:
+            raise export_limits.exceeded("检查报告超过序列化大小预算")
         objects.append(item)
 
     return {
         "total_objects": len(objects),
         "type_counts": type_counts,
         "objects": objects,
-        "depth": "deep"
+        "depth": "fast"
     }
 
 
@@ -762,9 +734,11 @@ def get_unpack_policy():
     include_images = parse_bool_form('include_images', False)
     include_index = parse_bool_form('include_index', True)
 
-    # RAW 导出入口已下线，统一走 JSON/CSV/PNG 安全通道
+    # RAW 导出入口已下线；类型只能选择服务端现有的 JSON / 图片能力。
     if target_format not in {'json', 'csv'}:
-        target_format = 'json'
+        raise ClientFacingError("导出格式只支持 JSON 或 CSV。")
+    if process_mode not in {'auto', 'manual'}:
+        raise ClientFacingError("文本处理方式无效。")
 
     if preset == 'recommended':
         selected_types = DEFAULT_RECOMMENDED_TYPES
@@ -784,13 +758,12 @@ def get_unpack_policy():
     elif preset == 'advanced':
         if not selected_types:
             selected_types = DEFAULT_RECOMMENDED_TYPES
+        else:
+            selected_types = sorted(set(selected_types) & (LIGHT_EDITABLE_TYPES | JSON_LIKE_TYPES | IMAGE_TYPES))
+            if not selected_types:
+                raise ClientFacingError("未选择服务端支持的导出类型。")
     else:
-        # 兼容旧前端仍提交 raw 等未知 preset
-        preset = 'recommended'
-        selected_types = DEFAULT_RECOMMENDED_TYPES
-        target_format = 'json'
-        include_images = False
-        include_index = True
+        raise ClientFacingError("导出模式无效，请使用页面提供的模式。")
 
     return {
         "preset": preset,
@@ -804,38 +777,183 @@ def get_unpack_policy():
 
 def should_export_object(obj, policy):
     selected_types = set(policy["selected_types"])
-    if '__all__' in selected_types:
-        return True
     return obj.type.name in selected_types
 
 
-def export_image_object(obj, zf, workdir, index_data):
-    data = obj.read()
-    name = safe_name(getattr(data, 'name', '') or f"Object_{obj.path_id}")
-    file_name = f"Images/{name}_{obj.path_id}.png"
+def _check_texture_for_export(data, budget, key):
+    budget.check_image(data.m_Width, data.m_Height, key)
+    stream = getattr(data, "m_StreamData", None)
+    if stream and not getattr(data, "image_data", None):
+        budget.reserve_binary(stream.size)
 
-    # PNG 编码先落到磁盘，再写入 ZIP，避免 BytesIO + getvalue 的双份内存复制。
+
+def _check_sprite_for_export(data, budget, key):
+    # Sprite.image 会先解码整个底图，不能仅检查最终裁剪尺寸。
+    budget.check_image(data.m_Rect.width, data.m_Rect.height, key)
+    render_data = data.m_RD
+    atlas_pointer = data.m_SpriteAtlas
+    atlas = None
+    if atlas_pointer:
+        reader = atlas_pointer.deref()
+        atlas_key = (id(reader.assets_file), reader.path_id)
+        if atlas_key not in budget.image_metadata:
+            budget.reserve_source(reader)
+            budget.image_metadata[atlas_key] = reader.read()
+        atlas = budget.image_metadata[atlas_key]
+        budget.reserve_source(reader)  # UnityPy image 属性会再读取一次。
+    elif data.m_AtlasTags:
+        for reader in data.assets_file.objects.values():
+            budget.visit_read(2)  # 预取检查和库内部的图集查找。
+            if reader.type.name == "SpriteAtlas":
+                budget.reserve_source(reader)
+                candidate = reader.read()
+                budget.reserve_source(reader)  # 库内部名称探测也会读取该对象。
+                if candidate.m_Name == data.m_AtlasTags[0]:
+                    atlas = candidate
+                    break
+        if atlas is None:
+            raise ClientFacingError("Sprite 引用的图集不存在，请使用完整 Bundle。")
+    if atlas is not None:
+        for render_key, entry in atlas.m_RenderDataMap:
+            budget.visit_read(2)  # 预取检查和库内部的 render key 查找。
+            if render_key == data.m_RenderDataKey:
+                render_data = entry
+                break
+        else:
+            raise ClientFacingError("Sprite 图集中找不到对应图片。")
+    rect = render_data.textureRect
+    budget.check_image(rect.width, rect.height, key)
+    for pointer in (render_data.texture, render_data.alphaTexture):
+        if pointer:
+            reader = pointer.deref()
+            texture_key = (id(reader.assets_file), reader.path_id)
+            if texture_key not in budget.image_metadata:
+                budget.reserve_source(reader)
+                texture = reader.read()
+                _check_texture_for_export(texture, budget, texture_key)
+                budget.reserve_source(reader)
+                budget.image_metadata[texture_key] = texture
+
+
+def export_image_object(obj, zf, workdir, index_data, budget):
+    budget.reserve_source(obj)
+    data = obj.read()
+    name = safe_name(export_limits.check_name(getattr(data, 'm_Name', '') or f"Object_{obj.path_id}"))
+    file_name = f"Images/{name}_{obj.path_id}.png"
+    key = (id(obj), "output")
+    if obj.type.name == "Texture2D":
+        _check_texture_for_export(data, budget, key)
+    else:
+        _check_sprite_for_export(data, budget, key)
+    budget.start_file()
     image_path = os.path.join(workdir, f"image_{obj.path_id}.png")
-    data.image.save(image_path, 'PNG')
-    zf.write(image_path, file_name)
+    try:
+        with open(image_path, "w+b") as output:
+            sink = export_limits.BoundedOutput(output, budget, "image", export_limits.PNG_MAX_BYTES, "单个 PNG", image=True)
+            image = data.image
+            try:
+                budget.check_image(*image.size, key)
+                image.save(sink, 'PNG')
+            finally:
+                image.close()
+        zf.write(image_path, file_name)
+    finally:
+        if os.path.exists(image_path):
+            os.remove(image_path)
+        budget.disk_sizes.pop("image", None)
     index_data[str(obj.path_id)] = file_name
 
 
-def export_typetree_object(obj, zf, index_data, policy):
+def prepare_export_tree(tree, policy, budget):
+    """仅在正式导出时展开内嵌 JSON；使用有预算的迭代遍历。"""
+    nodes = 0
+
+    def children(mapping):
+        for key, value in mapping.items():
+            yield key
+            if (key in STRING_EMBEDDED_JSON_KEYS and isinstance(value, str)
+                    and looks_like_json_text(value)):
+                if len(value) > export_limits.TREE_MAX_STRING_CHARS:
+                    raise export_limits.exceeded("内嵌 JSON 字符串过长")
+                text = clean_json_string(value) if policy["process_mode"] == "auto" else value
+                try:
+                    patch_limits.check_json_text(text, "Bundle 内嵌 JSON", max_bytes=export_limits.TEXT_MAX_BYTES,
+                                                 max_depth=export_limits.TREE_MAX_DEPTH, max_nodes=export_limits.TREE_MAX_NODES)
+                except ClientFacingError as exc:
+                    raise export_limits.exceeded("Bundle 内嵌 JSON 结构过于复杂") from exc
+                try:
+                    value = json.loads(text)
+                except json.JSONDecodeError:
+                    if len(text.encode("utf-8")) > patch_limits.JSON5_MAX_BYTES:
+                        raise export_limits.exceeded("非标准内嵌 JSON 超过 JSON5 解析预算")
+                    try:
+                        value = json5.loads(text)
+                    except RecursionError as exc:
+                        raise export_limits.exceeded("Bundle 内嵌 JSON 结构过于复杂") from exc
+                    except ValueError:
+                        pass
+                mapping[key] = value
+            yield value
+
+    stack = [(iter((tree,)), 1)]
+    while stack:
+        values, depth = stack[-1]
+        try:
+            value = next(values)
+        except StopIteration:
+            stack.pop()
+            continue
+        nodes += 1
+        budget.tree_nodes += 1
+        if (nodes > export_limits.TREE_MAX_NODES or budget.tree_nodes > export_limits.TREE_TOTAL_NODES
+                or depth > export_limits.TREE_MAX_DEPTH):
+            raise export_limits.exceeded("Bundle 文本结构过于复杂")
+        if isinstance(value, str):
+            if len(value) > export_limits.TREE_MAX_STRING_CHARS:
+                raise export_limits.exceeded("Bundle 文本字符串过长")
+            try:
+                value.encode("utf-8")
+            except UnicodeError as exc:
+                raise ClientFacingError("Bundle 文本包含无效 UTF-8 字符。") from exc
+        elif isinstance(value, dict):
+            stack.append((children(value), depth + 1))
+        elif isinstance(value, list):
+            stack.append((iter(value), depth + 1))
+        elif value is not None and not isinstance(value, (int, float, bool)):
+            raise ValueError("对象字段不支持 JSON 导出")
+    return tree
+
+
+def export_typetree_object(obj, zf, index_data, policy, budget):
+    budget.reserve_source(obj)
     tree = obj.read_typetree()
     if not tree:
         return False
 
-    tree = transform_json_tree(tree, mode='expand', process_strategy=policy["process_mode"])
-    name = safe_name(tree.get("m_Name", f"Object_{obj.path_id}")) if isinstance(tree, dict) else f"Object_{obj.path_id}"
+    tree = prepare_export_tree(tree, policy, budget)
+    name = safe_name(export_limits.check_name(tree.get("m_Name", f"Object_{obj.path_id}"))) if isinstance(tree, dict) else f"Object_{obj.path_id}"
     base_name = f"{obj.type.name}/{name}_{obj.path_id}"
 
     if policy["target_format"] == 'csv':
-        zf.writestr(f"{base_name}.csv", FormatManager.to_csv(tree))
+        budget.start_file()
+        with zf.open(f"{base_name}.csv", "w") as output:
+            sink = export_limits.MemberWriter(output, budget)
+            sink.write("\ufeff")
+            writer = csv.writer(sink, lineterminator='\n')
+            if isinstance(tree, dict):
+                for key, value in tree.items():
+                    if isinstance(value, (dict, list)):
+                        parts, size = [], 0
+                        for chunk in export_limits.json_chunks(value):
+                            size += len(chunk.encode("utf-8"))
+                            if size > export_limits.TEXT_MAX_BYTES:
+                                raise export_limits.exceeded("CSV 字段内容过大")
+                            parts.append(chunk)
+                        value = "".join(parts)
+                    writer.writerow([key, value])
         index_data[str(obj.path_id)] = f"{base_name}.csv"
     else:
-        content = json.dumps(tree, indent=4, ensure_ascii=False).encode('utf-8')
-        zf.writestr(f"{base_name}.json", content)
+        export_limits.write_json_member(zf, f"{base_name}.json", tree, budget)
         index_data[str(obj.path_id)] = f"{base_name}.json"
 
     return True
@@ -845,7 +963,8 @@ def export_typetree_object(obj, zf, index_data, policy):
 
 @unity_bp.route('/unity')
 def index():
-    return render_template('tab_unity.html', current_tab='unity')
+    return render_template('tab_unity.html', current_tab='unity',
+                           export_type_options=sorted(LIGHT_EDITABLE_TYPES | JSON_LIKE_TYPES | IMAGE_TYPES))
 
 
 # ==================== 只分析 Bundle ====================
@@ -856,40 +975,50 @@ def inspect_bundle():
     if lock_response:
         return lock_response
 
-    workdir = tempfile.mkdtemp(prefix=TEMP_PREFIX)
-
+    workdir = None
     try:
+        workdir = tempfile.mkdtemp(prefix=TEMP_PREFIX)
         cleanup_old_temp()
         reject_if_too_large(MAX_BUNDLE_SIZE, "Bundle 文件")
         file = request.files.get('bundle')
         inspect_depth = request.form.get('inspect_depth', 'fast')
+        if inspect_depth != 'fast':
+            raise ClientFacingError("检查模式只支持 fast 轻量检查。")
 
         if not file:
             return jsonify({"success": False, "error": "请选择 Bundle 文件"}), 400
 
-        bundle_path = save_upload_to_workdir(file, workdir, "bundle")
+        export_limits.check_name(file.filename)
+        bundle_path = save_inspect_export_upload(file, workdir, export_limits.ExportBudget())
         try:
             env = UnityPy.load(bundle_path)
+        except (MemoryError, RecursionError):
+            raise
         except Exception as e:
             return jsonify({
                 "success": False,
                 "error": f"无法解析 Bundle，请确认是完整的 Unity AssetBundle。详情：{e}",
             }), 400
 
-        report = inspect_env_light(env) if inspect_depth == 'fast' else inspect_env(env)
-
-        return jsonify({
+        report = inspect_env_light(env)
+        content = export_limits.encode_report({
             "success": True,
             "filename": file.filename,
             "report": report
         })
+        return Response(content, mimetype="application/json")
 
     except ClientFacingError as e:
         return jsonify({"success": False, "error": str(e)}), getattr(e, "status", 400)
+    except RequestEntityTooLarge:
+        return jsonify({"success": False, "error": "上传内容超过在线版限制。"}), 413
+    except RecursionError:
+        return jsonify({"success": False, "error": "Bundle 结构过于复杂，请使用本地工具。"}), 413
     except Exception as e:
         return jsonify({"success": False, "error": f"分析失败：{e}"}), 500
     finally:
-        shutil.rmtree(workdir, ignore_errors=True)
+        if workdir:
+            shutil.rmtree(workdir, ignore_errors=True)
         gc.collect()
         release_unity_lock()
 
@@ -902,19 +1031,22 @@ def unpack():
     if lock_response:
         return lock_response
 
-    workdir = tempfile.mkdtemp(prefix=TEMP_PREFIX)
-
+    workdir = None
+    download_ready = False
     try:
+        workdir = tempfile.mkdtemp(prefix=TEMP_PREFIX)
         cleanup_old_temp()
         reject_if_too_large(MAX_BUNDLE_SIZE, "Bundle 文件")
         file = request.files.get('bundle')
 
         if not file:
-            return render_template('error.html', msg="请选择文件。"), 400
+            return _client_error("请选择文件。", 400)
 
         policy = get_unpack_policy()
-        bundle_path = save_upload_to_workdir(file, workdir, "bundle")
-        output_zip_path = os.path.join(workdir, f"Unpacked_{safe_name(file.filename)}.zip")
+        export_limits.check_name(file.filename)
+        budget = export_limits.ExportBudget()
+        bundle_path = save_inspect_export_upload(file, workdir, budget)
+        output_zip_path = os.path.join(workdir, "output.zip")
 
         env = UnityPy.load(bundle_path)
         index_data = {}
@@ -922,8 +1054,10 @@ def unpack():
         skipped_count = 0
         failed_count = 0
 
-        with zipfile.ZipFile(output_zip_path, 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
-            for obj in env.objects:
+        with open(output_zip_path, "w+b") as output, zipfile.ZipFile(
+                export_limits.BoundedOutput(output, budget, "zip", export_limits.ZIP_MAX_BYTES, "输出 ZIP"),
+                'w', zipfile.ZIP_DEFLATED) as zf:
+            for obj in export_limits.iter_objects(env):
                 if not should_export_object(obj, policy):
                     skipped_count += 1
                     continue
@@ -931,24 +1065,26 @@ def unpack():
                 try:
                     if obj.type.name in IMAGE_TYPES:
                         if policy["include_images"]:
-                            export_image_object(obj, zf, workdir, index_data)
+                            export_image_object(obj, zf, workdir, index_data, budget)
                             exported_count += 1
                         else:
                             skipped_count += 1
                         continue
 
-                    if export_typetree_object(obj, zf, index_data, policy):
+                    if export_typetree_object(obj, zf, index_data, policy, budget):
                         exported_count += 1
                     else:
                         skipped_count += 1
 
+                except (ClientFacingError, MemoryError, RecursionError, OSError):
+                    raise
                 except Exception:
                     failed_count += 1
 
             if policy["include_index"]:
-                zf.writestr("_index.json", json.dumps(index_data, indent=4, ensure_ascii=False))
+                export_limits.write_json_member(zf, "_index.json", index_data, budget)
 
-            zf.writestr("_export_summary.json", json.dumps({
+            export_limits.write_json_member(zf, "_export_summary.json", {
                 "preset": policy["preset"],
                 "format": policy["target_format"],
                 "selected_types": policy["selected_types"],
@@ -956,27 +1092,32 @@ def unpack():
                 "exported_count": exported_count,
                 "skipped_count": skipped_count,
                 "failed_count": failed_count
-            }, indent=4, ensure_ascii=False))
+            }, budget)
 
         if exported_count == 0:
-            shutil.rmtree(workdir, ignore_errors=True)
             return _client_error("没有导出任何对象。请切换为高级自定义，或选择更多对象类型。", 400)
 
-        register_cleanup(workdir)
-        return send_file(
+        response = send_file(
             output_zip_path,
             mimetype='application/zip',
             as_attachment=True,
             download_name=f"Unpacked_{safe_name(file.filename)}.zip"
         )
+        register_cleanup(workdir)
+        download_ready = True
+        return response
 
     except ClientFacingError as e:
-        shutil.rmtree(workdir, ignore_errors=True)
         return _client_error(str(e), getattr(e, "status", 400))
+    except RequestEntityTooLarge:
+        return _client_error("上传内容超过在线版限制。", 413)
+    except RecursionError:
+        return _client_error("Bundle 结构过于复杂，请使用本地工具。", 413)
     except Exception as e:
-        shutil.rmtree(workdir, ignore_errors=True)
         return _client_error(f"解包失败: {e}", 500)
     finally:
+        if workdir and not download_ready:
+            shutil.rmtree(workdir, ignore_errors=True)
         release_unity_lock()
 
 

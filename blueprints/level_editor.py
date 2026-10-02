@@ -3,9 +3,13 @@ import os
 import tempfile
 import shutil
 import gc
-from flask import Blueprint, render_template, jsonify, request, send_file, after_this_request
+from flask import Blueprint, render_template, jsonify, send_file
 from logic_level_editor import LevelEditorLogic
 from extensions import acquire_unity_lock, release_unity_lock
+from utils.json_requests import (
+    JsonInputError, json_error_response, read_json_object,
+    validate_level_id, serialize_level_config,
+)
 
 # 假定把桌面端的常量直接放在这里，或者从独立的 utils/constants.py 导入
 from data.constants import PLANT_HEROES, ZOMBIE_HEROES, SCENES, ALL_HEROES
@@ -49,14 +53,14 @@ def get_ab_levels():
 # 4. 提取单个关卡 JSON 接口
 @level_editor_bp.route('/api/editor/ab/extract', methods=['POST'])
 def extract_level():
+    try:
+        level_id = validate_level_id(read_json_object())
+    except JsonInputError as e:
+        return json_error_response(e)
     lock_response = acquire_unity_lock(json_response=True)
     if lock_response:
         return lock_response
     try:
-        data = request.json
-        level_id = data.get('level_id')
-        if not level_id:
-            return jsonify({"status": "error", "message": "缺失 level_id"}), 400
         config_json = logic.load_level_config(level_id)
         return jsonify({"status": "success", "data": config_json})
     except Exception as e:
@@ -67,44 +71,47 @@ def extract_level():
 # 5. 打包并下载 AB 包接口
 @level_editor_bp.route('/api/editor/ab/pack', methods=['POST'])
 def pack_level():
+    try:
+        data = read_json_object()
+        level_id = validate_level_id(data)
+        config_text = serialize_level_config(data.get('config'))
+    except JsonInputError as e:
+        return json_error_response(e)
+
     lock_response = acquire_unity_lock(json_response=True)
     if lock_response:
         return lock_response
     
-    workdir = tempfile.mkdtemp(prefix="level_editor_")
+    workdir = None
+    download_ready = False
     try:
-        data = request.json
-        level_id = data.get('level_id')
-        config_dict = data.get('config')
-        
-        if not level_id or not config_dict:
-            shutil.rmtree(workdir, ignore_errors=True)
-            release_unity_lock()
-            return jsonify({"status": "error", "message": "缺少必要的参数"}), 400
-            
+        workdir = tempfile.mkdtemp(prefix="level_editor_")
         asset_filename = logic.asset_filename
         out_path = os.path.join(workdir, asset_filename)
         # 执行打包逻辑
-        logic.pack_level_config(level_id, config_dict, output_path=out_path)
-        
-        @after_this_request
-        def cleanup(response):
-            try:
-                shutil.rmtree(workdir, ignore_errors=True)
-                gc.collect()
-            except Exception:
-                pass
-            return response
+        logic.pack_level_config(level_id, config_text, output_path=out_path)
+
+        def cleanup():
+            shutil.rmtree(workdir, ignore_errors=True)
+            gc.collect()
             
         # 将打包好的文件作为附件返回给用户下载
-        return send_file(
+        response = send_file(
             out_path, 
             as_attachment=True, 
             download_name=asset_filename,
             mimetype="application/octet-stream"
         )
+        # 先关闭下载文件句柄再删除目录，兼容 Windows。
+        response.direct_passthrough = False
+        response.call_on_close(cleanup)
+        download_ready = True
+        return response
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
     except Exception as e:
-        shutil.rmtree(workdir, ignore_errors=True)
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
+        if workdir and not download_ready:
+            shutil.rmtree(workdir, ignore_errors=True)
         release_unity_lock()

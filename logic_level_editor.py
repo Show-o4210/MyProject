@@ -133,8 +133,8 @@ class LevelEditorLogic:
                         raise ValueError(f"解析 JSON 失败: {e}")
         raise ValueError(f"在 AB 包中未找到关卡: {level_id}")
 
-    def pack_level_config(self, level_id, config_dict, output_path=None):
-        """将 JSON 写入并生成新的 AB 包"""
+    def pack_level_config(self, level_id, config_text, output_path=None):
+        """将已验证、已序列化的 JSON 写入并生成新的 AB 包。"""
         if not self.check_ab_exists():
             raise FileNotFoundError("找不到底包文件！")
 
@@ -145,8 +145,7 @@ class LevelEditorLogic:
             if obj.type.name == "TextAsset":
                 data = obj.read()
                 if self._get_name(data) == level_id:
-                    new_text = json.dumps(config_dict, indent=4, ensure_ascii=False)
-                    self._set_text(data, new_text)
+                    self._set_text(data, config_text)
                     found = True
                     break
         

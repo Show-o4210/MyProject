@@ -136,10 +136,13 @@ class BoundedZipReader:
         return bytes(data)
 
 
-def check_json_text(text, label):
+def check_json_text(text, label, *, max_bytes=None, max_depth=None, max_nodes=None):
     """解析前检查嵌套和结构标记；忽略字符串与 JSON5 注释中的括号。"""
-    if len(text.encode("utf-8")) > JSON_MAX_BYTES:
-        raise limit_error(f"{label} 文本超过 {JSON_MAX_BYTES // MIB} MiB")
+    max_bytes = JSON_MAX_BYTES if max_bytes is None else max_bytes
+    max_depth = JSON_MAX_DEPTH if max_depth is None else max_depth
+    max_nodes = JSON_MAX_NODES if max_nodes is None else max_nodes
+    if len(text.encode("utf-8")) > max_bytes:
+        raise limit_error(f"{label} 文本超过 {max_bytes // MIB} MiB")
     depth = tokens = i = 0
     quote = None
     while i < len(text):
@@ -164,13 +167,13 @@ def check_json_text(text, label):
         elif char in "{[":
             depth += 1
             tokens += 1
-            if depth > JSON_MAX_DEPTH:
-                raise limit_error(f"{label} 嵌套深度超过 {JSON_MAX_DEPTH} 层")
+            if depth > max_depth:
+                raise limit_error(f"{label} 嵌套深度超过 {max_depth} 层")
         elif char in "}]":
             depth -= 1
         elif char in ",:":
             tokens += 1
-        if tokens > 2 * JSON_MAX_NODES:
+        if tokens > 2 * max_nodes:
             raise limit_error(f"{label} 结构过于复杂")
         i += 1
 

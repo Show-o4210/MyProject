@@ -1,9 +1,10 @@
 import logging
 
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, jsonify, render_template
 
 from extensions import limiter
 from security import visitor_ip_key
+from utils.json_requests import JsonInputError, json_error_response, read_json_object
 from services.feedback import (
     create_feedback,
     FeedbackValidationError,
@@ -22,11 +23,12 @@ def feedback_page():
 @feedback_bp.route("/api/feedback/submit", methods=["POST"])
 @limiter.limit("3 per hour", key_func=visitor_ip_key)
 def submit_feedback():
-    data = request.get_json(silent=True)
-
     try:
+        data = read_json_object()
         create_feedback(data)
         return jsonify({"ok": True, "message": "提交成功"}), 200
+    except JsonInputError as e:
+        return json_error_response(e)
     except FeedbackValidationError as e:
         return jsonify({"ok": False, "error": e.message, "code": "VALIDATION_ERROR"}), 400
     except FeedbackStorageError as e:
