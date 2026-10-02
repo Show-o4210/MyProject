@@ -262,6 +262,14 @@ class ExportRouteTests(unittest.TestCase):
         self.assertFalse(UNITY_TASK_LOCK.locked())
         self.assertFalse(list(Path(self.temp.name).iterdir()))
 
+    def test_export_json5_budget_is_independent_of_repack_budget(self):
+        self.obj.read_typetree.return_value = {"m_Name": "small", "m_Script": "{value: 'nonstandard JSON'}"}
+        with patch.object(limits, "JSON5_MAX_BYTES", 8), \
+                patch.object(unity.patch_limits, "JSON5_MAX_BYTES", 128), \
+                patch("blueprints.unity.json5.loads") as parse:
+            self.assert_error(self.post(mode="manual"))
+            parse.assert_not_called()
+
     def test_single_image_pixels_and_side_limits_precede_decode(self):
         self.obj, image = texture_object(size=(3, 3))
         self.env.objects = [self.obj]

@@ -47,6 +47,41 @@ class ZipBudgetTests(unittest.TestCase):
         archive.infolist.return_value = infos
         return archive
 
+    def test_larger_text_metadata_is_accepted_without_relaxing_other_formats(self):
+        for name, size in (("_index.json", 10 * limits.MIB),
+                           ("a.json", 40 * limits.MIB),
+                           ("a.csv", 40 * limits.MIB)):
+            with self.subTest(name=name):
+                archive = self.metadata([(name, size, size)])
+                limits.BoundedZipReader(archive)
+                archive.open.assert_not_called()
+                archive = self.metadata([(name, size + 1, size + 1)])
+                with self.assertRaises(limits.ClientFacingError) as caught:
+                    limits.BoundedZipReader(archive)
+                self.assertEqual(caught.exception.status, 413)
+                archive.open.assert_not_called()
+        for name, size in (("a.dat", 32 * limits.MIB), ("a.raw", 32 * limits.MIB),
+                           ("a.png", 16 * limits.MIB)):
+            with self.subTest(name=name):
+                archive = self.metadata([(name, size + 1, size + 1)])
+                with self.assertRaises(limits.ClientFacingError) as caught:
+                    limits.BoundedZipReader(archive)
+                self.assertEqual(caught.exception.status, 413)
+                archive.open.assert_not_called()
+
+    def test_raw_actual_read_retains_format_cap_below_zip_member_cap(self):
+        archive = self.metadata([("a.dat", 1, 1)])
+        archive.getinfo.return_value = archive.infolist.return_value[0]
+        body = io.BytesIO(b"0123456789")
+        archive.open.return_value.__enter__ = Mock(return_value=body)
+        archive.open.return_value.__exit__ = Mock(return_value=False)
+        with patch.object(limits, "RAW_MAX_BYTES", 5), patch.object(limits, "ZIP_MAX_MEMBER_BYTES", 10):
+            reader = limits.BoundedZipReader(archive)
+            with self.assertRaises(limits.ClientFacingError) as caught:
+                reader.read("a.dat")
+        self.assertEqual(caught.exception.status, 413)
+        self.assertEqual(body.tell(), 6)
+
     def test_metadata_rejects_before_any_body_is_opened(self):
         cases = (
             ("ZIP_MAX_ENTRIES", 1, [("a.dat", 1, 1), ("b.dat", 1, 1)]),

@@ -884,7 +884,7 @@ def prepare_export_tree(tree, policy, budget):
                 try:
                     value = json.loads(text)
                 except json.JSONDecodeError:
-                    if len(text.encode("utf-8")) > patch_limits.JSON5_MAX_BYTES:
+                    if len(text.encode("utf-8")) > export_limits.JSON5_MAX_BYTES:
                         raise export_limits.exceeded("非标准内嵌 JSON 超过 JSON5 解析预算")
                     try:
                         value = json5.loads(text)
