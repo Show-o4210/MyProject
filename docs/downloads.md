@@ -1,16 +1,8 @@
 # 下载中心维护指南
 
-下载中心采用“内容介绍 + 统一获取入口”的结构：列表中的每个条目只描述一种工具或资源，不再维护逐条文件 URL；所有内容统一通过夸克网盘和 QQ 群提供。
+下载中心展示资料卡片，点击后弹出夸克网盘和 QQ 群入口。每项资料只维护名称、文件类型和图标，不再提供介绍或详情页。
 
-配置保存在 `data/downloads.json`。修改后运行：
-
-```powershell
-python scripts/validate_downloads.py
-```
-
-## 统一获取方式
-
-根节点 `download_options[]` 控制列表页和详情页展示的入口：
+配置集中在 `data/downloads.json`：
 
 ```json
 {
@@ -18,63 +10,29 @@ python scripts/validate_downloads.py
     {
       "id": "quark",
       "name": "夸克网盘",
-      "description": "打开 PVZH 相关内容合集。",
       "url": "https://pan.quark.cn/s/92d058b77b5f",
-      "icon": "cloud_download",
-      "action": "打开网盘"
+      "icon": "cloud_download"
     },
     {
       "id": "qq-group",
       "name": "QQ 群",
-      "description": "加入群聊获取资源和帮助。",
       "url": "https://qm.qq.com/q/PayU4f00iQ",
-      "icon": "group_add",
-      "action": "加入群聊"
+      "icon": "group_add"
     }
+  ],
+  "items": [
+    {"id": "my-tool", "name": "工具名称", "tag": "APK", "icon": "extension"}
   ]
 }
 ```
 
-界面默认把第一项作为主要获取方式。旧的 `/api/download/<item_id>` 和 `/api/download/<item_id>/<file_id>` 地址会兼容重定向到第一项，避免已经分享的链接失效。
+- `download_options`：所有卡片共用的获取入口，链接只维护一次。
+- `items`：扁平资料列表；`id` 和 `name` 必填，`tag` 与 `icon` 可选。
+- `id`：稳定的资料标识，不再生成独立页面地址。
+- 不再维护分区、介绍、使用步骤、注意事项、版本、日期、封面或逐文件下载链接。
 
-## 内容条目
+修改后执行 `python scripts/validate_downloads.py`。
 
-条目仍放在 `sections[].items[]` 中，但页面会把所有非空分区合并为一个列表，不展示空分区和分区 Tab。
+验收时检查：每张卡片打开对应名称的弹窗，两个外链正确；关闭按钮、Esc 和点击遮罩均可关闭，关闭后焦点回到卡片。手机上卡片和弹窗不溢出。
 
-```json
-{
-  "id": "my-tool",
-  "kind": "single",
-  "name": "工具名称",
-  "description": "列表页的一行摘要",
-  "details": "详情页的完整介绍",
-  "usage": ["第一步", "第二步"],
-  "notes": ["操作前请备份"],
-  "version": "1.0.0",
-  "tag": "APK",
-  "icon": "extension",
-  "size": "15 MB",
-  "updated_at": "2026-08-17",
-  "images": []
-}
-```
-
-字段说明：
-
-- `id`：全站唯一的详情页路由标识。
-- `name`、`description`：紧凑列表展示的名称和单行摘要。
-- `details`：详情页介绍。
-- `usage`、`notes`：可选字符串数组。
-- `version`、`tag`、`size`、`updated_at`：可选元数据。
-- `icon`：Material Symbols 图标名。
-- `cover` 或 `images[0]`：可选封面。
-
-不要再给条目添加 `url` 或 `files`。校验脚本发现旧式独立链接时会给出警告。
-
-## 验收
-
-- 手机竖屏下每个条目保持单行小长条布局。
-- 点击条目进入详情页，列表不展开大段说明。
-- 列表页和详情页均显示夸克网盘、QQ 群两个入口。
-- 旧下载 API 能重定向到夸克网盘。
-- `scripts/validate_downloads.py` 无错误或警告。
+详情页及旧下载 API 已移除，sitemap 只收录 `/downloads`。

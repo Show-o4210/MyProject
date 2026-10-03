@@ -177,7 +177,7 @@ def _build_robots_txt() -> str:
 
 
 def _iter_sitemap_urls() -> list[dict[str, str]]:
-    """组装 sitemap URL 列表：固定页 + downloads.json 详情。"""
+    """组装公开页面的 sitemap URL 列表。"""
     today = datetime.now(timezone.utc).date().isoformat()
     base = _site_base_url()
     urls: list[dict[str, str]] = []
@@ -189,24 +189,6 @@ def _iter_sitemap_urls() -> list[dict[str, str]]:
             "changefreq": page["changefreq"],
             "priority": page["priority"],
         })
-
-    catalog = load_json_file("downloads.json", default={})
-    sections = catalog.get("sections", []) if isinstance(catalog, dict) else []
-    for section in sections:
-        if not isinstance(section, dict):
-            continue
-        for item in section.get("items", []) or []:
-            if not isinstance(item, dict):
-                continue
-            item_id = item.get("id")
-            if not item_id:
-                continue
-            urls.append({
-                "loc": f"{base}/downloads/{item_id}",
-                "lastmod": today,
-                "changefreq": "weekly",
-                "priority": "0.6",
-            })
 
     return urls
 

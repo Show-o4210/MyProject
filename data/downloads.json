@@ -3,117 +3,46 @@
     {
       "id": "quark",
       "name": "夸克网盘",
-      "description": "打开 PVZH 相关内容合集，适合直接查找和保存文件。",
       "url": "https://pan.quark.cn/s/92d058b77b5f",
-      "icon": "cloud_download",
-      "action": "打开网盘"
+      "icon": "cloud_download"
     },
     {
       "id": "qq-group",
       "name": "QQ 群",
-      "description": "加入群聊【【PVZH】Main】，获取资源、通知与使用帮助。",
       "url": "https://qm.qq.com/q/PayU4f00iQ",
-      "icon": "group_add",
-      "action": "加入群聊"
+      "icon": "group_add"
     }
   ],
-  "sections": [
+  "items": [
     {
-      "id": "tools",
-      "name": "工具与资源",
-      "description": "面向制作与运维的辅助软件、替换工具、底包与素材文件。",
-      "icon": "build",
-      "empty_title": "暂无工具与资源",
-      "empty_hint": "工具与资源列表为空，请稍后再来。",
-      "items": [
-        {
-          "id": "pvzh-DIY",
-          "kind": "single",
-          "name": "PVZH卡牌DIY",
-          "description": "自制卡工具，由 qhsj 定制制作，用于 PVZH 卡牌内容编辑与 DIY 制作。",
-          "details": "PVZH卡牌DIY 是一个面向自制卡制作的辅助工具，提供了一套模板和编辑功能。\n\n该工具更偏向简单的创作用途。",
-          "usage": [],
-          "notes": [],
-          "version": "4.8.1",
-          "tag": "APK",
-          "icon": "extension",
-          "size": "68 MB",
-          "updated_at": "2026-08-12",
-          "images": []
-        },
-        {
-          "id": "txt2D",
-          "kind": "single",
-          "name": "卡牌贴图素材",
-          "description": "包含了原版所有卡牌的贴图素材，对于大部分内容进行了拼接，是透明背景的。",
-          "details": "包含了原版所有卡牌的贴图素材，对于大部分内容进行了拼接，是透明背景的。",
-          "usage": [
-            "下载 ZIP 文件并解压。"
-          ],
-          "notes": [],
-          "version": "1.0",
-          "tag": "ZIP",
-          "icon": "folder_zip",
-          "size": "250 MB",
-          "updated_at": "2026-08-18",
-          "images": []
-        },
-        {
-          "id": "Card_maker",
-          "kind": "single",
-          "name": "本地card_mod编辑器",
-          "description": "一个可以本地解包打包card_data的工具",
-          "details": "这是一个可以离线允许的mod制作工具，能够精准解剖card_data为json并打包回去，可以新增字符，和网站的unity ab包工具很像",
-          "usage": [],
-          "notes": [],
-          "version": "1.1",
-          "tag": "APK",
-          "icon": "extension",
-          "size": "12 MB",
-          "updated_at": "2026-08-12",
-          "images": []
-        },
-        {
-          "id": "pvzh-shuazuan",
-          "kind": "single",
-          "name": "PVZH 刷钻工具",
-          "description": "PVZH 刷钻石工具。之前那个锁设备还加固，我自己做了一个新的",
-          "details": "给你刷钻石用的",
-          "usage": [],
-          "notes": [
-            "项目开源在https://github.com/Show-o4210/uxyy"
-          ],
-          "version": "1.0",
-          "tag": "APK",
-          "icon": "diamond",
-          "size": "20 MB",
-          "updated_at": "2026-08-19",
-          "images": []
-        },
-        {
-          "id": "pvzh-heroes",
-          "kind": "single",
-          "name": "刷英雄文件",
-          "description": "刷英雄文件工具包，主要用于英雄相关内容处理，具体使用方法请参考视频教程。",
-          "details": "刷英雄文件",
-          "usage": [
-            "下载 ZIP 文件并解压。",
-            "查看压缩包内的文件结构。",
-            "根据视频教程将文件放入指定位置。",
-            "启动游戏并检查英雄内容是否生效。"
-          ],
-          "notes": [
-            "需要Root权限才能正常使用。",
-            "没有Root尝试虚拟机或者安装包注入等方法。"
-          ],
-          "version": "1.0",
-          "tag": "ZIP",
-          "icon": "folder_zip",
-          "size": "2 KB",
-          "updated_at": "2026-04-19",
-          "images": []
-        }
-      ]
+      "id": "pvzh-DIY",
+      "name": "PVZH卡牌DIY",
+      "tag": "APK",
+      "icon": "extension"
+    },
+    {
+      "id": "txt2D",
+      "name": "卡牌贴图素材",
+      "tag": "ZIP",
+      "icon": "folder_zip"
+    },
+    {
+      "id": "Card_maker",
+      "name": "本地card_mod编辑器",
+      "tag": "APK",
+      "icon": "extension"
+    },
+    {
+      "id": "pvzh-shuazuan",
+      "name": "PVZH 刷钻工具",
+      "tag": "APK",
+      "icon": "diamond"
+    },
+    {
+      "id": "pvzh-heroes",
+      "name": "刷英雄文件",
+      "tag": "ZIP",
+      "icon": "folder_zip"
     }
   ]
 }

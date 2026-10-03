@@ -1,150 +1,71 @@
 #!/usr/bin/env python3
-"""校验 data/downloads.json 结构与约定。
-
-用法（在项目根目录）:
-  python scripts/validate_downloads.py
-
-退出码: 0 通过；1 有错误。
-"""
-
-from __future__ import annotations
+"""校验资料卡片及共享下载入口：python scripts/validate_downloads.py。"""
 
 import json
-import os
+from pathlib import Path
 import sys
+from urllib.parse import urlsplit
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH = os.path.join(ROOT, "data", "downloads.json")
+DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "downloads.json"
 
-def main() -> int:
-    errors: list[str] = []
-    warnings: list[str] = []
 
-    if not os.path.exists(DATA_PATH):
-        print(f"[ERROR] 找不到 {DATA_PATH}")
+def check_records(records, label, required, allowed):
+    errors = []
+    if not isinstance(records, list):
+        return [f"{label} 必须是数组"]
+    seen = set()
+    for index, record in enumerate(records):
+        prefix = f"{label}[{index}]"
+        if not isinstance(record, dict):
+            errors.append(f"{prefix} 必须是对象")
+            continue
+        for field in required:
+            value = record.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{prefix}.{field} 必须是非空字符串")
+        for field, value in record.items():
+            if field not in allowed:
+                errors.append(f"{prefix} 不支持字段 {field}")
+            elif not isinstance(value, str):
+                errors.append(f"{prefix}.{field} 必须是字符串")
+        record_id = record.get("id")
+        if isinstance(record_id, str):
+            if record_id in seen:
+                errors.append(f"{prefix} 的 id 重复：{record_id}")
+            seen.add(record_id)
+    return errors
+
+
+def main():
+    try:
+        data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        print(f"[ERROR] 无法读取下载配置：{error}")
         return 1
-
-    with open(DATA_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
     if not isinstance(data, dict):
-        print("[ERROR] 根节点必须是 object")
+        print("[ERROR] 根节点必须是对象")
         return 1
-
-    sections = data.get("sections")
-    if not isinstance(sections, list) or not sections:
-        print("[ERROR] 缺少 sections[]")
-        return 1
-
-    download_options = data.get("download_options")
-    if not isinstance(download_options, list) or not download_options:
-        errors.append("缺少 download_options[]")
-    else:
-        option_ids: set[str] = set()
-        for oi, option in enumerate(download_options):
-            prefix = f"download_options[{oi}]"
-            if not isinstance(option, dict):
-                errors.append(f"{prefix} 不是 object")
-                continue
-            option_id = option.get("id")
-            if not option_id:
-                errors.append(f"{prefix} 缺少 id")
-            elif option_id in option_ids:
-                errors.append(f"重复的 download option id: {option_id}")
-            else:
-                option_ids.add(option_id)
-            if not option.get("name"):
-                errors.append(f"{prefix} 缺少 name")
-            if not (option.get("url") or "").strip():
-                errors.append(f"{prefix} 缺少 url")
-
-    seen_item_ids: set[str] = set()
-    seen_section_ids: set[str] = set()
-
-    for si, section in enumerate(sections):
-        if not isinstance(section, dict):
-            errors.append(f"sections[{si}] 不是 object")
-            continue
-        sid = section.get("id")
-        if not sid:
-            errors.append(f"sections[{si}] 缺少 id")
-            continue
-        if sid in seen_section_ids:
-            errors.append(f"重复的 section id: {sid}")
-        seen_section_ids.add(sid)
-
-        items = section.get("items")
-        if items is None:
-            errors.append(f"section `{sid}` 缺少 items")
-            continue
-        if not isinstance(items, list):
-            errors.append(f"section `{sid}`.items 必须是 array")
-            continue
-
-        for ii, item in enumerate(items):
-            prefix = f"section `{sid}` items[{ii}]"
-            if not isinstance(item, dict):
-                errors.append(f"{prefix} 不是 object")
-                continue
-            iid = item.get("id")
-            if not iid:
-                errors.append(f"{prefix} 缺少 id")
-                continue
-            if iid in seen_item_ids:
-                errors.append(f"重复的 item id: {iid}")
-            seen_item_ids.add(iid)
-
-            if not item.get("name"):
-                errors.append(f"{prefix} (`{iid}`) 缺少 name")
-
-            if item.get("url") or item.get("files"):
-                warnings.append(f"`{iid}` 仍含独立下载链接；当前界面只使用 download_options[]")
-
-            for field in ("series_id", "series_name"):
-                val = item.get(field)
-                if val is not None and not isinstance(val, str):
-                    errors.append(f"`{iid}`.{field} 必须是 string")
-
-            if item.get("series_order") is not None:
+    errors = [f"根节点不支持字段 {key}" for key in data if key not in {"items", "download_options"}]
+    errors += check_records(data.get("items"), "items", {"id", "name"}, {"id", "name", "tag", "icon"})
+    options = data.get("download_options")
+    errors += check_records(options, "download_options", {"id", "name", "url"}, {"id", "name", "url", "icon"})
+    if isinstance(options, list):
+        if not options:
+            errors.append("至少需要一个下载入口")
+        for index, option in enumerate(options):
+            if isinstance(option, dict) and isinstance(option.get("url"), str):
                 try:
-                    int(item["series_order"])
-                except (TypeError, ValueError):
-                    errors.append(f"`{iid}`.series_order 必须是整数")
-
-            images = item.get("images")
-            if images is not None and not isinstance(images, list):
-                errors.append(f"`{iid}`.images 必须是 array")
-
-    # 系列完整性提示
-    series_map: dict[str, list[str]] = {}
-    for section in sections:
-        if not isinstance(section, dict):
-            continue
-        for item in section.get("items") or []:
-            if not isinstance(item, dict):
-                continue
-            sid = (item.get("series_id") or "").strip()
-            if sid:
-                series_map.setdefault(sid, []).append(item.get("id") or "?")
-    for sid, members in series_map.items():
-        if len(members) < 2:
-            warnings.append(f"系列 `{sid}` 仅 1 个成员，互链暂不可见: {members}")
-
-    print(f"校验文件: {DATA_PATH}")
-    print(f"分区数: {len(sections)}  条目数: {len(seen_item_ids)}")
-    print(f"统一下载方式: {len(download_options) if isinstance(download_options, list) else 0}")
-    print()
-
-    for w in warnings:
-        print(f"[WARN] {w}")
-    for e in errors:
-        print(f"[ERROR] {e}")
-
+                    url = urlsplit(option["url"])
+                    valid = url.scheme in {"https", "http"} and bool(url.netloc)
+                except ValueError:
+                    valid = False
+                if not valid:
+                    errors.append(f"download_options[{index}].url 必须是 HTTP(S) 链接")
+    for error in errors:
+        print(f"[ERROR] {error}")
     if errors:
-        print(f"\n失败: {len(errors)} 个错误, {len(warnings)} 个警告")
         return 1
-
-    print(f"\n通过: 0 错误, {len(warnings)} 个警告")
+    print(f"通过：{len(data['items'])} 项资料，{len(options)} 个共享入口")
     return 0
 
 

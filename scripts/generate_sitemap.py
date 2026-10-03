@@ -4,16 +4,14 @@ Build-time 生成 static/sitemap.xml 与 static/robots.txt 快照。
 
 线上爬虫访问的是根路径 /robots.txt、/sitemap.xml，由 blueprints/home.py
 动态路由提供（WhiteNoise 只挂 /static/，不会自动映射根路径）。
-本脚本便于本地预览、仓库内快照与离线校验，改下载目录后请重跑。
+本脚本便于本地预览、仓库内快照与离线校验，更改公开页面后请重跑。
 """
-import json
 import os
 from datetime import datetime, timezone
 
 
 def main():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    downloads_path = os.path.join(root_dir, "data", "downloads.json")
     static_dir = os.path.join(root_dir, "static")
     today = datetime.now(timezone.utc).date().isoformat()
     base = os.environ.get("SITE_BASE_URL", "https://pvz-h-tools.onrender.com").rstrip("/")
@@ -27,23 +25,6 @@ def main():
         {"loc": f"{base}/phantom", "changefreq": "weekly", "priority": "0.8"},
         {"loc": f"{base}/tools", "changefreq": "monthly", "priority": "0.5"},
     ]
-
-    if os.path.exists(downloads_path):
-        try:
-            with open(downloads_path, "r", encoding="utf-8") as f:
-                catalog = json.load(f)
-            sections = catalog.get("sections", [])
-            for section in sections:
-                for item in section.get("items", []):
-                    item_id = item.get("id")
-                    if item_id:
-                        urls.append({
-                            "loc": f"{base}/downloads/{item_id}",
-                            "changefreq": "weekly",
-                            "priority": "0.6",
-                        })
-        except Exception as e:
-            print(f"Error reading downloads.json: {e}")
 
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',

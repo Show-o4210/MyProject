@@ -1,84 +1,105 @@
 {% extends "base.html" %}
 
 {% block title %}下载中心 - PVZH Mod 工具箱{% endblock %}
-{% block meta_description %}PVZH 下载中心：通过夸克网盘或 QQ 群获取工具、资源与相关内容。{% endblock %}
+{% block meta_description %}PVZH 下载中心：通过夸克网盘或 QQ 群获取工具与资料。{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-5 md:py-8">
-    <header class="mb-5 md:mb-7">
-        <div class="flex items-center gap-3 mb-2">
-            <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
+<style>
+    #download-dialog { width: min(28rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; padding: 0; border: 0; border-radius: 1.5rem; }
+    #download-dialog::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blur(4px); }
+</style>
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-7 md:py-10">
+    <header class="mb-6 md:mb-8">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
                 <span class="material-symbols-rounded">download</span>
             </div>
             <div>
-                <p class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-blue-600">Download Center</p>
+                <p class="text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-600">Download Center</p>
                 <h1 class="text-2xl md:text-3xl font-extrabold text-slate-950 tracking-tight">下载中心</h1>
             </div>
         </div>
-        <p class="text-sm text-slate-500 leading-relaxed max-w-2xl">
-            所有 PVZH 相关内容统一通过夸克网盘和 QQ 群提供。列表仅展示摘要，点击条目查看介绍、使用方法和注意事项。
-        </p>
+        <p class="text-sm text-slate-500">点击资料卡片，选择网盘或群聊。</p>
     </header>
 
-    <section class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6" aria-label="下载方式">
-        {% for option in download_options %}
-        <a href="{{ option.url }}" target="_blank" rel="noopener noreferrer"
-           class="group flex items-center gap-3 p-3.5 rounded-2xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md {% if option.id == 'quark' %}border-blue-200 hover:border-blue-400{% else %}border-emerald-200 hover:border-emerald-400{% endif %}">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 {% if option.id == 'quark' %}bg-blue-50 text-blue-600{% else %}bg-emerald-50 text-emerald-600{% endif %}">
-                <span class="material-symbols-rounded text-[22px]">{{ option.icon }}</span>
-            </div>
-            <div class="min-w-0 flex-1">
-                <h2 class="text-sm font-extrabold text-slate-900">{{ option.name }}</h2>
-                <p class="text-xs text-slate-500 mt-0.5 line-clamp-1">{{ option.description }}</p>
-            </div>
-            <span class="material-symbols-rounded text-slate-300 group-hover:text-blue-500 transition">open_in_new</span>
-        </a>
-        {% endfor %}
-    </section>
-
-    <section>
-        <div class="flex items-center justify-between mb-2.5 px-1">
-            <h2 class="text-sm font-extrabold text-slate-900">内容列表</h2>
-            <span class="text-xs font-bold text-slate-400">{{ entries|length }} 项</span>
-        </div>
-
+    <section aria-label="工具与资料">
         {% if entries %}
-        <div class="space-y-2.5">
-            {% for tool in entries %}
-            <a href="{{ url_for('downloads.detail', item_id=tool.id) }}"
-               class="group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition">
-                <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-slate-100 text-blue-600 flex items-center justify-center overflow-hidden shrink-0">
-                    {% if tool.cover %}
-                    <img src="{{ tool.cover }}" alt="" class="w-full h-full object-cover">
-                    {% else %}
-                    <span class="material-symbols-rounded text-[24px]">{{ tool.icon or 'inventory_2' }}</span>
-                    {% endif %}
-                </div>
-
-                <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2 min-w-0">
-                        <h3 class="text-sm sm:text-base font-extrabold text-slate-950 truncate">{{ tool.name }}</h3>
-                        {% if tool.tag %}
-                        <span class="hidden sm:inline-flex text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100 shrink-0">{{ tool.tag }}</span>
-                        {% endif %}
-                    </div>
-                    <p class="text-xs sm:text-sm text-slate-500 truncate mt-0.5">{{ tool.description }}</p>
-                </div>
-
-                <div class="hidden sm:flex items-center gap-3 text-[11px] font-bold text-slate-400 shrink-0">
-                    {% if tool.version %}<span>v{{ tool.version|replace('v', '') }}</span>{% endif %}
-                    {% if tool.updated_at %}<span>{{ tool.updated_at }}</span>{% endif %}
-                </div>
-                <span class="material-symbols-rounded text-slate-300 group-hover:text-blue-600 transition shrink-0">chevron_right</span>
-            </a>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+            {% for item in entries %}
+            <button type="button" data-download-name="{{ item.name }}" aria-haspopup="dialog" aria-controls="download-dialog"
+                    class="group w-full flex items-center gap-3 p-4 sm:p-5 text-left bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                <span class="material-symbols-rounded text-[25px] w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0" aria-hidden="true">{{ item.icon or 'inventory_2' }}</span>
+                <span class="min-w-0 flex-1">
+                    <span class="block text-sm sm:text-base font-extrabold text-slate-950 break-words">{{ item.name }}</span>
+                    {% if item.tag %}<span class="inline-flex mt-1.5 text-[10px] font-bold text-slate-400">{{ item.tag }}</span>{% endif %}
+                </span>
+                <span class="material-symbols-rounded text-[20px] text-slate-300 group-hover:text-blue-600 transition shrink-0" aria-hidden="true">arrow_outward</span>
+            </button>
             {% endfor %}
         </div>
         {% else %}
         <div class="text-center py-12 bg-white rounded-2xl border border-slate-200 border-dashed">
             <span class="material-symbols-rounded text-5xl text-slate-300 block mb-2">inventory_2</span>
-            <p class="text-sm font-bold text-slate-700">暂时没有可展示的内容</p>
+            <p class="text-sm font-bold text-slate-700">暂时没有可展示的资料</p>
         </div>
         {% endif %}
     </section>
+
+    <dialog id="download-dialog" aria-labelledby="download-dialog-title" class="bg-white text-slate-900 shadow-2xl">
+        <div class="p-5 sm:p-6">
+            <div class="flex items-start justify-between gap-4 mb-5">
+                <div class="min-w-0">
+                    <p class="text-xs font-bold text-blue-600 mb-1">获取资料</p>
+                    <h2 id="download-dialog-title" class="text-lg font-extrabold break-words">选择下载方式</h2>
+                </div>
+                <form method="dialog">
+                    <button type="submit" aria-label="关闭下载弹窗" autofocus
+                            class="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                        <span class="material-symbols-rounded text-[20px]" aria-hidden="true">close</span>
+                    </button>
+                </form>
+            </div>
+            <div class="space-y-3">
+                {% for option in download_options %}
+                <a href="{{ option.url }}" target="_blank" rel="noopener noreferrer"
+                   class="flex items-center gap-3 p-4 rounded-2xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 {% if option.id == 'quark' %}bg-blue-600 hover:bg-blue-700 border-blue-600 text-white{% else %}bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-800{% endif %}">
+                    <span class="material-symbols-rounded text-[24px]" aria-hidden="true">{{ option.icon or 'open_in_new' }}</span>
+                    <span class="flex-1 font-extrabold text-sm">{{ option.name }}</span>
+                    <span class="material-symbols-rounded text-[18px]" aria-hidden="true">open_in_new</span>
+                </a>
+                {% else %}
+                <p class="text-sm text-slate-500">下载入口暂未配置，请稍后再来。</p>
+                {% endfor %}
+            </div>
+        </div>
+    </dialog>
+    <noscript>
+        <div class="mt-6 flex flex-wrap gap-4">
+            {% for option in download_options %}<a href="{{ option.url }}" target="_blank" rel="noopener noreferrer" class="text-sm font-bold text-blue-600 underline">{{ option.name }}</a>{% endfor %}
+        </div>
+    </noscript>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const downloadDialog = document.getElementById('download-dialog');
+    const downloadTitle = document.getElementById('download-dialog-title');
+    let downloadTrigger = null;
+    document.querySelectorAll('[data-download-name]').forEach(button => {
+        button.addEventListener('click', () => {
+            downloadTrigger = button;
+            downloadTitle.textContent = button.dataset.downloadName;
+            downloadDialog.showModal();
+        });
+    });
+    downloadDialog.addEventListener('close', () => downloadTrigger?.focus());
+    downloadDialog.addEventListener('click', event => {
+        if (event.target !== downloadDialog) return;
+        const bounds = downloadDialog.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) {
+            downloadDialog.close();
+        }
+    });
+</script>
 {% endblock %}

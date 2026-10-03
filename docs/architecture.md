@@ -22,7 +22,7 @@
 | `deck_editor.py` | 卡组编辑与打包 |
 | `level_editor.py` | 关卡数据读取、编辑与打包 |
 | `phantom.py` | 幻影卡牌工坊页面与 API |
-| `downloads.py` | 下载目录、详情、子文件与镜像跳转 |
+| `downloads.py` | 资料卡片列表与共享获取入口 |
 | `version.py` | APK 版本查询接口 |
 | `sponsors.py` | 赞助相关接口 |
 
@@ -95,7 +95,7 @@
 
 最大原/序列化 JSON 与最多节点均来自 FTUE_Node_1_Slim，现有 level_id 最长 39 字符。pack 正文约为最大原 JSON 的 13.7 倍，序列化预算约 14.2 倍、节点约 20 倍，留出 Mod 编辑余量。
 
-下载中心每次从 `data/downloads.json` 加载内容条目，并将所有非空分区合并为统一列表。资源获取不再使用逐文件 GitHub 镜像，而由根节点 `download_options[]` 统一提供夸克网盘和 QQ 群入口。
+下载中心从 `data/downloads.json` 的 `items[]` 加载资料卡片；点击卡片打开原生 dialog，共享 `download_options[]` 中的夸克网盘和 QQ 群链接。只维护名称、文件类型与图标；详情页、独立下载 API 和分区结构已移除，sitemap 仅收录下载中心。
 
 ## 运行约束
 
