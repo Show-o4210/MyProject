@@ -5,10 +5,8 @@ from unittest.mock import Mock, patch
 
 from flask import Flask
 
-from blueprints.feedback import feedback_bp
 from extensions import init_limiter, limiter
 import security
-from utils.json_requests import init_small_json_limits
 
 
 class ClientIpTests(unittest.TestCase):
@@ -20,16 +18,13 @@ class ClientIpTests(unittest.TestCase):
         security._recent_log_keys.clear()
         self.addCleanup(security._recent_log_keys.clear)
         self.audit = Mock()
-        self.feedback = Mock()
         self.db = Mock()
-        self.db.table.side_effect = {"security_logs": self.audit, "feedbacks": self.feedback}.__getitem__
+        self.db.table.side_effect = {"security_logs": self.audit}.__getitem__
         for target, value in (
             ("security.get_supabase", Mock(return_value=self.db)),
-            ("services.feedback.get_supabase", Mock(return_value=self.db)),
             ("security.BLOCKED_IPS", {self.BLOCKED}),
             ("security.TRUSTED_IPS", {self.TRUSTED}),
             ("security.SELF_PING_TOKEN", ""),
-            ("security.ABUSE_TEXT_PATTERNS", []),
             ("security.LOG_DEDUP_SECONDS", 300),
             ("builtins.print", Mock()),
         ):
@@ -40,12 +35,10 @@ class ClientIpTests(unittest.TestCase):
         self.app = Flask(__name__)
         self.app.testing = True
         self.app.config["MAX_CONTENT_LENGTH"] = 150 * 1024 * 1024
-        init_small_json_limits(self.app)
         security.init_security_handlers(self.app)
         init_limiter(self.app)
         limiter.reset()
         self.addCleanup(limiter.reset)
-        self.app.register_blueprint(feedback_bp)
 
         @self.app.route("/identity")
         @limiter.limit("2 per hour")
@@ -149,7 +142,7 @@ class ClientIpTests(unittest.TestCase):
 
     def test_cf_blocked_response_variants_and_dedup_remain(self):
         for path, method, status in (("/admin/probe", "GET", 403),
-                                     ("/api/feedback/submit", "POST", 200), ("/page", "GET", 404)):
+                                     ("/page", "POST", 200), ("/page", "GET", 404)):
             for _ in range(5):
                 response = self.send(path, method=method, headers={
                     "CF-Connecting-IP": self.BLOCKED, "X-Forwarded-For": self.TRUSTED,
@@ -157,7 +150,6 @@ class ClientIpTests(unittest.TestCase):
                 self.assertEqual(response.status_code, status)
                 if method == "POST":
                     self.assertEqual(response.get_json(), {"ok": True, "message": "提交成功"})
-        self.feedback.insert.assert_not_called()
         self.assertEqual(self.audit.insert.call_count, 3)  # 三个 reason 各自去重
 
     def test_configured_ipv6_block_uses_same_canonical_form(self):
@@ -176,25 +168,15 @@ class ClientIpTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.audit.insert.assert_not_called()
 
-    def test_feedback_and_audit_store_same_canonical_ip(self):
-        response = self.send("/api/feedback/submit", method="POST", json={"content": "测试反馈"},
+    def test_identity_and_audit_store_same_canonical_ip(self):
+        response = self.send("/identity",
                              headers={"User-Agent": "", "CF-Connecting-IP": "2001:0DB8:0:0:0:0:0:7",
                                       "X-Forwarded-For": self.TRUSTED})
         self.assertEqual(response.status_code, 200)
-        self.feedback.insert.assert_called_once()
-        self.audit.insert.assert_called_once()  # 空 UA 只记录，不阻止正常反馈
-        self.assertEqual(self.feedback.insert.call_args.args[0]["ua_info"]["ip"], "2001:db8::7")
+        self.audit.insert.assert_called_once()  # 空 UA 只记录，不阻止正常请求
+        self.assertEqual(response.get_json()["ip"], "2001:db8::7")
         self.assertEqual(self.audit.insert.call_args.args[0]["ip"], "2001:db8::7")
         self.assertFalse(self.audit.insert.call_args.args[0]["blocked"])
-
-    def test_feedback_fallback_attribution_and_three_per_hour_limit(self):
-        statuses = [self.send("/api/feedback/submit", method="POST", json={"content": "反馈"},
-                              headers={"CF-Connecting-IP": "invalid", "X-Forwarded-For": f"203.0.113.{n}"})
-                    .status_code for n in range(4)]
-        self.assertEqual(statuses, [200, 200, 200, 429])
-        self.assertEqual(self.feedback.insert.call_count, 3)
-        for call in self.feedback.insert.call_args_list:
-            self.assertEqual(call.args[0]["ua_info"]["ip"], self.PEER)
 
 
 if __name__ == "__main__":

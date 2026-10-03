@@ -1,167 +1,31 @@
-"""小 JSON 接口回归：低阈值、WSGI 请求流、数据库 mock 和真实底包。"""
+"""关卡 JSON 接口回归：低阈值、WSGI 请求流、Unity mock 和真实底包。"""
 
 import io
 import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from flask import Flask, request
 import UnityPy
 
-from blueprints import feedback, level_editor
-from extensions import UNITY_TASK_LOCK, init_limiter, limiter
-import security
+from blueprints import level_editor
+from extensions import UNITY_TASK_LOCK
 from utils import json_requests as limits
 
 
-FEEDBACK = "/api/feedback/submit"
 PACK = "/api/editor/ab/pack"
 EXTRACT = "/api/editor/ab/extract"
-HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 
-def test_app(blueprint, with_security=False):
+def test_app(blueprint):
     app = Flask(__name__)
     app.testing = True
     app.config["MAX_CONTENT_LENGTH"] = 150 * 1024 * 1024
     limits.init_small_json_limits(app)
-    if with_security:
-        security.init_security_handlers(app)
-        init_limiter(app)
     app.register_blueprint(blueprint)
     return app
-
-
-class FeedbackTests(unittest.TestCase):
-    def setUp(self):
-        for target, value in (
-            ("security.BLOCKED_IPS", set()), ("security.TRUSTED_IPS", set()),
-            ("security.ABUSE_TEXT_PATTERNS", []),
-            ("security.get_supabase", Mock()),
-        ):
-            patcher = patch(target, value)
-            patcher.start()
-            self.addCleanup(patcher.stop)
-        self.db = Mock()
-        patcher = patch("services.feedback.get_supabase", return_value=self.db)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        self.app = test_app(feedback.feedback_bp, with_security=True)
-        limiter.reset()
-        self.addCleanup(limiter.reset)
-        self.client = self.app.test_client()
-        self.insert = self.db.table.return_value.insert
-
-    def post(self, **kwargs):
-        return self.client.post(FEEDBACK, headers=HEADERS, **kwargs)
-
-    def test_normal_feedback_and_minimal_supabase_insert(self):
-        result = self.post(json={"type": "bug", "content": "发现问题", "contact": "邮箱"})
-        self.assertEqual(result.status_code, 200)
-        self.assertTrue(result.json["ok"])
-        self.db.table.assert_called_once_with("feedbacks")
-        row = self.insert.call_args.args[0]
-        self.assertEqual(row["content"], "发现问题")
-        self.assertEqual(row["status"], "pending")
-        self.assertEqual(self.insert.call_args.kwargs["returning"], "minimal")
-        self.insert.return_value.execute.assert_called_once()
-
-    def test_maximum_normal_fields_including_escaped_unicode(self):
-        # 补充平面 Unicode 的 JSON 转义每字符 12 字节，仍远低于 16 KiB。
-        data = {"type": "feature", "content": "😀" * 500, "contact": "😀" * 100}
-        body = json.dumps(data).encode()
-        self.assertLess(len(body), limits.JSON_BODY_LIMITS["feedback.submit_feedback"])
-        result = self.post(data=body, content_type="application/json")
-        self.assertEqual(result.status_code, 200)
-        self.assertEqual(self.insert.call_args.args[0]["content"], data["content"])
-
-    def test_each_field_requires_string(self):
-        for field in ("type", "content", "contact"):
-            for value in ([], {}, ["bug"], 1, True, None):
-                with self.subTest(field=field, value=value):
-                    limiter.reset()
-                    data = {"type": "bug", "content": "有效", "contact": ""}
-                    data[field] = value
-                    result = self.post(json=data)
-                    self.assertEqual(result.status_code, 400)
-                    self.assertIn("字符串", result.json["error"])
-        self.insert.assert_not_called()
-
-    def test_whitelist_and_field_lengths_remain(self):
-        for data in (
-            {"content": "字" * 501}, {"content": "有效", "contact": "字" * 101},
-            {"content": "有效", "type": "unknown"}, {"content": " "},
-        ):
-            with self.subTest(data=data):
-                limiter.reset()
-                self.assertEqual(self.post(json=data).status_code, 400)
-        self.insert.assert_not_called()
-
-    def test_invalid_json_and_root_return_chinese_400(self):
-        for body in (b"{", b"[]", b"null"):
-            with self.subTest(body=body):
-                result = self.post(data=body, content_type="application/json")
-                self.assertEqual(result.status_code, 400)
-                self.assertIn("JSON", result.json["error"])
-        self.insert.assert_not_called()
-
-    def test_body_limit_precedes_security_json_parse_and_business(self):
-        with patch.dict(limits.JSON_BODY_LIMITS, {"feedback.submit_feedback": 64}), \
-                patch.object(self.app.json, "loads", wraps=self.app.json.loads) as parse, \
-                patch.object(feedback, "create_feedback") as create:
-            result = self.post(data=b'{"content":"' + b"a" * 80 + b'"}',
-                               content_type="application/json")
-            self.assertEqual(result.status_code, 413)
-            parse.assert_not_called()
-            create.assert_not_called()
-        self.assertIn("过大", result.json["error"])
-
-    def test_stream_limit_without_or_with_false_content_length(self):
-        for content_length in ("", "10"):
-            with self.subTest(content_length=content_length):
-                limiter.reset()
-                stream = io.BytesIO(b'{"content":"' + b"a" * 80 + b'"}')
-                with patch.dict(limits.JSON_BODY_LIMITS, {"feedback.submit_feedback": 64}), \
-                        patch.object(feedback, "create_feedback") as create:
-                    result = self.post(content_type="application/json", environ_overrides={
-                        "wsgi.input": stream, "wsgi.input_terminated": True,
-                        "CONTENT_LENGTH": content_length,
-                    })
-                    self.assertEqual(result.status_code, 413)
-                    self.assertLessEqual(stream.tell(), 64)
-                    create.assert_not_called()
-
-    def test_three_per_hour_is_preserved(self):
-        for _ in range(3):
-            self.assertEqual(self.post(json={"content": "反馈"}).status_code, 200)
-        result = self.post(json={"content": "反馈"})
-        self.assertEqual(result.status_code, 429)
-        self.assertEqual(self.insert.call_count, 3)
-
-    def test_storage_error_classification_is_preserved(self):
-        self.insert.return_value.execute.side_effect = RuntimeError("permission denied 42501")
-        result = self.post(json={"content": "反馈"})
-        self.assertEqual(result.status_code, 503)
-        self.assertEqual(result.json["code"], "PERMISSION_DENIED")
-
-    def test_blocked_feedback_still_returns_shadow_success(self):
-        with patch("security.BLOCKED_IPS", {"127.0.0.1"}), \
-                patch.dict(limits.JSON_BODY_LIMITS, {"feedback.submit_feedback": 64}):
-            result = self.post(data=b"x" * 100, content_type="application/json")
-        self.assertEqual(result.status_code, 200)
-        self.assertEqual(result.json, {"ok": True, "message": "提交成功"})
-        self.insert.assert_not_called()
-
-    def test_global_upload_limit_is_unchanged(self):
-        self.app.add_url_rule("/upload", "upload", lambda: request.get_data(),
-                              methods=["POST"])
-        with patch.dict(limits.JSON_BODY_LIMITS, {"feedback.submit_feedback": 64}):
-            result = self.client.post("/upload", data=b"x" * 1024, headers=HEADERS)
-        self.assertEqual(result.status_code, 200)
-        self.assertEqual(len(result.data), 1024)
-        self.assertEqual(self.app.config["MAX_CONTENT_LENGTH"], 150 * 1024 * 1024)
 
 
 class LevelRequestTests(unittest.TestCase):
@@ -210,6 +74,15 @@ class LevelRequestTests(unittest.TestCase):
         self.mkdtemp.assert_not_called()
         self.assertFalse(UNITY_TASK_LOCK.locked())
         self.assertEqual(list(Path(self.temp.name).iterdir()), [])
+
+    def test_global_upload_limit_is_unchanged(self):
+        self.app.add_url_rule("/upload", "upload", lambda: request.get_data(),
+                              methods=["POST"])
+        with patch.dict(limits.JSON_BODY_LIMITS, {"level_editor.pack_level": 64}):
+            result = self.client.post("/upload", data=b"x" * 1024)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.data), 1024)
+        self.assertEqual(self.app.config["MAX_CONTENT_LENGTH"], 150 * 1024 * 1024)
 
     def test_oversized_body_before_parse_load_or_lock(self):
         with patch.dict(limits.JSON_BODY_LIMITS, {"level_editor.pack_level": 64}), \

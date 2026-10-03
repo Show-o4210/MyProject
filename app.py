@@ -16,7 +16,6 @@ from blueprints.home import home_bp
 from blueprints.deck_editor import deck_editor_bp
 from blueprints.downloads import downloads_bp
 from blueprints.level_editor import level_editor_bp
-from blueprints.feedback import feedback_bp
 from blueprints.phantom import phantom_bp
 from blueprints.version import version_bp
 from blueprints.sponsors import sponsors_bp
@@ -110,7 +109,6 @@ app.register_blueprint(deck_editor_bp)
 app.register_blueprint(home_bp)
 app.register_blueprint(unity_bp)
 app.register_blueprint(level_editor_bp)
-app.register_blueprint(feedback_bp)
 app.register_blueprint(phantom_bp)
 app.register_blueprint(version_bp)
 app.register_blueprint(sponsors_bp)

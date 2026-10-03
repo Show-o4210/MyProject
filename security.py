@@ -18,7 +18,7 @@ import time
 设计原则：
 1. 对明确恶意 IP 直接封禁。
 2. 不再把 Edg/148.0.0.0 当成恶意特征，因为这可能误伤正常浏览器。
-3. 对留言/反馈等提交类接口采用“影子封禁”：返回成功，但实际不进入业务逻辑。
+3. 对提交类请求采用“影子封禁”：返回成功，但实际不进入业务逻辑。
 4. 对后台、统计、上传等敏感接口硬拦截。
 5. 命中写入 security_logs，同一 IP+reason 按时间窗口去重，方便取证并限制写入。
 6. 进程内自唤醒（KeepAlive）不得被当成外部脚本攻击。
@@ -70,12 +70,6 @@ TRUSTED_IPS = parse_ip_list(os.getenv("SECURITY_TRUSTED_IPS", ""))
 SELF_PING_UA_PREFIX = "PVZH-KeepAlive/"
 SELF_PING_TOKEN = os.getenv("SELF_PING_TOKEN", "").strip()
 
-# 提交类接口：命中封禁时返回“假成功”，避免对方知道自己被拦截
-# 你可以按实际蓝图路径继续补充
-SHADOW_BAN_PATH_KEYWORDS = [
-    "/feedback",
-]
-
 # 敏感接口：命中封禁时直接拒绝
 SENSITIVE_PATH_KEYWORDS = [
     "/admin",
@@ -105,13 +99,6 @@ EXCLUDED_EXACT_PATHS = {
     "/thanks.txt",
     "/api/thanks",
 }
-
-# 可选：内容辱骂词/垃圾词检测。
-# 不建议写太宽，否则会误杀正常留言。
-ABUSE_TEXT_PATTERNS = [
-    # r"辱骂关键词1",
-    # r"辱骂关键词2",
-]
 
 # 可选：UA 异常规则。只做辅助加分/记录，不单独作为封禁依据。
 SUSPICIOUS_UA_PATTERNS = {
@@ -170,13 +157,13 @@ def resolve_client_ip():
 
 
 def get_visitor_info():
-    """安全检查、审计和反馈归属共用的规范 IP 与 UA。"""
+    """安全检查和审计共用的规范 IP 与 UA。"""
     user_agent = request.headers.get("User-Agent", "") or ""
     return resolve_client_ip(), user_agent
 
 
 def visitor_ip_key():
-    """Flask-Limiter 与安全检查、反馈和审计共用同一个规范 IP。"""
+    """Flask-Limiter 与安全检查和审计共用同一个规范 IP。"""
     return resolve_client_ip()
 
 
@@ -203,31 +190,6 @@ def detect_suspicious_ua(user_agent):
         if re.search(config["pattern"], user_agent, re.IGNORECASE):
             return key, config
     return None, None
-
-
-def get_request_text_sample(max_len=500):
-    """
-    尝试提取提交内容样本，用于日志与辱骂检测。
-    注意：这里只取短样本，避免日志过大。
-    """
-    try:
-        if request.is_json:
-            payload = request.get_json(silent=True) or {}
-            text = str(payload)
-        else:
-            text = " ".join([str(v) for v in request.form.values()])
-        return text[:max_len]
-    except Exception:
-        return ""
-
-
-def contains_abuse_text(text):
-    if not text:
-        return False
-    for pattern in ABUSE_TEXT_PATTERNS:
-        if re.search(pattern, text, re.IGNORECASE):
-            return True
-    return False
 
 
 def _should_skip_dedup_log(ip: str, reason: str) -> bool:
@@ -316,7 +278,7 @@ def log_security_event(ip, user_agent, reason, severity="medium", blocked=True):
 def fake_success_response():
     """
     影子封禁响应：让对方以为提交成功。
-    与正常反馈成功契约对齐：{ ok: true, message: "..." }
+    返回统一的提交成功响应：{ ok: true, message: "..." }
     """
     return make_response(jsonify({
         "ok": True,
@@ -359,7 +321,7 @@ def security_check():
             return forbidden_response()
 
         # 提交类接口：影子封禁，返回假成功，不进入后续业务逻辑
-        if method in {"POST", "PUT", "PATCH", "DELETE"} or path_matches(path, SHADOW_BAN_PATH_KEYWORDS):
+        if method in {"POST", "PUT", "PATCH", "DELETE"}:
             log_security_event(ip, user_agent, reason + " / shadow_banned", severity="high", blocked=True)
             return fake_success_response()
 
@@ -388,13 +350,6 @@ def security_check():
 
         # 空 UA 等：仅记录
         log_security_event(ip, user_agent, ua_config["description"], severity=ua_config["severity"], blocked=False)
-
-    # 3. 内容辱骂检测：只对提交类请求检查
-    if method in {"POST", "PUT", "PATCH"} and path_matches(path, SHADOW_BAN_PATH_KEYWORDS):
-        text_sample = get_request_text_sample()
-        if contains_abuse_text(text_sample):
-            log_security_event(ip, user_agent, "abusive_text_detected", severity="high", blocked=True)
-            return fake_success_response()
 
     return None
 

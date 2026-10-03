@@ -30,7 +30,6 @@ class SecurityAuditTests(unittest.TestCase):
             ("security.BLOCKED_IPS", {self.BLOCKED_IP}),
             ("security.TRUSTED_IPS", set()),
             ("security.SELF_PING_TOKEN", ""),
-            ("security.ABUSE_TEXT_PATTERNS", ["test-abuse"]),
             ("security._supabase_log_fail_count", 0),
             ("security._supabase_log_last_warn", 0.0),
             ("builtins.print", Mock()),
@@ -74,9 +73,9 @@ class SecurityAuditTests(unittest.TestCase):
     def test_repeated_shadow_bans_keep_fake_success_with_one_insert(self):
         for index in range(450):
             method, path = (
-                ("GET", "/feedback"), ("POST", "/feedback"),
+                ("POST", "/submit"),
                 ("PUT", "/submit"), ("PATCH", "/submit"), ("DELETE", "/submit"),
-            )[index % 5]
+            )[index % 4]
             response = self.request(path, method)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.get_json(), {"ok": True, "message": "提交成功"})
@@ -98,7 +97,7 @@ class SecurityAuditTests(unittest.TestCase):
     def test_distinct_blocked_reasons_have_separate_windows(self):
         for _ in range(20):
             self.request("/admin")
-            self.request("/feedback", "POST")
+            self.request("/submit", "POST")
             self.request("/page")
         self.assertEqual(self.insert.call_count, 3)
         self.assertEqual(self.execute.call_count, 3)
@@ -187,13 +186,12 @@ class SecurityAuditTests(unittest.TestCase):
         for ip, path, headers, kwargs, status in (
             ("192.0.2.1", "/admin", {"User-Agent": ""}, {}, 403),
             ("192.0.2.2", "/page", {"User-Agent": "curl/8.0"}, {}, 403),
-            ("192.0.2.3", "/feedback", self.HEADERS, {"json": {"text": "test-abuse"}}, 200),
         ):
             with self.subTest(ip=ip):
                 for _ in range(20):
                     response = self.request(path, "POST", ip=ip, headers=headers, **kwargs)
                     self.assertEqual(response.status_code, status)
-        self.assertEqual(self.execute.call_count, 3)
+        self.assertEqual(self.execute.call_count, 2)
         self.route.assert_not_called()
 
     def test_excluded_and_trusted_requests_still_skip_auditing(self):

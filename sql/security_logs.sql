@@ -6,7 +6,7 @@
 --   [SECURITY] Failed to log to Supabase:
 --   {'message': 'permission denied for table security_logs', 'code': '42501', ...}
 -- 原因几乎总是：表未建 / RLS 未开策略 / 未 GRANT INSERT 给 anon。
--- 后端 SUPABASE_KEY 使用 anon key 写入（与 feedbacks 相同模式）。
+-- 后端 SUPABASE_KEY 使用 anon key 写入。
 --
 -- 会 DROP 旧表后重建（旧审计数据会清空；需保留请先导出）。
 -- =============================================================================

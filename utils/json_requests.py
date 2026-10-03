@@ -8,7 +8,6 @@ from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
 
 JSON_BODY_LIMITS = {
-    "feedback.submit_feedback": 16 * 1024,
     "level_editor.pack_level": 128 * 1024,
     "level_editor.extract_level": 4 * 1024,
 }
@@ -26,11 +25,6 @@ class JsonInputError(Exception):
 
 
 def json_error_response(error):
-    if request.endpoint == "feedback.submit_feedback":
-        return jsonify({
-            "ok": False, "error": str(error),
-            "code": "REQUEST_TOO_LARGE" if error.status == 413 else "VALIDATION_ERROR",
-        }), error.status
     return jsonify({"status": "error", "message": str(error)}), error.status
 
 
@@ -43,8 +37,8 @@ def apply_json_body_limit():
 
 
 def init_small_json_limits(app):
-    # 必须先于安全钩子注册：安全采样也可能调用 get_json()。
-    # 此处只设置流限制，保留已封禁请求的提前响应行为。
+    # 此处只设置流限制，在后续钩子读取正文前生效。
+    # 保留已封禁请求的提前响应行为。
     app.before_request(apply_json_body_limit)
 
     @app.errorhandler(RequestEntityTooLarge)

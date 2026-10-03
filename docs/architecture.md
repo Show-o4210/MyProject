@@ -7,7 +7,6 @@
 主要分层如下：
 
 - `blueprints/`：HTTP 路由、请求解析和页面渲染。
-- `services/`：与路由解耦的业务逻辑，目前主要承载反馈提交。
 - `logic_*.py`：Unity 底包和关卡等领域逻辑。
 - `utils/`：卡牌索引、JSON 清洗和数据读取。
 - `data/`：运行时配置、下载目录、卡牌数据和 Unity 底包。
@@ -24,7 +23,6 @@
 | `level_editor.py` | 关卡数据读取、编辑与打包 |
 | `phantom.py` | 幻影卡牌工坊页面与 API |
 | `downloads.py` | 下载目录、详情、子文件与镜像跳转 |
-| `feedback.py` | 反馈页面和提交接口 |
 | `version.py` | APK 版本查询接口 |
 | `sponsors.py` | 赞助相关接口 |
 
@@ -79,11 +77,11 @@
 
 这些预算限制补丁输入的资源放大，但不能保证 UnityPy 加载压缩 Bundle、构建对象以及 `env.file.save()` 生成完整 bytes 时的峰值内存。普通上传仍受 150 MiB 请求上限，以及回填的 140 MiB 原文件 / 90 MiB ZIP 上限约束；原文件槽拒绝直接 ZIP，避免进入 UnityPy 自动 ZIP 解压。资源受限子进程可以作为将来需要强隔离时的方案，本轮没有引入后台任务或子进程。
 
-反馈由蓝图校验 HTTP 输入，再交给 `services/feedback.py` 写入 Supabase。安全层负责真实访客 IP、黑名单、可疑请求处理和审计日志。
+安全层负责真实访客 IP、黑名单、可疑请求处理和审计日志。
 
-小型 JSON 请求预算集中于 `utils/json_requests.py`，依赖 Flask >= 3.1 的每请求 `max_content_length`，在安全钩子可能读取正文前设置。`POST /api/feedback/submit` 上限 16 KiB；`POST /api/editor/ab/extract` 上限 4 KiB；`POST /api/editor/ab/pack` 上限 128 KiB，不降低全局 150 MiB 上传上限。Content-Length 仅作辅助拒绝，实际读取使用 Werkzeug 受限流。WSGI 服务器标记 `wsgi.input_terminated` 的流达到预算即返回中文 413（恰好等于预算也保守拒绝），避免把 `readall()` 返回的截断正文当作完整 JSON；未标记终止且没有 Content-Length 时遵循 Werkzeug 的安全空流行为。已封禁请求仍保留安全层的提前响应。
+小型 JSON 请求预算集中于 `utils/json_requests.py`，依赖 Flask >= 3.1 的每请求 `max_content_length`，在读取正文前设置。`POST /api/editor/ab/extract` 上限 4 KiB；`POST /api/editor/ab/pack` 上限 128 KiB，不降低全局 150 MiB 上传上限。Content-Length 仅作辅助拒绝，实际读取使用 Werkzeug 受限流。WSGI 服务器标记 `wsgi.input_terminated` 的流达到预算即返回中文 413（恰好等于预算也保守拒绝），避免把 `readall()` 返回的截断正文当作完整 JSON；未标记终止且没有 Content-Length 时遵循 Werkzeug 的安全空流行为。已封禁请求仍保留安全层的提前响应。
 
-反馈 type/content/contact 均要求字符串，保留类型白名单、500/100 字和 3/hour 限流。关卡 config 必须是非空对象：根深度为 1，最多 32 层、20000 节点（键和值均计数）、单个键或字符串值 4096 字符、保持原四空格缩进后最多 256 KiB UTF-8；level_id 为非空字符串、最长 128 字符。遍历使用迭代器栈，序列化分段计数；超预算中文 413，参数或 JSON 格式错误中文 400。请求体解析、参数/结构预算和序列化均先于 Unity 锁；目标查找与写入共用一次 UnityPy.load。异常释放锁并清理目录，成功在下载流关闭后清理。UnityPy 加载与完整 Bundle 输出的峰值内存风险仍见上文。
+关卡 config 必须是非空对象：根深度为 1，最多 32 层、20000 节点（键和值均计数）、单个键或字符串值 4096 字符、保持原四空格缩进后最多 256 KiB UTF-8；level_id 为非空字符串、最长 128 字符。遍历使用迭代器栈，序列化分段计数；超预算中文 413，参数或 JSON 格式错误中文 400。请求体解析、参数/结构预算和序列化均先于 Unity 锁；目标查找与写入共用一次 UnityPy.load。异常释放锁并清理目录，成功在下载流关闭后清理。UnityPy 加载与完整 Bundle 输出的峰值内存风险仍见上文。
 
 默认预算基线：2026-10-02 随项目提供的 `data/data_assets_44` 中含 PlayerConfig / BoardConfig 的 1065 份 TextAsset 关卡 JSON，统计无解析失败。下表分位数取排序后向下取整的位置；字符串长度包含对象键，节点包含对象键和值。
 
@@ -95,7 +93,7 @@
 | 节点 | 216 | 252 | 288 | 988 | 20000 |
 | 最长字符串字符数 | 36 | 42 | 45 | 56 | 4096 |
 
-最大原/序列化 JSON 与最多节点均来自 FTUE_Node_1_Slim，现有 level_id 最长 39 字符。pack 正文约为最大原 JSON 的 13.7 倍，序列化预算约 14.2 倍、节点约 20 倍，留出 Mod 编辑余量；16 KiB 反馈正文也容纳 600 个补充平面 Unicode 字符以 JSON 转义提交的约 7.2 KiB 正文。
+最大原/序列化 JSON 与最多节点均来自 FTUE_Node_1_Slim，现有 level_id 最长 39 字符。pack 正文约为最大原 JSON 的 13.7 倍，序列化预算约 14.2 倍、节点约 20 倍，留出 Mod 编辑余量。
 
 下载中心每次从 `data/downloads.json` 加载内容条目，并将所有非空分区合并为统一列表。资源获取不再使用逐文件 GitHub 镜像，而由根节点 `download_options[]` 统一提供夸克网盘和 QQ 群入口。
 

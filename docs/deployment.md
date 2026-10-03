@@ -32,7 +32,7 @@ gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --ma
 
 以 `.env.example` 为基准在部署平台配置变量，不要上传真实 `.env`。
 
-- 反馈和安全日志需要 `SUPABASE_URL` 与 `SUPABASE_KEY`。
+- 安全日志需要 `SUPABASE_URL` 与 `SUPABASE_KEY`。
 - 自定义域名应设置 `SITE_BASE_URL`，避免 sitemap 继续输出默认域名。
 - 如启用进程内自唤醒，`SELF_PING_URL` 必须指向本站 `/health`；可同时设置 `SELF_PING_TOKEN`。
 
@@ -40,10 +40,9 @@ gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --ma
 
 按功能执行：
 
-- `sql/feedbacks.sql`：创建反馈表、RLS 和 INSERT-only 权限。
 - `sql/security_logs.sql`：创建安全审计表及写入权限。
 
-后端使用 anon key 时，插入操作不能依赖插入后的 SELECT 回读。当前反馈服务已按 `returning=minimal` 约定处理。
+后端使用 anon key 时，插入操作不能依赖插入后的 SELECT 回读。安全审计已按 `returning=minimal` 约定处理。
 
 ## SEO
 
@@ -66,5 +65,5 @@ python scripts/generate_sitemap.py
 - `/robots.txt` 和 `/sitemap.xml` 使用正确公网域名。
 - 首页、下载中心和主要编辑器页面可以打开。
 - 下载跳转与 GitHub 镜像列表正常。
-- 配置 Supabase 后，反馈提交和安全日志写入正常。
+- 配置 Supabase 后，安全日志写入正常。
 
