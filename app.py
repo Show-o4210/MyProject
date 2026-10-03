@@ -14,9 +14,6 @@ from utils.json_requests import init_small_json_limits
 from blueprints.unity import unity_bp
 from blueprints.home import home_bp
 from blueprints.deck_editor import deck_editor_bp
-from blueprints.card_sender import card_sender_bp
-from blueprints.pack_buyer import pack_buyer_bp
-from blueprints.ea_tools import ea_tools_bp
 from blueprints.downloads import downloads_bp
 from blueprints.level_editor import level_editor_bp
 from blueprints.feedback import feedback_bp
@@ -109,9 +106,6 @@ scheduler.start()
 # --- 唤醒逻辑结束 ---
 
 app.register_blueprint(downloads_bp)
-app.register_blueprint(pack_buyer_bp)
-app.register_blueprint(card_sender_bp)
-app.register_blueprint(ea_tools_bp)
 app.register_blueprint(deck_editor_bp)
 app.register_blueprint(home_bp)
 app.register_blueprint(unity_bp)

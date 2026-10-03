@@ -7,7 +7,6 @@
 - Unity AssetBundle 轻量检查、按需导出与补丁回填
 - 卡组编辑器和关卡编辑器
 - 幻影卡牌工坊
-- 可扩展的 EA 账号工具工作台（卡牌发送、卡包购买、账号库存与未开卡包查验）
 - 使用紧凑内容列表，并通过夸克网盘或 QQ 群统一获取资源的下载中心
 - 意见反馈、赞助名单、版本查询和基础安全审计
 
@@ -79,8 +78,6 @@ python app.py
 
 默认访问地址为 <http://127.0.0.1:5001>。反馈和安全日志依赖 Supabase；未配置 Supabase 时，其余不依赖数据库的页面和工具仍可使用。
 
-EA 账号工具统一入口为 `/ea-tools`，整合了卡牌发送、卡包购买与库存查验三大功能。`/card-sender` 与 `/pack-buyer` 仅作为旧链接兼容入口；卡包列表使用精简规范的 JSON 格式 (`data/packs.json`)。
-
 Windows 下也可以运行 `开始.bat`，但首次运行前仍需安装依赖并配置 `.env`。
 
 ## 配置
@@ -96,7 +93,6 @@ Windows 下也可以运行 `开始.bat`，但首次运行前仍需安装依赖�
 | `SECURITY_TRUSTED_IPS` | 可信 IP，英文逗号分隔 | 可选 |
 | `SELF_PING_URL` | Render 自唤醒地址，应指向 `/health` | 部署时可选 |
 | `SELF_PING_TOKEN` | 自唤醒请求令牌 | 可选 |
-| `PVZH_*` | EA/PopCap 客户端参数 | 使用送卡或买包功能时可选 |
 | `SITE_BASE_URL` | sitemap 使用的公网根地址 | 自定义域名时建议设置 |
 
 不要提交真实 `.env`、访问令牌或用户凭据。
@@ -135,8 +131,6 @@ MyProject/
 ```
 
 维护关卡编辑器底包时，请保持 `data_assets_<数字版本>` 的命名格式。若 `data/` 中暂时保留多个版本，编辑器会自动使用数字版本最高的一个；非数字后缀文件不会参与选择。
-
-EA/PopCap 请求的 Header、上游调用和响应解析集中在 `logic_ea_api.py`。新增 EA API 业务时，应复用该公共层，并为每个业务保留独立的输入校验与 API 路由；统一页面入口由 `blueprints/ea_tools.py` 和 `templates/ea_tools.html` 承载。
 
 更详细的模块关系见 [架构说明](docs/architecture.md)。下载内容维护见 [下载中心维护指南](docs/downloads.md)，部署与运维见 [部署说明](docs/deployment.md)，历史变更见 [CHANGELOG](docs/CHANGELOG.md)。
 

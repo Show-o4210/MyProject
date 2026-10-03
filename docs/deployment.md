@@ -35,7 +35,6 @@ gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --ma
 - 反馈和安全日志需要 `SUPABASE_URL` 与 `SUPABASE_KEY`。
 - 自定义域名应设置 `SITE_BASE_URL`，避免 sitemap 继续输出默认域名。
 - 如启用进程内自唤醒，`SELF_PING_URL` 必须指向本站 `/health`；可同时设置 `SELF_PING_TOKEN`。
-- EA/PopCap 相关默认参数可通过 `PVZH_*` 覆盖。
 
 ## Supabase
 

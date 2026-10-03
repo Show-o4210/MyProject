@@ -1,5 +1,5 @@
 # render.yaml
-# Free 套餐约 512MB：workers 保持 1；threads 分担 I/O（送卡/买包等出站请求）。
+# Free 套餐约 512MB：workers 保持 1；threads 分担 I/O 请求。
 # max-requests 不宜过低（旧值 50 会几乎每分钟换 worker，加重冷启动与 500 毛刺）。
 # 若 Dashboard 里自定义了 Start Command，请同步改成下面这一行。
 services:
