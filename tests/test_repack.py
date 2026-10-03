@@ -11,7 +11,6 @@ from unittest.mock import Mock, patch
 import zipfile
 
 from flask import Flask
-from PIL import Image
 import UnityPy
 
 from blueprints import unity
@@ -29,13 +28,6 @@ def small_zip(members):
     return output.getvalue()
 
 
-def small_png(size=(2, 2)):
-    output = io.BytesIO()
-    with Image.new("RGBA", size, (12, 34, 56, 255)) as image:
-        image.save(output, "PNG")
-    return output.getvalue()
-
-
 class ZipBudgetTests(unittest.TestCase):
     def metadata(self, names):
         infos = []
@@ -47,7 +39,7 @@ class ZipBudgetTests(unittest.TestCase):
         archive.infolist.return_value = infos
         return archive
 
-    def test_larger_text_metadata_is_accepted_without_relaxing_other_formats(self):
+    def test_text_metadata_limits_reject_before_read(self):
         for name, size in (("_index.json", 10 * limits.MIB),
                            ("a.json", 40 * limits.MIB),
                            ("a.csv", 40 * limits.MIB)):
@@ -60,39 +52,30 @@ class ZipBudgetTests(unittest.TestCase):
                     limits.BoundedZipReader(archive)
                 self.assertEqual(caught.exception.status, 413)
                 archive.open.assert_not_called()
-        for name, size in (("a.dat", 32 * limits.MIB), ("a.raw", 32 * limits.MIB),
-                           ("a.png", 16 * limits.MIB)):
-            with self.subTest(name=name):
-                archive = self.metadata([(name, size + 1, size + 1)])
-                with self.assertRaises(limits.ClientFacingError) as caught:
-                    limits.BoundedZipReader(archive)
-                self.assertEqual(caught.exception.status, 413)
-                archive.open.assert_not_called()
 
-    def test_raw_actual_read_retains_format_cap_below_zip_member_cap(self):
-        archive = self.metadata([("a.dat", 1, 1)])
+    def test_csv_actual_read_retains_format_cap_below_zip_member_cap(self):
+        archive = self.metadata([("a.csv", 1, 1)])
         archive.getinfo.return_value = archive.infolist.return_value[0]
         body = io.BytesIO(b"0123456789")
         archive.open.return_value.__enter__ = Mock(return_value=body)
         archive.open.return_value.__exit__ = Mock(return_value=False)
-        with patch.object(limits, "RAW_MAX_BYTES", 5), patch.object(limits, "ZIP_MAX_MEMBER_BYTES", 10):
+        with patch.object(limits, "CSV_MAX_BYTES", 5), patch.object(limits, "ZIP_MAX_MEMBER_BYTES", 10):
             reader = limits.BoundedZipReader(archive)
             with self.assertRaises(limits.ClientFacingError) as caught:
-                reader.read("a.dat")
+                reader.read("a.csv")
         self.assertEqual(caught.exception.status, 413)
         self.assertEqual(body.tell(), 6)
 
     def test_metadata_rejects_before_any_body_is_opened(self):
         cases = (
-            ("ZIP_MAX_ENTRIES", 1, [("a.dat", 1, 1), ("b.dat", 1, 1)]),
-            ("ZIP_MAX_NAME_CHARS", 3, [("long.dat", 1, 1)]),
-            ("ZIP_MAX_MEMBER_BYTES", 5, [("a.dat", 6, 6)]),
-            ("ZIP_MAX_DECLARED_BYTES", 5, [("a.dat", 3, 3), ("b.dat", 3, 3)]),
-            ("ZIP_MAX_COMPRESSION_RATIO", 2, [("a.dat", 5, 2)]),
+            ("ZIP_MAX_ENTRIES", 1, [("a.csv", 1, 1), ("b.csv", 1, 1)]),
+            ("ZIP_MAX_NAME_CHARS", 3, [("long.csv", 1, 1)]),
+            ("ZIP_MAX_MEMBER_BYTES", 5, [("a.csv", 6, 6)]),
+            ("ZIP_MAX_DECLARED_BYTES", 5, [("a.csv", 3, 3), ("b.csv", 3, 3)]),
+            ("ZIP_MAX_COMPRESSION_RATIO", 2, [("a.csv", 5, 2)]),
             ("INDEX_MAX_BYTES", 5, [("_index.json", 6, 6)]),
             ("JSON_MAX_BYTES", 5, [("a.json", 6, 6)]),
             ("CSV_MAX_BYTES", 5, [("a.csv", 6, 6)]),
-            ("PNG_MAX_BYTES", 5, [("a.png", 6, 6)]),
         )
         for setting, value, entries in cases:
             with self.subTest(setting=setting), patch.object(limits, setting, value):
@@ -103,7 +86,7 @@ class ZipBudgetTests(unittest.TestCase):
                 archive.open.assert_not_called()
 
     def test_directory_limits_precede_zipfile_allocation(self):
-        content = small_zip({"a.dat": b"a", "b.dat": b"b"})
+        content = small_zip({"a.csv": b"a", "b.csv": b"b"})
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / "patch.zip"
             path.write_bytes(content)
@@ -117,7 +100,7 @@ class ZipBudgetTests(unittest.TestCase):
                         constructor.assert_not_called()
 
     def test_actual_member_budget_stops_chunked_read_of_underdeclared_data(self):
-        archive = self.metadata([("a.dat", 1, 1)])
+        archive = self.metadata([("a.csv", 1, 1)])
         archive.getinfo.return_value = archive.infolist.return_value[0]
         body = io.BytesIO(b"0123456789")
         stream = Mock(wraps=body)
@@ -126,27 +109,27 @@ class ZipBudgetTests(unittest.TestCase):
         with patch.object(limits, "ZIP_MAX_MEMBER_BYTES", 5), patch.object(limits, "READ_CHUNK_BYTES", 3):
             reader = limits.BoundedZipReader(archive)
             with self.assertRaises(limits.ClientFacingError) as caught:
-                reader.read("a.dat")
+                reader.read("a.csv")
         self.assertEqual(caught.exception.status, 413)
         self.assertEqual(body.tell(), 6)
         self.assertEqual(reader.total_read, 6)
         self.assertEqual([call.args[0] for call in stream.read.call_args_list], [3, 3])
 
     def test_actual_total_budget_counts_repeated_reads(self):
-        content = small_zip({"a.dat": b"abc"})
+        content = small_zip({"a.csv": b"abc"})
         with zipfile.ZipFile(io.BytesIO(content)) as zf, patch.object(limits, "ZIP_MAX_READ_BYTES", 5):
             reader = limits.BoundedZipReader(zf)
-            self.assertEqual(reader.read("a.dat"), b"abc")
+            self.assertEqual(reader.read("a.csv"), b"abc")
             with self.assertRaises(limits.ClientFacingError) as caught:
-                reader.read("a.dat")
+                reader.read("a.csv")
             self.assertEqual(caught.exception.status, 413)
             self.assertEqual(reader.total_read, 6)
 
     def test_exact_actual_budget_is_accepted(self):
-        content = small_zip({"a.dat": b"abc"})
+        content = small_zip({"a.csv": b"abc"})
         with zipfile.ZipFile(io.BytesIO(content)) as zf, patch.object(limits, "ZIP_MAX_READ_BYTES", 3):
             reader = limits.BoundedZipReader(zf)
-            self.assertEqual(reader.read("a.dat"), b"abc")
+            self.assertEqual(reader.read("a.csv"), b"abc")
             self.assertEqual(reader.total_read, 3)
 
     def test_json_depth_is_rejected_before_parsing(self):
@@ -205,14 +188,6 @@ class ZipBudgetTests(unittest.TestCase):
         for text in ('{"a": 1,,}', '[,]', '{"a":,}', '[1,,]'):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 limits.load_patch_json(text, "补丁")
-
-    def test_pillow_protection_is_retained(self):
-        raw = small_png()
-        with patch.object(Image, "MAX_IMAGE_PIXELS", 2):
-            with self.assertRaises(limits.ClientFacingError) as caught:
-                limits.open_patch_image(raw)
-            self.assertEqual(caught.exception.status, 413)
-            self.assertEqual(Image.MAX_IMAGE_PIXELS, 2)
 
 
 class RepackRouteTests(unittest.TestCase):
@@ -288,26 +263,23 @@ class RepackRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.obj.save_typetree.assert_called_once_with({"m_Name": "修改后"})
 
-    def test_normal_png_repack(self):
-        self.obj.type.name = "Texture2D"
-        saved_images = []
-        data = self.obj.read.return_value
-        data.save.side_effect = lambda: saved_images.append(data.image.copy())
-        response = self.post({"Image_123.png": small_png()})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(saved_images[0].mode, "RGBA")
-        self.assertEqual(saved_images[0].getpixel((0, 0)), (12, 34, 56, 255))
-        saved_images[0].close()
-        data.save.assert_called_once()
-
-    def test_normal_dat_and_raw_repack(self):
-        for extension in ("dat", "raw"):
+    def test_removed_patch_formats_reject_before_bundle_load(self):
+        for extension in ("png", "dat", "raw", "txt"):
             with self.subTest(extension=extension):
-                self.obj.reset_mock()
-                response = self.post({f"Object_123.{extension}": b"\x00\x01\x02"})
-                self.assertEqual(response.status_code, 200)
-                self.obj.set_raw_data.assert_called_once_with(b"\x00\x01\x02")
-                response.close()
+                response = self.post({f"Object_123.{extension}": b"unsupported"})
+                self.assert_rejected_and_cleaned(response, status=400)
+                self.assertIn("只支持 JSON 或 CSV", response.json["error"])
+        self.loader.assert_not_called()
+        self.obj.read.assert_not_called()
+        self.obj.set_raw_data.assert_not_called()
+
+    def test_text_patch_cannot_modify_image_or_advanced_object(self):
+        for name in ("Texture2D", "Sprite", "GameObject", "Material"):
+            with self.subTest(type=name):
+                self.obj.type.name = name
+                self.assert_rejected_and_cleaned(self.post({"Object_123.json": '{}'}), status=400)
+        self.obj.read.assert_not_called()
+        self.obj.save_typetree.assert_not_called()
 
     def test_index_matching_preserves_renamed_patch(self):
         response = self.post({"_index.json": '{"123": "folder/renamed.json"}', "folder/renamed.json": '{"m_Name": "renamed"}'})
@@ -330,10 +302,10 @@ class RepackRouteTests(unittest.TestCase):
 
     def test_metadata_and_index_rejections_clean_up_and_unlock(self):
         cases = (
-            ("ZIP_MAX_ENTRIES", 1, {"a.dat": b"a", "b.dat": b"b"}),
-            ("ZIP_MAX_MEMBER_BYTES", 2, {"a.dat": b"abc"}),
-            ("ZIP_MAX_DECLARED_BYTES", 3, {"a.dat": b"ab", "b.dat": b"ab"}),
-            ("ZIP_MAX_COMPRESSION_RATIO", 0, {"a.dat": b"a"}),
+            ("ZIP_MAX_ENTRIES", 1, {"a.csv": b"a", "b.csv": b"b"}),
+            ("ZIP_MAX_MEMBER_BYTES", 2, {"a.csv": b"abc"}),
+            ("ZIP_MAX_DECLARED_BYTES", 3, {"a.csv": b"ab", "b.csv": b"ab"}),
+            ("ZIP_MAX_COMPRESSION_RATIO", 0, {"a.csv": b"a"}),
             ("INDEX_MAX_BYTES", 2, {"_index.json": b"{} "}),
         )
         for setting, value, members in cases:
@@ -349,21 +321,12 @@ class RepackRouteTests(unittest.TestCase):
         third = Mock(path_id=125, type=SimpleNamespace(name="MonoBehaviour"))
         self.env.objects.extend([second, third])
         with patch.object(limits, "ZIP_MAX_READ_BYTES", 5):
-            response = self.post({"a_123.dat": b"abc", "b_124.dat": b"def", "c_125.dat": b"ghi"})
+            response = self.post({"a_123.csv": "x,a\n", "b_124.csv": "x,b\n", "c_125.csv": "x,c\n"})
         self.assert_rejected_and_cleaned(response)
-        self.obj.set_raw_data.assert_called_once_with(b"abc")
-        second.set_raw_data.assert_not_called()
-        third.set_raw_data.assert_not_called()
+        self.obj.save_typetree.assert_called_once_with({"x": "a"})
+        second.save_typetree.assert_not_called()
+        third.save_typetree.assert_not_called()
 
-    def test_image_limits_precede_rgba_conversion(self):
-        self.obj.type.name = "Texture2D"
-        raw = small_png((4, 4))
-        for setting, value in (("IMAGE_MAX_PIXELS", 15), ("IMAGE_MAX_SIDE", 3)):
-            with self.subTest(setting=setting), patch.object(limits, setting, value):
-                with patch.object(Image.Image, "convert", side_effect=AssertionError("不得展开 RGBA")):
-                    response = self.post({"Image_123.png": raw})
-                self.assert_rejected_and_cleaned(response)
-                self.obj.read.assert_not_called()
 
     def test_csv_row_column_and_field_limits_return_413(self):
         for setting, value, text in (
@@ -374,15 +337,6 @@ class RepackRouteTests(unittest.TestCase):
             with self.subTest(setting=setting), patch.object(limits, setting, value):
                 self.assert_rejected_and_cleaned(self.post({"Card_123.csv": text}))
 
-    def test_total_image_pixel_limit_aborts_before_second_decode(self):
-        self.obj.type.name = "Texture2D"
-        second = Mock(path_id=124, type=SimpleNamespace(name="Texture2D"))
-        self.env.objects.append(second)
-        with patch.object(limits, "IMAGE_MAX_TOTAL_PIXELS", 7):
-            response = self.post({"a_123.png": small_png(), "b_124.png": small_png()})
-        self.assert_rejected_and_cleaned(response)
-        self.obj.read.assert_called_once()
-        second.read.assert_not_called()
 
     def test_embedded_json_depth_cannot_bypass_budget(self):
         text = json.dumps({"m_Name": "ok", "m_Script": '{"x": [[[1]]]} '})
@@ -393,18 +347,18 @@ class RepackRouteTests(unittest.TestCase):
         self.assert_rejected_and_cleaned(self.post({"Card_123.json": "not JSON"}), status=400)
 
     def test_original_zip_cannot_bypass_patch_budgets_via_unitypy(self):
-        response = self.post({"Object_123.dat": b"abc"}, original=small_zip({"data.dat": b"abc"}))
+        response = self.post({"Object_123.csv": b"abc"}, original=small_zip({"data.csv": b"abc"}))
         self.assert_rejected_and_cleaned(response, status=400)
         self.loader.assert_not_called()
 
     def test_flask_upload_limit_remains_a_413_with_cleanup_and_unlock(self):
         self.app.config["MAX_CONTENT_LENGTH"] = 64
-        self.assert_rejected_and_cleaned(self.post({"Object_123.dat": b"abc"}))
+        self.assert_rejected_and_cleaned(self.post({"Object_123.csv": b"abc"}))
         self.loader.assert_not_called()
 
     def test_plain_form_receives_chinese_413_error_page(self):
         with patch.object(limits, "ZIP_MAX_MEMBER_BYTES", 2):
-            response = self.post({"Object_123.dat": b"abc"}, headers={"Accept": "text/html"})
+            response = self.post({"Object_123.csv": b"abc"}, headers={"Accept": "text/html"})
         self.assertEqual(response.status_code, 413)
         self.assertIn("声明解压大小", response.get_data(as_text=True))
         self.assertTrue(all(not path.exists() for path in self.workdirs))
@@ -422,7 +376,7 @@ class RepackRouteTests(unittest.TestCase):
 
     def test_memory_failure_does_not_retry_full_bundle_save(self):
         self.env.file.save.side_effect = MemoryError("内存不足")
-        response = self.post({"Object_123.dat": b"abc"})
+        response = self.post({"Object_123.csv": "m_Name,modified\n"})
         self.assertEqual(response.status_code, 507)
         self.env.file.save.assert_called_once()
         self.assertTrue(all(not path.exists() for path in self.workdirs))
@@ -430,7 +384,7 @@ class RepackRouteTests(unittest.TestCase):
 
 
 class RealBundleRepackTests(unittest.TestCase):
-    def test_real_bundle_json_csv_and_dat_roundtrips(self):
+    def test_real_bundle_json_and_csv_roundtrips(self):
         # 使用项目已有的 23 KiB 底包，不修改磁盘原件；验证真实 UnityPy load/save。
         source = (ROOT / "data" / "recipe_decks_1").read_bytes()
         original = UnityPy.load(source)
@@ -440,7 +394,6 @@ class RealBundleRepackTests(unittest.TestCase):
         cases = (
             ("json", json.dumps(tree, ensure_ascii=False).encode("utf-8"), "SecurityBudgetRoundtrip"),
             ("csv", unity.FormatManager.to_csv(tree), "SecurityBudgetRoundtrip"),
-            ("dat", obj.get_raw_data(), obj.read_typetree()["m_Name"]),
         )
         app = Flask(__name__, template_folder=str(ROOT / "templates"))
         app.testing = True
@@ -462,6 +415,59 @@ class RealBundleRepackTests(unittest.TestCase):
                     self.assertFalse(UNITY_TASK_LOCK.locked())
                 finally:
                     response.close()
+
+    def test_export_edit_repack_preserves_text_and_references(self):
+        for source_name, object_type in (("recipe_decks_1", "MonoBehaviour"), ("data_assets_44", "TextAsset")):
+            source = (ROOT / "data" / source_name).read_bytes()
+            original = UnityPy.load(source)
+            target = next(obj for obj in original.objects if obj.type.name == object_type)
+            expected = target.read_typetree()
+            expected["m_Name"] = "TextOnlyRoundtrip"
+            app = Flask(__name__, template_folder=str(ROOT / "templates"))
+            app.testing = True
+            app.register_blueprint(unity.unity_bp)
+            for fmt in ("json", "csv"):
+                with self.subTest(format=fmt), patch.object(unity, "cleanup_old_temp"):
+                    exported = app.test_client().post("/unpack", data={
+                        "bundle": (io.BytesIO(source), "source.bundle"), "format": fmt,
+                    }, headers={"X-Requested-With": "fetch"})
+                    try:
+                        self.assertEqual(exported.status_code, 200, exported.data[:500])
+                        with zipfile.ZipFile(io.BytesIO(exported.data)) as archive:
+                            index = json.loads(archive.read("_index.json"))
+                            name = index[str(target.path_id)]
+                            if fmt == "json":
+                                tree = json.loads(archive.read(name))
+                                tree["m_Name"] = "TextOnlyRoundtrip"
+                                body = json.dumps(tree, ensure_ascii=False)
+                            else:
+                                text = archive.read(name).decode("utf-8-sig")
+                                tree = unity.FormatManager.from_csv(text, original_tree=target.read_typetree())
+                                tree["m_Name"] = "TextOnlyRoundtrip"
+                                body = unity.FormatManager.to_csv(tree)
+                    finally:
+                        exported.close()
+                        exported.request.environ["wsgi.input"].close()
+                    response = app.test_client().post("/repack", data={
+                        "original_bundle": (io.BytesIO(source), "source.bundle"),
+                        "modified_zip": (io.BytesIO(small_zip({
+                            "_index.json": json.dumps({str(target.path_id): name}), name: body,
+                        })), "patch.zip"),
+                    }, headers={"X-Requested-With": "fetch"})
+                    try:
+                        self.assertEqual(response.status_code, 200, response.data[:500])
+                        result = UnityPy.load(response.data)
+                        modified = next(obj for obj in result.objects if obj.path_id == target.path_id)
+                        actual = modified.read_typetree()
+                        if object_type == "TextAsset":
+                            self.assertEqual(json.loads(actual["m_Script"]), json.loads(expected["m_Script"]))
+                            actual["m_Script"] = expected["m_Script"]
+                        self.assertEqual(actual, expected)
+                        self.assertEqual((ROOT / "data" / source_name).read_bytes(), source)
+                    finally:
+                        response.close()
+                        response.request.environ["wsgi.input"].close()
+                    self.assertFalse(UNITY_TASK_LOCK.locked())
 
 
 if __name__ == "__main__":

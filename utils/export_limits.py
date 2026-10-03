@@ -1,4 +1,4 @@
-"""在线检查/导出的工作预算：边处理边计数，不做一次额外的全包预检。"""
+"""在线文本导出的工作预算：边处理边计数，不做一次额外的全包预检。"""
 
 import io
 import json
@@ -8,8 +8,6 @@ MIB = 1024 * 1024
 MAX_OBJECTS = 10_000
 MAX_BUNDLE_FILES = 256
 MAX_BUNDLE_DEPTH = 16
-REPORT_MAX_ENTRIES = 10_000
-REPORT_MAX_BYTES = 2 * MIB
 NAME_MAX_CHARS = 512
 EXPORT_MAX_FILES = 5000
 TEXT_MAX_BYTES = 16 * MIB
@@ -21,10 +19,6 @@ TREE_MAX_DEPTH = 32
 TREE_MAX_NODES = 500_000
 TREE_TOTAL_NODES = 2_000_000
 TREE_MAX_STRING_CHARS = 2 * MIB
-IMAGE_MAX_SIDE = 4096
-IMAGE_MAX_PIXELS = 4 * MIB
-IMAGE_TOTAL_PIXELS = 16 * MIB
-PNG_MAX_BYTES = 16 * MIB
 EXPORT_TOTAL_BYTES = 64 * MIB
 TEMP_MAX_BYTES = 384 * MIB
 ZIP_MAX_BYTES = 32 * MIB
@@ -75,20 +69,12 @@ def iter_objects(env):
 class ExportBudget:
     def __init__(self):
         self.files = self.text_bytes = self.raw_bytes = self.payload_bytes = 0
-        self.tree_nodes = self.image_pixels = 0
-        self.read_operations = 0
+        self.tree_nodes = 0
         self.disk_sizes = {}
-        self.image_keys = {}
-        self.image_metadata = {}
 
-    def reserve_source(self, obj, extra_bytes=0):
-        self.visit_read()
-        self.reserve_binary(obj.byte_size + extra_bytes)
+    def reserve_source(self, obj):
+        self.reserve_binary(obj.byte_size)
 
-    def visit_read(self, count=1):
-        self.read_operations += count
-        if self.read_operations > MAX_OBJECTS:
-            raise exceeded(f"对象读取或引用查找次数超过 {MAX_OBJECTS}")
 
     def reserve_binary(self, size):
         if size < 0 or size > RAW_MAX_BYTES:
@@ -102,28 +88,17 @@ class ExportBudget:
             raise exceeded(f"导出文件数量超过 {EXPORT_MAX_FILES} 个")
         self.files += 1
 
-    def add_payload(self, size, member_size, image=False):
-        cap = PNG_MAX_BYTES if image else TEXT_MAX_BYTES
+    def add_payload(self, size, member_size):
+        cap = TEXT_MAX_BYTES
         if member_size + size > cap:
-            raise exceeded(f"单个{'PNG' if image else '文本'}导出内容超过 {cap // MIB} MiB")
+            raise exceeded(f"单个文本导出内容超过 {cap // MIB} MiB")
         if self.payload_bytes + size > EXPORT_TOTAL_BYTES:
             raise exceeded(f"导出内容累计超过 {EXPORT_TOTAL_BYTES // MIB} MiB")
-        if not image and self.text_bytes + size > TEXT_TOTAL_BYTES:
+        if self.text_bytes + size > TEXT_TOTAL_BYTES:
             raise exceeded(f"文本导出内容累计超过 {TEXT_TOTAL_BYTES // MIB} MiB")
         self.payload_bytes += size
-        if not image:
-            self.text_bytes += size
+        self.text_bytes += size
 
-    def check_image(self, width, height, key):
-        if (width <= 0 or height <= 0 or width > IMAGE_MAX_SIDE
-                or height > IMAGE_MAX_SIDE or width * height > IMAGE_MAX_PIXELS):
-            raise exceeded(f"图片超过单边 {IMAGE_MAX_SIDE} 或单图 {IMAGE_MAX_PIXELS} 像素")
-        pixels = int(width * height)
-        increase = max(0, pixels - self.image_keys.get(key, 0))
-        if self.image_pixels + increase > IMAGE_TOTAL_PIXELS:
-            raise exceeded(f"图片累计像素超过 {IMAGE_TOTAL_PIXELS}")
-        self.image_pixels += increase
-        self.image_keys[key] = max(pixels, self.image_keys.get(key, 0))
 
     def set_disk_size(self, key, size):
         total = sum(self.disk_sizes.values()) - self.disk_sizes.get(key, 0) + size
@@ -133,18 +108,15 @@ class ExportBudget:
 
 
 class BoundedOutput:
-    """ZIP/PNG 实际文件写入前检查上限，支持 zipfile 回写头部的 seek。"""
-    def __init__(self, file, budget, key, cap, label, image=False):
+    """ZIP 实际文件写入前检查上限，支持 zipfile 回写头部的 seek。"""
+    def __init__(self, file, budget, key, cap, label):
         self.file, self.budget, self.key = file, budget, key
         self.cap, self.label, self.size = cap, label, 0
-        self.image = image
 
     def write(self, data):
         size = max(self.size, self.file.tell() + len(data))
         if size > self.cap:
             raise exceeded(f"{self.label}超过 {self.cap // MIB} MiB")
-        if self.image:
-            self.budget.add_payload(size - self.size, self.size, image=True)
         self.budget.set_disk_size(self.key, size)
         self.size = size
         return self.file.write(data)
@@ -153,7 +125,7 @@ class BoundedOutput:
         return getattr(self.file, name)
 
     def fileno(self):
-        # 编码器必须通过 write()，不能优化成直接写底层文件描述符。
+        # 所有输出必须通过 write() 检查，不能绕过预算直接写文件描述符。
         raise io.UnsupportedOperation("受限输出不提供文件描述符")
 
 
@@ -179,13 +151,3 @@ def write_json_member(zf, name, value, budget):
         writer = MemberWriter(file, budget)
         for chunk in json_chunks(value, indent=4):
             writer.write(chunk)
-
-
-def encode_report(value):
-    output = bytearray()
-    for chunk in json_chunks(value, separators=(",", ":")):
-        data = chunk.encode("utf-8")
-        if len(output) + len(data) > REPORT_MAX_BYTES:
-            raise exceeded(f"检查报告超过 {REPORT_MAX_BYTES // MIB} MiB")
-        output.extend(data)
-    return bytes(output)

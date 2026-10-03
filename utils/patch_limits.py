@@ -4,18 +4,15 @@ from contextlib import contextmanager
 import io
 import json
 import struct
-import warnings
 import zipfile
 
 import json5
-from PIL import Image
 
 MIB = 1024 * 1024
 ZIP_MAX_ENTRIES = 2048
 ZIP_MAX_NAME_CHARS = 512
 ZIP_MAX_DIRECTORY_BYTES = 4 * MIB
 ZIP_MAX_MEMBER_BYTES = 48 * MIB
-RAW_MAX_BYTES = 32 * MIB  # 二进制补丁保留原预算，不随文本容量调整。
 ZIP_MAX_DECLARED_BYTES = 128 * MIB
 ZIP_MAX_READ_BYTES = 64 * MIB
 ZIP_MAX_COMPRESSION_RATIO = 200
@@ -29,10 +26,6 @@ CSV_MAX_COLUMNS = 32
 CSV_MAX_FIELD_CHARS = 128 * 1024
 JSON_MAX_DEPTH = 64
 JSON_MAX_NODES = 500000  # 真实 card_data_1 展开后 241267 节点，保留约两倍余量。
-PNG_MAX_BYTES = 16 * MIB
-IMAGE_MAX_SIDE = 4096
-IMAGE_MAX_PIXELS = 4 * 1024 * 1024
-IMAGE_MAX_TOTAL_PIXELS = 8 * 1024 * 1024
 
 
 class ClientFacingError(Exception):
@@ -55,9 +48,7 @@ def member_limit(name):
         return JSON_MAX_BYTES
     if name.endswith(".csv"):
         return CSV_MAX_BYTES
-    if name.endswith(".png"):
-        return PNG_MAX_BYTES
-    return RAW_MAX_BYTES
+    return ZIP_MAX_MEMBER_BYTES
 
 
 @contextmanager
@@ -252,28 +243,3 @@ def load_patch_json(text, label):
                 raise limit_error(f"{label} JSON5 嵌套过于复杂") from exc
     check_json_tree(parsed, label)
     return parsed
-
-
-def open_patch_image(raw, remaining_pixels=None):
-    """PNG 文件已受字节预算限制；RGBA 解码前检查尺寸，不关闭 Pillow 保护。"""
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(raw)) as image:
-                width, height = image.size
-                if (width > IMAGE_MAX_SIDE or height > IMAGE_MAX_SIDE
-                        or width * height > IMAGE_MAX_PIXELS):
-                    raise limit_error(
-                        f"图片尺寸超过单边 {IMAGE_MAX_SIDE} 或总计 {IMAGE_MAX_PIXELS} 像素上限"
-                    )
-                if remaining_pixels is not None and width * height > remaining_pixels:
-                    raise limit_error(f"本次回填图片累计像素超过 {IMAGE_MAX_TOTAL_PIXELS} 上限")
-                if image.format != "PNG":
-                    raise ClientFacingError("PNG 补丁内容不是标准 PNG 图片，请重新导出。")
-                return image.convert("RGBA")
-    except (Image.DecompressionBombWarning, Image.DecompressionBombError) as exc:
-        raise limit_error("图片触发 Pillow 解压安全限制") from exc
-    except ClientFacingError:
-        raise
-    except (OSError, ValueError) as exc:
-        raise ClientFacingError(f"无法读取 PNG 图片：{exc}。请确认文件完整。") from exc
