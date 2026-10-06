@@ -55,6 +55,12 @@ class ExportRouteTests(unittest.TestCase):
             mock = patcher.start()
             self.addCleanup(patcher.stop)
             setattr(self, name.split(".")[-1], mock)
+        def in_process_job(workdir, action, payload):
+            budget = limits.ExportBudget()
+            budget.disk_sizes.update(payload.get('disk_sizes', {}))
+            unity.perform_unpack(str(Path(workdir) / 'input.bundle'), str(Path(workdir) / 'output.zip'), payload['policy'], budget)
+        runner = patch.object(unity, 'run_unity_job', side_effect=in_process_job)
+        runner.start(); self.addCleanup(runner.stop)
         self.assertFalse(UNITY_TASK_LOCK.locked())
 
     def post(self, path="/unpack", **fields):

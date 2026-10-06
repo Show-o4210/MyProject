@@ -1,3 +1,4 @@
+import {validateJson} from '../json_budget.js';
 import {
   tabs, logicWorkspaceTabs,
   fallbackOptions, emptyConfig, labelOf,
@@ -23,6 +24,7 @@ import {
 } from './card_serializer.js';
 
 const { createApp } = Vue;
+const initialCard = await loadCard();
 
 createApp({
   delimiters: ['[[', ']]'],
@@ -32,7 +34,7 @@ createApp({
       logicWorkspaceTabs,
       options: { ...fallbackOptions },
       phantomConfig: { ...emptyConfig },
-      card: loadCard(),
+      card: initialCard,
       activeTab: 'basic',
       newSubtype: { id: '', name: '' },
       abilitySearch: '',
@@ -162,7 +164,7 @@ createApp({
   watch: {
     card: {
       deep: true,
-      handler(value) { saveCard(value); }
+      handler(value) { try { saveCard(value); } catch (error) { this.showToast(`草稿未保存：${error.message}`); } }
     },
     'card.logicSubtypes'(value) {
       this.card.displaySubtypes = [...value];
@@ -308,6 +310,7 @@ createApp({
       this.showToast('已重置草稿');
     },
     prepareImportedCard(card) {
+      validateJson(card);
       const merged = { ...createEmptyCard(), ...card, localId: card.localId || createEmptyCard().localId };
       const info = this.findCardIndexInfo(merged);
       if (info) {

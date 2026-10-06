@@ -505,7 +505,8 @@
 
 {% block scripts %}
 {% raw %}
-<script>
+<script type="module">
+import {readBoundedJson, validateJson} from '/static/js/json_budget.js';
 document.addEventListener('DOMContentLoaded', function() {
     if (typeof Vue === 'undefined') return;
     const { createApp, ref, reactive, computed, watch, onMounted, onUnmounted, defineComponent, nextTick } = Vue;
@@ -686,7 +687,9 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             const replaceConfig = (cfg) => {
-                const clean = ensureShape(JSON.parse(JSON.stringify(cfg || defaultConfig())));
+                validateJson(cfg);
+                if (!cfg || Array.isArray(cfg) || typeof cfg !== "object") throw new Error("关卡必须是 JSON 对象");
+                const clean = ensureShape(JSON.parse(JSON.stringify(cfg)));
                 Object.keys(levelConfig).forEach(k => delete levelConfig[k]);
                 Object.assign(levelConfig, clean);
                 currentLevelId.value = clean.Id || currentLevelId.value;
@@ -704,16 +707,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
             watch(levelConfig, () => { if (!isTypingJSON) syncJsonFromConfig(); }, { deep: true });
 
+            let jsonInputRevision = 0;
             const onJsonInput = (e) => {
+                const revision = ++jsonInputRevision;
+                const text = e.target.value;
                 isTypingJSON = true;
                 jsonError.value = false;
                 clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
+                debounceTimer = setTimeout(async () => {
                     try {
-                        const parsed = JSON.parse(e.target.value);
+                        const parsed = await readBoundedJson(text);
+                        if (revision !== jsonInputRevision) return;
                         replaceConfig(parsed);
                         jsonError.value = false;
                     } catch (err) {
+                        if (revision !== jsonInputRevision) return;
                         jsonError.value = true;
                     }
                     isTypingJSON = false;
@@ -973,7 +981,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const copyJson = async () => { await navigator.clipboard.writeText(jsonText.value); showToast('JSON 已复制'); };
             const downloadJson = () => { const blob = new Blob([jsonText.value], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${levelConfig.Id || 'LevelConfig'}.json`; a.click(); URL.revokeObjectURL(a.href); };
-            const importJsonFile = e => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { try { replaceConfig(JSON.parse(reader.result)); showToast('JSON 已导入'); } catch { showToast('JSON 文件格式错误', 'error'); } }; reader.readAsText(file, 'utf-8'); e.target.value = ''; };
+            const importJsonFile = async e => {
+                const file = e.target.files?.[0]; e.target.value = '';
+                if (!file) return;
+                try { replaceConfig(await readBoundedJson(file)); showToast('JSON 已导入'); }
+                catch (error) { showToast(error.message || 'JSON 文件格式错误', 'error'); }
+            };
 
             onMounted(async () => {
                 try {

@@ -216,6 +216,9 @@ class RepackRouteTests(unittest.TestCase):
         self.obj.type = SimpleNamespace(name="MonoBehaviour")
         self.env = SimpleNamespace(objects=[self.obj], file=Mock())
         self.env.file.save.return_value = b"modified bundle"
+        def in_process_job(workdir, action, payload):
+            unity.perform_repack(str(Path(workdir) / 'original.bundle'), str(Path(workdir) / 'patch.zip'), str(Path(workdir) / 'output.bundle'), payload['mode'])
+        self.stack.enter_context(patch.object(unity, 'run_unity_job', side_effect=in_process_job))
         self.loader = self.stack.enter_context(patch.object(unity.UnityPy, "load", return_value=self.env))
 
     def post(self, members, original=b"original bundle", headers=None, **fields):

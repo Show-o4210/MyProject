@@ -1,0 +1,13 @@
+{
+  "name": "pvzh-tools-frontend",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i styles/tailwind.css -o static/vendor/tailwind.css --minify",
+    "test": "node --test tests/frontend/*.test.mjs"
+  },
+  "dependencies": {
+    "tailwindcss": "3.4.17",
+    "vue": "3.5.13"
+  },
+  "type": "module"
+}

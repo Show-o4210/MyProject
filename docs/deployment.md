@@ -5,7 +5,7 @@
 仓库的 `render.yaml` 使用 Python 3.12.3，构建命令为：
 
 ```text
-pip install -r requirements.txt && python scripts/generate_sitemap.py
+pip install -r requirements.txt && python scripts/verify_frontend.py && python scripts/generate_sitemap.py
 ```
 
 启动命令为：
@@ -26,7 +26,7 @@ gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --ma
 
 信任 CF header 的依据是当前公网代理入口，而不是 IP 字符串合法性本身。若迁移平台、开放直接访问 Gunicorn 的入口、引入私网调用或改变 Cloudflare Worker/代理链，需重新评估 header 的写入/覆盖保证。降级到代理地址会让部分请求共用限流桶，这是保守降级的预期行为。
 
-目前单 worker 保留 `memory://` 限流与进程内审计去重；增加 worker 或实例时，需改为共享限流/去重存储。进程重启也会重置窗口。现有 self-ping 的 UA/Token 识别及其他 UA 策略属于独立问题，本轮没有修改。
+目前单 worker 保留 `memory://` 限流与进程内审计去重；增加 worker 或实例时，需改为共享限流/去重存储。进程重启也会重置窗口。UA 不再授予信任；令牌仅识别 GET/HEAD /health，不允许绕过其他路径。
 
 ## 环境变量
 
@@ -67,3 +67,11 @@ python scripts/generate_sitemap.py
 - 下载卡片弹窗及夸克网盘、QQ 群入口正常。
 - 配置 Supabase 后，安全日志写入正常。
 
+
+## 资源隔离与前端构建
+
+线上处理依赖 Linux resource 内核限制；非 Linux 环境的在线处理明确返回 503，不能悄悄退回网页进程。保持 1 个 Gunicorn worker；增加实例需要共享并发容量与限流存储。RSS/目录监测是采样保护，内核地址空间/CPU/单文件限制提供硬边界；不等同于整个主机磁盘配额。
+
+已提交本地 Vue 和生成 CSS，Render 无需安装 Node。修改 Tailwind 类名后执行 `npm ci && npm run build:css`，检查变化并更新 `static/vendor/manifest.json` 中 CSS SHA-256；构建会拒绝与清单不同的资源。Vue 使用完整生产版以支持原有模板编译器。
+
+测试：`python -m pytest -q`、`node --test tests/frontend/*.test.mjs`、`python scripts/verify_frontend.py`。真实 Unity 测试仅使用仓库底包，不访问生产站点。安全扫描应在修复合并、部署后复查；PR 完成不自动关闭旧扫描 finding。

@@ -20,7 +20,7 @@ limiter = Limiter(
 
 # Unity 任务锁：忙时短暂排队，避免用户连续提交 Unity 操作时直接 429。
 # 最长等待秒数（免费机内存仍只允许真正并发 1 个 Unity 任务）。
-UNITY_LOCK_WAIT_SECONDS = 25
+UNITY_LOCK_WAIT_SECONDS = 0
 
 
 def init_limiter(app):

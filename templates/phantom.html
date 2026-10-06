@@ -4,6 +4,7 @@
 {% block meta_description %}幻影卡牌工坊：可视化编辑单卡逻辑节点、序列化与导出，面向 Plants vs. Zombies Heroes Mod 作者。{% endblock %}
 
 {% block content %}
+<p id="draft-recovery" hidden role="alert" class="p-4 text-red-700">本地草稿无效或超过安全限制，已清除。可以重新导入符合限制的 JSON。</p>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/phantom.css') }}">
 <style>
     /* 重写/覆盖部分 phantom.css 全局规则，以便流畅嵌入 base.html */
