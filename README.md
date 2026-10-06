@@ -59,9 +59,9 @@
 - 对 `data_assets_44`、`recipe_decks_1` 和 `recipe_definitions_1` 分别执行JSON 与 CSV，共六次真实导出无失败对象；最大 Bundle 含 2,408 对象，文本导出未压缩内容约 17.4 MiB、ZIP 约 2.0 MiB。
 - 回归测试覆盖 JSON / CSV 导出、编辑与回填，移除格式的明确拒绝、声明及实际读取超限、输出预算、临时目录清理、Unity 锁、客户端 IP、限流及审计去重。使用小型文件、调低测试阈值和 mock 验证，不生成真实大型 ZIP bomb，不对线上服务做压力测试。
 
-这些限制约束应用可控制的输入、处理和输出规模，不能硬性隔离 `UnityPy.load()`、单次对象读取或 `env.file.save()` 生成完整 Bundle bytes 时的内存与 CPU 峰值。若将来需要强隔离，可考虑资源受限子进程；当前保持单 worker 和 Unity 全局任务锁，未引入后台队列、任务状态机或新的调度系统。
+Unity 解包、回填、卡组导出与关卡打包现运行在可丢弃 Linux 子进程：384 MiB 地址空间硬上限、256 MiB RSS 监测上限、30 秒 CPU / 45 秒实际时间、140 MiB 单文件硬上限；保留已有对象、补丁、ZIP 和临时磁盘预算。超限终止子进程并清理失败输出。单 worker 下全局锁立即拒绝并发任务，避免请求等待占满线程。没有后台队列。
 
-客户端 IP 规则依赖当前 Render public Web Service 的 Cloudflare / Render 公网代理入口；地址格式合法不等于来源可信，迁移部署或开放直连入口时需要重新评估。单 worker 继续使用 `memory://` 限流和进程内审计去重，重启会重置窗口；扩展至多 worker / 多实例时需采用共享存储。现有 self-ping UA 识别属于独立待处理问题。详见 [部署说明](docs/deployment.md#客户端-ip-的信任边界)。
+客户端 IP 规则依赖当前 Render public Web Service 的 Cloudflare / Render 公网代理入口；地址格式合法不等于来源可信，迁移部署或开放直连入口时需要重新评估。单 worker 继续使用 `memory://` 限流和进程内审计去重，重启会重置窗口；扩展至多 worker / 多实例时需采用共享存储。UA 不再作为信任凭据；健康检查独立豁免，令牌不得绕过其他业务路径。详见 [部署说明](docs/deployment.md#客户端-ip-的信任边界)。
 
 ## 快速开始
 

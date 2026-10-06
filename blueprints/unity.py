@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, send_file, jsonify, after_this_request
+from flask import current_app, Blueprint, render_template, request, send_file, jsonify, after_this_request
 import UnityPy
 import json
 import json5
@@ -20,6 +20,7 @@ from utils.patch_limits import (
 unity_bp = Blueprint('unity', __name__)
 
 from extensions import acquire_unity_lock, release_unity_lock
+from utils.unity_jobs import run_unity_job
 
 MAX_BUNDLE_SIZE = 140 * 1024 * 1024      # 140MB，在线版硬限制
 MAX_PATCH_ZIP_SIZE = 90 * 1024 * 1024    # 90MB，回填补丁包硬限制
@@ -783,7 +784,7 @@ def export_typetree_object(obj, zf, index_data, policy, budget):
 
 @unity_bp.route('/unity')
 def index():
-    return render_template('tab_unity.html', current_tab='unity')
+    return render_template('tab_unity.html', current_tab='unity', upload_total_mib=(current_app.config.get('MAX_CONTENT_LENGTH') or 150 * 1024 * 1024) // (1024 * 1024) - 1)
 
 
 # ==================== 解包导出 ====================
@@ -799,7 +800,7 @@ def unpack():
     try:
         workdir = tempfile.mkdtemp(prefix=TEMP_PREFIX)
         cleanup_old_temp()
-        reject_if_too_large(MAX_BUNDLE_SIZE, "Bundle 文件")
+        reject_if_too_large(MAX_BUNDLE_SIZE + 1024 * 1024, "上传内容")
         file = request.files.get('bundle')
 
         if not file:
@@ -811,43 +812,7 @@ def unpack():
         bundle_path = save_bundle_upload(file, workdir, budget)
         output_zip_path = os.path.join(workdir, "output.zip")
 
-        env = UnityPy.load(bundle_path)
-        index_data = {}
-        exported_count = 0
-        skipped_count = 0
-        failed_count = 0
-
-        with open(output_zip_path, "w+b") as output, zipfile.ZipFile(
-                export_limits.BoundedOutput(output, budget, "zip", export_limits.ZIP_MAX_BYTES, "输出 ZIP"),
-                'w', zipfile.ZIP_DEFLATED) as zf:
-            for obj in export_limits.iter_objects(env):
-                if obj.type.name not in TEXT_OBJECT_TYPES:
-                    skipped_count += 1
-                    continue
-
-                try:
-                    if export_typetree_object(obj, zf, index_data, policy, budget):
-                        exported_count += 1
-                    else:
-                        skipped_count += 1
-
-                except (ClientFacingError, MemoryError, RecursionError, OSError):
-                    raise
-                except Exception:
-                    failed_count += 1
-
-            export_limits.write_json_member(zf, "_index.json", index_data, budget)
-
-            export_limits.write_json_member(zf, "_export_summary.json", {
-                "format": policy["target_format"],
-                "selected_types": sorted(TEXT_OBJECT_TYPES),
-                "exported_count": exported_count,
-                "skipped_count": skipped_count,
-                "failed_count": failed_count
-            }, budget)
-
-        if exported_count == 0:
-            return _client_error("没有可导出的 MonoBehaviour 或 TextAsset 文本对象。", 400)
+        run_unity_job(workdir, "unpack", {"policy": policy, "disk_sizes": budget.disk_sizes})
 
         response = send_file(
             output_zip_path,
@@ -876,6 +841,7 @@ def unpack():
 def _client_error(msg, status=400):
     """回填/解包错误：fetch 客户端返回 JSON，普通表单仍返回错误页。"""
     from extensions import _wants_json_error
+    current_app.logger.info("unity_request_error path=%s status=%s", request.path, status)
     if _wants_json_error():
         return jsonify({"success": False, "error": str(msg)}), status
     return render_template("error.html", msg=str(msg)), status
@@ -892,7 +858,7 @@ def _save_bundle_bytes(env):
             if packer is None:
                 return env.file.save()
             return env.file.save(packer=packer)
-        except MemoryError:
+        except (MemoryError, RecursionError, OSError):
             raise
         except Exception as e:
             last_err = e
@@ -917,7 +883,11 @@ def repack():
         reject_if_too_large(MAX_BUNDLE_SIZE + MAX_PATCH_ZIP_SIZE, "上传内容")
         orig_file = request.files.get('original_bundle')
         mod_zip = request.files.get('modified_zip')
+        if set(request.files) != {'original_bundle', 'modified_zip'} or len(list(request.files.items(multi=True))) != 2:
+            raise ClientFacingError('回填仅接受一份原始 Bundle 和一份补丁 ZIP。')
         process_mode = request.form.get('mode', 'auto')
+        if process_mode not in {"auto", "manual"}:
+            raise ClientFacingError("不支持的文本处理模式。")
         if not orig_file or not mod_zip:
             raise ClientFacingError("缺少文件！请同时上传原始 Bundle 与修改后的 ZIP。")
         if not (orig_file.filename or "").strip():
@@ -929,8 +899,8 @@ def repack():
         orig_path = os.path.join(workdir, "original.bundle")
         zip_path = os.path.join(workdir, "patch.zip")
         output_bundle_path = os.path.join(workdir, "output.bundle")
-        orig_file.save(orig_path)
-        mod_zip.save(zip_path)
+        save_limited_upload(orig_file, orig_path, MAX_BUNDLE_SIZE)
+        save_limited_upload(mod_zip, zip_path, MAX_PATCH_ZIP_SIZE)
         for path, limit, label in (
             (orig_path, MAX_BUNDLE_SIZE, "原始 Bundle"),
             (zip_path, MAX_PATCH_ZIP_SIZE, "修改后的 ZIP"),
@@ -945,72 +915,8 @@ def repack():
                 # UnityPy 会自动识别 ZIP；原始文件槽不能绕过补丁 ZIP 的预算。
                 raise ClientFacingError("原始文件是 ZIP，请先取出原始 Bundle；ZIP 只能作为修改后的补丁上传。")
 
-        # ZIP 元数据和索引预算先于 UnityPy 加载；不做 testzip 或全包正文扫描。
-        with open_patch_zip(zip_path) as patch:
-            zip_file_map, fallback_map, index_data = build_zip_patch_maps(patch)
-            try:
-                env = UnityPy.load(orig_path)
-            except MemoryError:
-                raise
-            except Exception as exc:
-                raise ClientFacingError(
-                    f"无法解析原始 Bundle，请确认文件完整且为 Unity AssetBundle。详情：{exc}"
-                ) from exc
-            modified_files_count = 0
-            for obj in env.objects:
-                actual_zip_path, expected_filename, _ = find_patch_for_object(
-                    obj, zip_file_map, fallback_map, index_data,
-                )
-                if not actual_zip_path:
-                    continue
-                try:
-                    lower_name = expected_filename.lower()
-                    if obj.type.name not in TEXT_OBJECT_TYPES:
-                        raise ClientFacingError(f"对象类型 {obj.type.name} 不支持文本回填，只支持 MonoBehaviour / TextAsset。")
-                    if lower_name.endswith(('.json', '.json5')):
-                        new_tree = parse_patch_json(
-                            read_text_from_zip(patch, actual_zip_path),
-                            process_mode=process_mode, source_label=expected_filename,
-                        )
-                        inject_typetree_to_object(
-                            obj, new_tree, process_mode=process_mode, source_label=expected_filename,
-                        )
-                    elif lower_name.endswith('.csv'):
-                        csv_text = read_text_from_zip(patch, actual_zip_path)
-                        if not csv_text.strip():
-                            raise ClientFacingError(f"{expected_filename} CSV 文件为空")
-                        new_tree = FormatManager.from_csv(csv_text, original_tree=obj.read_typetree())
-                        if not new_tree:
-                            raise ClientFacingError(
-                                f"{expected_filename} CSV 未能解析为对象字段表（需要至少两列：字段名,值）"
-                            )
-                        inject_typetree_to_object(
-                            obj, new_tree, process_mode=process_mode, source_label=expected_filename,
-                        )
-                    else:
-                        raise ClientFacingError("在线回填只支持 JSON 或 CSV 补丁。")
-                    modified_files_count += 1
-                except ClientFacingError as exc:
-                    msg = str(exc)
-                    if expected_filename not in msg:
-                        msg = f"文件 [{expected_filename}]：{msg}"
-                    raise ClientFacingError(msg, status=exc.status) from exc
-                except MemoryError:
-                    raise
-                except Exception as exc:
-                    raise ClientFacingError(f"文件 [{expected_filename}] 注入失败：{exc}") from exc
-            if modified_files_count == 0:
-                raise ClientFacingError(
-                    "没有检测到任何可注入的补丁文件。请检查 ZIP 是否来自当前 Bundle 的导出结果，"
-                    "是否保留 _index.json 或文件名中的 path_id，以及原始 Bundle 是否选错版本。"
-                )
+        run_unity_job(workdir, "repack", {"mode": process_mode, "reserved_disk": sum(os.path.getsize(p) for p in (orig_path, zip_path))})
 
-        # UnityPy 仍会生成完整输出 bytes，落盘并不能限制库内部的峰值内存。
-        saved_bytes = _save_bundle_bytes(env)
-        with open(output_bundle_path, 'wb') as fp:
-            fp.write(saved_bytes)
-        del saved_bytes
-        gc.collect()
         response = send_file(
             output_bundle_path, mimetype='application/octet-stream', as_attachment=True,
             download_name=f"modded_{safe_name(orig_file.filename)}",
@@ -1036,3 +942,124 @@ def repack():
         if workdir and not download_ready:
             shutil.rmtree(workdir, ignore_errors=True)
         release_unity_lock()
+
+def perform_unpack(bundle_path, output_zip_path, policy, budget):
+    env = UnityPy.load(bundle_path)
+    index_data = {}
+    exported_count = 0
+    skipped_count = 0
+    failed_count = 0
+
+    with open(output_zip_path, "w+b") as output, zipfile.ZipFile(
+            export_limits.BoundedOutput(output, budget, "zip", export_limits.ZIP_MAX_BYTES, "输出 ZIP"),
+            'w', zipfile.ZIP_DEFLATED) as zf:
+        for obj in export_limits.iter_objects(env):
+            if obj.type.name not in TEXT_OBJECT_TYPES:
+                skipped_count += 1
+                continue
+
+            try:
+                if export_typetree_object(obj, zf, index_data, policy, budget):
+                    exported_count += 1
+                else:
+                    skipped_count += 1
+
+            except (ClientFacingError, MemoryError, RecursionError, OSError):
+                raise
+            except Exception:
+                failed_count += 1
+
+        export_limits.write_json_member(zf, "_index.json", index_data, budget)
+
+        export_limits.write_json_member(zf, "_export_summary.json", {
+            "format": policy["target_format"],
+            "selected_types": sorted(TEXT_OBJECT_TYPES),
+            "exported_count": exported_count,
+            "skipped_count": skipped_count,
+            "failed_count": failed_count
+        }, budget)
+
+    if exported_count == 0:
+        raise ClientFacingError("没有可导出的 MonoBehaviour 或 TextAsset 文本对象。")
+
+
+def perform_repack(orig_path, zip_path, output_bundle_path, process_mode):
+    # ZIP 元数据和索引预算先于 UnityPy 加载；不做 testzip 或全包正文扫描。
+    with open_patch_zip(zip_path) as patch:
+        zip_file_map, fallback_map, index_data = build_zip_patch_maps(patch)
+        try:
+            env = UnityPy.load(orig_path)
+        except MemoryError:
+            raise
+        except Exception as exc:
+            raise ClientFacingError(
+                f"无法解析原始 Bundle，请确认文件完整且为 Unity AssetBundle。详情：{exc}"
+            ) from exc
+        modified_files_count = 0
+        for obj in export_limits.iter_objects(env):
+            actual_zip_path, expected_filename, _ = find_patch_for_object(
+                obj, zip_file_map, fallback_map, index_data,
+            )
+            if not actual_zip_path:
+                continue
+            try:
+                lower_name = expected_filename.lower()
+                if obj.type.name not in TEXT_OBJECT_TYPES:
+                    raise ClientFacingError(f"对象类型 {obj.type.name} 不支持文本回填，只支持 MonoBehaviour / TextAsset。")
+                if lower_name.endswith(('.json', '.json5')):
+                    new_tree = parse_patch_json(
+                        read_text_from_zip(patch, actual_zip_path),
+                        process_mode=process_mode, source_label=expected_filename,
+                    )
+                    inject_typetree_to_object(
+                        obj, new_tree, process_mode=process_mode, source_label=expected_filename,
+                    )
+                elif lower_name.endswith('.csv'):
+                    csv_text = read_text_from_zip(patch, actual_zip_path)
+                    if not csv_text.strip():
+                        raise ClientFacingError(f"{expected_filename} CSV 文件为空")
+                    new_tree = FormatManager.from_csv(csv_text, original_tree=obj.read_typetree())
+                    if not new_tree:
+                        raise ClientFacingError(
+                            f"{expected_filename} CSV 未能解析为对象字段表（需要至少两列：字段名,值）"
+                        )
+                    inject_typetree_to_object(
+                        obj, new_tree, process_mode=process_mode, source_label=expected_filename,
+                    )
+                else:
+                    raise ClientFacingError("在线回填只支持 JSON 或 CSV 补丁。")
+                modified_files_count += 1
+            except ClientFacingError as exc:
+                msg = str(exc)
+                if expected_filename not in msg:
+                    msg = f"文件 [{expected_filename}]：{msg}"
+                raise ClientFacingError(msg, status=exc.status) from exc
+            except MemoryError:
+                raise
+            except Exception as exc:
+                raise ClientFacingError(f"文件 [{expected_filename}] 注入失败：{exc}") from exc
+        if modified_files_count == 0:
+            raise ClientFacingError(
+                "没有检测到任何可注入的补丁文件。请检查 ZIP 是否来自当前 Bundle 的导出结果，"
+                "是否保留 _index.json 或文件名中的 path_id，以及原始 Bundle 是否选错版本。"
+            )
+
+    # 完整序列化位于受限子进程；同时限制上传暂存、副本与输出总量。
+    saved_bytes = _save_bundle_bytes(env)
+    output_cap = min(MAX_BUNDLE_SIZE, export_limits.TEMP_MAX_BYTES - 2 * (os.path.getsize(orig_path) + os.path.getsize(zip_path)))
+    if len(saved_bytes) > output_cap:
+        raise export_limits.exceeded("回填输出 Bundle 超过文件或临时磁盘预算")
+    with open(output_bundle_path, 'wb') as fp:
+        fp.write(saved_bytes)
+    del saved_bytes
+    gc.collect()
+
+
+def save_limited_upload(upload, path, cap):
+    size = 0
+    with open(path, "wb") as output:
+        while chunk := upload.stream.read(64 * 1024):
+            size += len(chunk)
+            if size > cap:
+                raise export_limits.exceeded("上传文件过大")
+            output.write(chunk)
