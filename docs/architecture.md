@@ -100,3 +100,9 @@ JSON 和 CSV 的六次真实导出均无失败对象；CSV 最大未压缩 81373
 - Render 配置使用单 worker，避免 UnityPy 并发导致内存峰值过高。
 - `data/` 中的二进制底包和 JSON 都是运行时资产，不应当作普通文档移动。
 - `data/news.json` 是首页公告来源；`data/version.json` 是版本 API 的首选数据源。
+
+## PVZH DIY 玩家精选
+`blueprints/featured.py` 提供两个只读端点：`/api/pvzh-diy/v1/featured/version.json` 和 `manifest.json`。部署时从公开资源仓库 DIY-IMG 的审核目录生成 `data/featured.json`；所有图片 URL 固定 Git 提交 SHA，由 jsDelivr 分发。Render 每次请求仅读取最多 128 KiB 本地快照，不访问 GitHub、不代理图片。两条端点按小型公开 API 精确加入安全层排除列表，其他安全规则不变。无有效快照返回 503，客户端保留上次目录。官方作品独立随客户端发布，不进入服务端目录。
+
+原 `/version`、`/api/version`、`/version.txt` 保留七字段，新增可空 `minimum_supported_version` / `minimum_supported_version_code`。当前均为空，不触发新的最低版本服务限制；旧 force_update 值保留。发布流程和逐件许可详见 [DIY-IMG](https://github.com/Show-o4210/DIY-IMG)。
+

@@ -92,6 +92,8 @@ EXCLUDED_EXACT_PATHS = {
     "/version",
     "/version.txt",
     "/api/version",
+    "/api/pvzh-diy/v1/featured/version.json",
+    "/api/pvzh-diy/v1/featured/manifest.json",
     "/sponsors",
     "/sponsors.txt",
     "/api/sponsors",
