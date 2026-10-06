@@ -32,6 +32,12 @@ class PublicCatalogTest(unittest.TestCase):
         self.assertEqual(503, self.client.get("/api/pvzh-diy/v1/featured/version.json").status_code)
         self.file.write_bytes(b" " * 131073)
         self.assertEqual(503, self.client.get("/api/pvzh-diy/v1/featured/manifest.json").status_code)
+    def test_malformed_snapshot_types_are_503(self):
+        for value in ([], {"schema_version": 2, "featured_version": "v1", "works": [None]},
+                      {"schema_version": 2, "featured_version": "v1", "works": []}):
+            self.file.write_text(json.dumps(value))
+            expected = 200 if isinstance(value, dict) and value.get("works") == [] else 503
+            self.assertEqual(expected, self.client.get("/api/pvzh-diy/v1/featured/manifest.json").status_code)
     def test_existing_version_aliases_keep_seven_fields(self):
         old = {"version": "v4.13.1", "version_code": 41301, "force_update": True,
                "download_url": "https://example.org", "update_title": "旧客户端", "update_log": "兼容", "release_date": "2026-10-03"}

@@ -3,7 +3,7 @@ import json
 import re
 from pathlib import Path
 from urllib.parse import urlsplit
-from flask import Blueprint, jsonify
+from flask import Blueprint
 from blueprints.version import build_no_cache_response
 from utils.json_data import data_file_path
 
@@ -14,10 +14,13 @@ HOSTS = {"cdn.jsdelivr.net", "fastly.jsdelivr.net", "gcore.jsdelivr.net"}
 
 def catalog():
     # No external requests, images, database writes or per-user state.
-    raw = Path(data_file_path("featured.json")).read_bytes()
+    with Path(data_file_path("featured.json")).open("rb") as source:
+        raw = source.read(131073)
     if len(raw) > 131072:
         raise ValueError("Catalog too large")
     data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError("Catalog must be an object")
     if data.get("schema_version") != 2 or not ID.fullmatch(data.get("featured_version", "")):
         raise ValueError("Invalid version")
     works = data.get("works")
@@ -25,6 +28,8 @@ def catalog():
         raise ValueError("Invalid works")
     ids = set()
     for work in works:
+        if not isinstance(work, dict):
+            raise ValueError("Work must be an object")
         identifier = work.get("id", "")
         if not ID.fullmatch(identifier) or identifier in ids or not SHA.fullmatch(work.get("sha256", "")):
             raise ValueError("Invalid work")
@@ -38,6 +43,8 @@ def catalog():
         if not isinstance(fallbacks, list) or len(fallbacks) > 2:
             raise ValueError("Invalid fallback URLs")
         for url in [work["image_url"]] + fallbacks:
+            if not isinstance(url, str):
+                raise ValueError("URL must be text")
             parsed = urlsplit(url)
             if parsed.scheme != "https" or parsed.hostname not in HOSTS or parsed.username or parsed.password or parsed.port not in (None, 443):
                 raise ValueError("Invalid CDN URL")
