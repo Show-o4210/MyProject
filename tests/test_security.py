@@ -194,15 +194,25 @@ class SecurityAuditTests(unittest.TestCase):
         self.assertEqual(self.execute.call_count, 2)
         self.route.assert_not_called()
 
+    def test_keepalive_ua_and_token_cannot_bypass_protected_routes(self):
+        with patch("security.SELF_PING_TOKEN", "valid-secret"):
+            for path, method, expected in (("/page", "GET", 404), ("/page", "POST", 200), ("/admin", "GET", 403)):
+                with self.subTest(path=path, method=method):
+                    self.route.reset_mock()
+                    response = self.request(path, method, headers={"User-Agent": "PVZH-KeepAlive/1.0", "X-Self-Ping-Token": "valid-secret"})
+                    self.assertEqual(response.status_code, expected)
+                    self.route.assert_not_called()
+        self.assertGreater(self.execute.call_count, 0)
+
     def test_excluded_and_trusted_requests_still_skip_auditing(self):
         self.assertEqual(self.request("/health").get_json(), {"status": "ok"})
         self.assertEqual(
             self.request("/page", headers={"User-Agent": "PVZH-KeepAlive/1.0"}).status_code,
-            200,
+            404,
         )
         with patch("security.TRUSTED_IPS", {self.BLOCKED_IP}):
             self.assertEqual(self.request("/page").status_code, 200)
-        self.execute.assert_not_called()
+        self.execute.assert_called_once()
 
 
 if __name__ == "__main__":

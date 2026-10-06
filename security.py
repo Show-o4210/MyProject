@@ -63,7 +63,7 @@ EXTRA_BLOCKED_IPS = parse_ip_list(os.getenv("SECURITY_BLOCKED_IPS", ""))
 BLOCKED_IPS = DEFAULT_BLOCKED_IPS | EXTRA_BLOCKED_IPS
 
 # 可信 IP（不参与脚本 UA 告警 / 不封禁）：可选
-# 例：Render 出站自唤醒 IP 曾是 74.220.49.7，但云厂商 IP 会变，优先靠 UA/Token
+# 例：Render 出站自唤醒 IP 曾是 74.220.49.7，但云厂商 IP 会变，健康检查使用独立白名单
 TRUSTED_IPS = parse_ip_list(os.getenv("SECURITY_TRUSTED_IPS", ""))
 
 # 与 app.py keep_awake 约定一致
@@ -170,20 +170,12 @@ def visitor_ip_key():
 
 
 def is_self_ping_request(user_agent: str) -> bool:
-    """
-    识别进程内自唤醒请求。
-
-    判定（任一即可）：
-    1. UA 以 PVZH-KeepAlive/ 开头（app.py 默认）
-    2. Header X-Self-Ping-Token 与环境变量 SELF_PING_TOKEN 一致（可选加固）
-    """
-    if user_agent and user_agent.startswith(SELF_PING_UA_PREFIX):
-        return True
-    if SELF_PING_TOKEN:
-        token = request.headers.get("X-Self-Ping-Token", "").strip()
-        if token and token == SELF_PING_TOKEN:
-            return True
-    return False
+    """UA 仅用于日志标记，不能授予信任；仅健康检查允许令牌识别。"""
+    import hmac
+    token = request.headers.get("X-Self-Ping-Token", "")
+    return (request.path == "/health" and request.method in {"GET", "HEAD"}
+            and bool(SELF_PING_TOKEN) and bool(token)
+            and hmac.compare_digest(token.encode("utf-8"), SELF_PING_TOKEN.encode("utf-8")))
 
 
 def detect_suspicious_ua(user_agent):

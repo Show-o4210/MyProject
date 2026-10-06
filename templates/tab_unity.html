@@ -22,6 +22,7 @@
         </div>
 
         <section id="unpack-panel" role="tabpanel" aria-labelledby="unpack-tab" v-show="activeMode === 'unpack'">
+            <p class="mb-4 text-xs text-slate-500">Bundle 上限 140 MiB；更大的文件请使用本地工具。</p>
             <form action="/unpack" method="post" enctype="multipart/form-data" @submit.prevent="submitDownload($event, 'unpack')" @change="clearFeedback('unpack')" :aria-busy="pending === 'unpack'">
                 <fieldset :disabled="!!pending" class="space-y-5 min-w-0">
                     <div>
@@ -63,6 +64,7 @@
         </section>
 
         <section id="repack-panel" role="tabpanel" aria-labelledby="repack-tab" v-show="activeMode === 'repack'">
+            <p class="mb-4 text-xs text-slate-500">原始 Bundle ≤140 MiB，补丁 ZIP ≤90 MiB；两份文件合计须小于 {{ upload_total_mib }} MiB。</p>
             <form action="/repack" method="post" enctype="multipart/form-data" @submit.prevent="submitDownload($event, 'repack')" @change="clearFeedback('repack')" :aria-busy="pending === 'repack'">
                 <fieldset :disabled="!!pending" class="space-y-5 min-w-0">
                     <div>
@@ -127,6 +129,20 @@
                 if (pending.value) return;
                 const form = event.currentTarget;
                 if (!form.reportValidity()) return;
+                clearFeedback(mode);
+                const limits = {bundle: 140, original_bundle: 140, modified_zip: 90};
+                let total = 0;
+                for (const input of form.querySelectorAll('input[type="file"]')) {
+                    const file = input.files?.[0];
+                    if (!file || !file.size) { errors.value[mode] = '请选择完整且非空的文件。'; return; }
+                    if (file.size > limits[input.name] * 1024 * 1024) {
+                        errors.value[mode] = `文件超过 ${limits[input.name]} MiB 在线上限，请使用本地工具。`; return;
+                    }
+                    total += file.size;
+                }
+                if (total >= {{ upload_total_mib }} * 1024 * 1024) {
+                    errors.value[mode] = '上传文件合计超过在线请求上限，请缩小补丁或使用本地工具。'; return;
+                }
                 const body = new FormData(form);
                 clearFeedback(mode);
                 pending.value = mode;

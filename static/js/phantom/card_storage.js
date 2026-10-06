@@ -1,28 +1,36 @@
+import {readBoundedJson, validateJson, checkText} from '../json_budget.js';
 import { STORAGE_KEY, createEmptyCard } from './state.js';
 
 const LEGACY_STORAGE_KEY = 'pvzh_phantom_json_creator_v11';
 
-export function loadCard() {
+export async function loadCard() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?.card && typeof parsed.card === 'object') return parsed.card;
+      const parsed = await readBoundedJson(raw);
+      if (parsed?.card && typeof parsed.card === 'object' && !Array.isArray(parsed.card)) return parsed.card;
+      throw new Error('草稿格式无效');
     }
     const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (legacyRaw) {
-      const legacy = JSON.parse(legacyRaw);
-      if (legacy?.cards?.[0]) return legacy.cards[0];
+      const legacy = await readBoundedJson(legacyRaw);
+      if (legacy?.cards?.[0] && typeof legacy.cards[0] === 'object' && !Array.isArray(legacy.cards[0])) return legacy.cards[0];
+      throw new Error('旧草稿格式无效');
     }
   } catch (error) {
     console.warn('无法读取本地草稿，已重置。', error);
+    clearCardStorage();
+    document.getElementById('draft-recovery')?.removeAttribute('hidden');
   }
   return createEmptyCard();
 }
 
 export function saveCard(card) {
+  validateJson(card);
   const data = { card, updatedAt: new Date().toISOString() };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const encoded = JSON.stringify(data);
+  checkText(encoded);
+  localStorage.setItem(STORAGE_KEY, encoded);
   return data;
 }
 
@@ -44,13 +52,5 @@ export function downloadJson(filename, data) {
 }
 
 export function readJsonFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try { resolve(JSON.parse(reader.result)); }
-      catch (error) { reject(error); }
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsText(file, 'utf-8');
-  });
+  return readBoundedJson(file);
 }

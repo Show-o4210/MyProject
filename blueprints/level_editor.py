@@ -6,6 +6,8 @@ import gc
 from flask import Blueprint, render_template, jsonify, send_file
 from logic_level_editor import LevelEditorLogic
 from extensions import acquire_unity_lock, release_unity_lock
+from utils.unity_jobs import run_unity_job
+from utils.patch_limits import ClientFacingError
 from utils.json_requests import (
     JsonInputError, json_error_response, read_json_object,
     validate_level_id, serialize_level_config,
@@ -89,7 +91,9 @@ def pack_level():
         asset_filename = logic.asset_filename
         out_path = os.path.join(workdir, asset_filename)
         # 执行打包逻辑
-        logic.pack_level_config(level_id, config_text, output_path=out_path)
+        worker_output = os.path.join(workdir, "output.bundle")
+        run_unity_job(workdir, "level_pack", {"level_id": level_id, "config_text": config_text})
+        os.replace(worker_output, out_path)
 
         def cleanup():
             shutil.rmtree(workdir, ignore_errors=True)
@@ -107,6 +111,8 @@ def pack_level():
         response.call_on_close(cleanup)
         download_ready = True
         return response
+    except ClientFacingError as e:
+        return jsonify({"status": "error", "message": str(e)}), e.status
     except ValueError as e:
         return jsonify({"status": "error", "message": str(e)}), 400
     except Exception as e:

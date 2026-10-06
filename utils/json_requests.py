@@ -8,6 +8,8 @@ from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
 
 JSON_BODY_LIMITS = {
+    "deck_editor.quick_export": 512 * 1024,
+    "unity.unpack": 141 * 1024 * 1024,
     "level_editor.pack_level": 128 * 1024,
     "level_editor.extract_level": 4 * 1024,
 }

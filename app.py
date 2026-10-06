@@ -1,5 +1,6 @@
 # app.py
 import datetime
+import logging
 import os
 
 import requests
@@ -23,6 +24,7 @@ from blueprints.sponsors import sponsors_bp
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config.from_object(Config)
+app.logger.setLevel(logging.INFO)
 
 # Flask send_file 默认缓存（favicon 等非 WhiteNoise 路径）
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 7
@@ -36,6 +38,13 @@ app.wsgi_app = WhiteNoise(
     prefix="static/",
     max_age=60 * 60 * 24 * 7,
 )
+
+@app.after_request
+def security_response_headers(response):
+    response.headers["Content-Security-Policy"] = "script-src 'self' 'unsafe-inline' 'unsafe-eval'; worker-src 'self'; object-src 'none'; base-uri 'self'"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
 
 init_small_json_limits(app)
 init_security_handlers(app)

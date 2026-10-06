@@ -19,7 +19,7 @@ PACK = "/api/editor/ab/pack"
 EXTRACT = "/api/editor/ab/extract"
 
 
-def test_app(blueprint):
+def make_app(blueprint):
     app = Flask(__name__)
     app.testing = True
     app.config["MAX_CONTENT_LENGTH"] = 150 * 1024 * 1024
@@ -30,7 +30,7 @@ def test_app(blueprint):
 
 class LevelRequestTests(unittest.TestCase):
     def setUp(self):
-        self.app = test_app(level_editor.level_editor_bp)
+        self.app = make_app(level_editor.level_editor_bp)
         self.client = self.app.test_client()
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -53,6 +53,10 @@ class LevelRequestTests(unittest.TestCase):
             mocked = patcher.start()
             self.addCleanup(patcher.stop)
             setattr(self, name.split(".")[-1], mocked)
+        def in_process_job(workdir, action, payload):
+            level_editor.logic.pack_level_config(payload['level_id'], payload['config_text'], output_path=str(Path(workdir) / 'output.bundle'))
+        runner = patch.object(level_editor, 'run_unity_job', side_effect=in_process_job)
+        runner.start(); self.addCleanup(runner.stop)
         self.assertFalse(UNITY_TASK_LOCK.locked())
 
     def write_bundle(self, level_id, config_text, output_path):
@@ -243,13 +247,13 @@ class RealLevelCompatibilityTests(unittest.TestCase):
 
     def test_real_largest_config_pack_uses_one_load_and_roundtrips(self):
         level_id, config = max(self.configs, key=lambda item: len(json.dumps(item[1])))
-        app = test_app(level_editor.level_editor_bp)
+        app = make_app(level_editor.level_editor_bp)
         with patch("logic_level_editor.UnityPy.load", wraps=UnityPy.load) as load, \
                 patch("blueprints.level_editor.release_unity_lock",
                       wraps=level_editor.release_unity_lock) as release:
             result = app.test_client().post(PACK, json={"level_id": level_id, "config": config})
             self.assertEqual(result.status_code, 200)
-            load.assert_called_once_with(level_editor.logic.input_ab_path)
+            load.assert_not_called()  # Real parsing/saving occurs only in the child.
             release.assert_called_once()
             self.assertFalse(UNITY_TASK_LOCK.locked())
             output = result.data
