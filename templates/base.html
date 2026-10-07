@@ -7,9 +7,9 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>{% block title %}PVZH Mod 工具箱 - Plants vs. Zombies Heroes 在线辅助工具{% endblock %}</title>
     <meta name="description"
-        content="{% block meta_description %}PVZH 在线 Mod 工具箱：Unity 文本解包回填、卡组和关卡编辑、幻影卡牌工坊与工具资料下载。{% endblock %}">
+        content="{% block meta_description %}PVZH 在线 Mod 工具箱：Unity 文本解包回填、卡组和关卡编辑与工具资料下载。{% endblock %}">
     <meta name="keywords" content="PVZH, 植物大战僵尸英雄, PVZ Heroes, Mod工具, 卡组编辑器, 关卡编辑器, UnityPy">
-    <meta name="robots" content="index, follow">
+    <meta name="robots" content="{% block robots %}index, follow{% endblock %}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="PVZH Mod 工具箱">
     <meta property="og:locale" content="zh_CN">
@@ -56,6 +56,8 @@
         }
 
         .page-bg { background-color: #fff; }
+        .tool-lifecycle-notice { background: #fffbeb; border-top: 1px solid #fde68a; color: #92400e; }
+        .tool-lifecycle-notice a { text-decoration: underline; text-underline-offset: 3px; }
         #support-modal::backdrop { background: rgba(15, 23, 42, 0.4); }
 
         .material-symbols-rounded {
@@ -65,7 +67,7 @@
 </head>
 
 <body class="page-bg text-slate-800 min-h-screen flex flex-col antialiased pb-[4.5rem] md:pb-0">
-    {% set navigation = [('/', '首页', 'home'), ('/unity', 'Unity 工具', 'inventory_2'), ('/phantom', '幻影引擎', 'auto_fix_high'), ('/downloads', '下载中心', 'download'), ('/tools', '致谢', 'volunteer_activism')] %}
+    {% set navigation = [('/', '首页', 'home'), ('/unity', 'Unity 工具', 'inventory_2'), ('/downloads', '下载中心', 'download'), ('/tools', '致谢', 'volunteer_activism')] %}
     <header class="sticky top-0 z-50 bg-white border-b border-slate-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 md:h-16 flex items-center justify-between gap-4">
             <a href="/" class="flex items-center gap-2.5 shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
@@ -80,6 +82,15 @@
             </nav>
             <button type="button" onclick="openSupportModal()" class="shrink-0 text-sm text-slate-500 hover:text-brand-600 rounded px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">赞助</button>
         </div>
+        {% if request.path in ['/', '/deck-editor', '/editor', '/downloads', '/phantom'] %}
+        <aside id="tool-lifecycle-notice" class="tool-lifecycle-notice" aria-label="工具维护公告">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 text-sm leading-relaxed">
+                <strong>工具维护公告：</strong>
+                {% if request.path == '/' %}除 Unity 文本工具外，其他工具可能会关闭。如果你正在使用，请与我联系。{% else %}此工具可能会关闭。如果你正在使用，请与我联系。{% endif %}
+                <a href="https://qm.qq.com/q/PayU4f00iQ" target="_blank" rel="noopener noreferrer">通过 QQ 群联系维护者</a>
+            </div>
+        </aside>
+        {% endif %}
     </header>
 
     <main class="flex-grow w-full max-w-7xl mx-auto relative z-10">

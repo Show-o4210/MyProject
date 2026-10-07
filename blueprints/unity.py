@@ -178,6 +178,15 @@ class FormatManager:
 
     @staticmethod
     def from_csv(csv_text, original_tree=None):
+        # csv 模块默认仅允许 128 KiB；解析器与业务预算保持一致。
+        previous_limit = csv.field_size_limit(patch_limits.CSV_MAX_FIELD_CHARS)
+        try:
+            return FormatManager._from_csv(csv_text, original_tree)
+        finally:
+            csv.field_size_limit(previous_limit)
+
+    @staticmethod
+    def _from_csv(csv_text, original_tree=None):
         result = {}
         original_tree = original_tree if isinstance(original_tree, dict) else {}
         reader = csv.reader(io.StringIO(csv_text))
@@ -197,7 +206,7 @@ class FormatManager:
             if len(row) > patch_limits.CSV_MAX_COLUMNS:
                 raise patch_limits.limit_error(f"CSV 列数超过 {patch_limits.CSV_MAX_COLUMNS} 列")
             if any(len(value) > patch_limits.CSV_MAX_FIELD_CHARS for value in row):
-                raise patch_limits.limit_error("CSV 单字段超过 128 KiB 字符上限")
+                raise patch_limits.limit_error(f"CSV 单字段超过 {patch_limits.CSV_MAX_FIELD_CHARS} 字符上限")
             if len(row) >= 2 and row[0].strip():
                 key, value = row[0].strip(), row[1]
                 if value.startswith(("{", "[")):
@@ -621,7 +630,7 @@ def build_zip_patch_maps(patch):
             raise ClientFacingError(f"补丁 [{file_name_only}] 格式不支持；在线回填只支持 JSON 或 CSV。")
         zip_file_map[file_name_only] = name
 
-        match = re.search(r'_(\d+)\.(json5?|csv)$', file_name_only, re.IGNORECASE)
+        match = re.search(r'_(-?\d+)\.(json5?|csv)$', file_name_only, re.IGNORECASE)
         if match:
             fallback_map[match.group(1)] = name
 
@@ -694,7 +703,7 @@ def prepare_export_tree(tree, policy, budget):
             yield key
             if (key in STRING_EMBEDDED_JSON_KEYS and isinstance(value, str)
                     and looks_like_json_text(value)):
-                if len(value) > export_limits.TREE_MAX_STRING_CHARS:
+                if len(value.encode("utf-8")) > export_limits.EMBEDDED_JSON_MAX_BYTES:
                     raise export_limits.exceeded("内嵌 JSON 字符串过长")
                 text = clean_json_string(value) if policy["process_mode"] == "auto" else value
                 try:

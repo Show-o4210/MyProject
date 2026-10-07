@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Worker as NodeWorker} from 'node:worker_threads';
 import {readBoundedJson} from '../../static/js/json_budget.js';
-import {loadCard, saveCard} from '../../static/js/phantom/card_storage.js';
-import {STORAGE_KEY} from '../../static/js/phantom/state.js';
+import {loadCard, saveCard} from '../../archive/phantom/static/js/phantom/card_storage.js';
+import {STORAGE_KEY} from '../../archive/phantom/static/js/phantom/state.js';
 
 let terminated = 0;
 class BrowserWorker {

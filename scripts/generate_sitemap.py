@@ -22,7 +22,6 @@ def main():
         {"loc": f"{base}/unity", "changefreq": "weekly", "priority": "0.9"},
         {"loc": f"{base}/deck-editor", "changefreq": "weekly", "priority": "0.8"},
         {"loc": f"{base}/editor", "changefreq": "weekly", "priority": "0.8"},
-        {"loc": f"{base}/phantom", "changefreq": "weekly", "priority": "0.8"},
         {"loc": f"{base}/tools", "changefreq": "monthly", "priority": "0.5"},
     ]
 
