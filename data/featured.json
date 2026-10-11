@@ -1,6 +1,73 @@
 {
   "schema_version": 2,
-  "featured_version": "players-001",
-  "works": [],
-  "source_repository": "Show-o4210/DIY-IMG"
+  "featured_version": "players-002",
+  "works": [
+    {
+      "id": "show-holly-emperor",
+      "image_url": "https://cdn.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-holly-emperor/image.png",
+      "image_fallbacks": [
+        "https://fastly.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-holly-emperor/image.png",
+        "https://gcore.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-holly-emperor/image.png"
+      ],
+      "source_url": "https://github.com/Show-o4210/DIY-IMG/blob/92e8763497aa48268b3806674aa6deadec7bf89a/works/show-holly-emperor/image.png",
+      "sha256": "087e16c0089c64d8a4736e462243198d66c8896a116a09c2c615d5603a8563d3",
+      "author_id": "show",
+      "author_words": "希望大家多多分享自己的作品！",
+      "license_label": "作者允许本应用展示、缓存与个人署名收藏；其他用途请联系作者。"
+    },
+    {
+      "id": "show-holly-missile",
+      "image_url": "https://cdn.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-holly-missile/image.png",
+      "image_fallbacks": [
+        "https://fastly.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-holly-missile/image.png",
+        "https://gcore.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-holly-missile/image.png"
+      ],
+      "source_url": "https://github.com/Show-o4210/DIY-IMG/blob/92e8763497aa48268b3806674aa6deadec7bf89a/works/show-holly-missile/image.png",
+      "sha256": "4d8dd42129ad162e89365367cb0006dceb52d898a06e91fe55825213ad03c723",
+      "author_id": "show",
+      "author_words": "希望大家多多分享自己的作品！",
+      "license_label": "作者允许本应用展示、缓存与个人署名收藏；其他用途请联系作者。"
+    },
+    {
+      "id": "show-happy-holly",
+      "image_url": "https://cdn.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-happy-holly/image.png",
+      "image_fallbacks": [
+        "https://fastly.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-happy-holly/image.png",
+        "https://gcore.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-happy-holly/image.png"
+      ],
+      "source_url": "https://github.com/Show-o4210/DIY-IMG/blob/92e8763497aa48268b3806674aa6deadec7bf89a/works/show-happy-holly/image.png",
+      "sha256": "69ad54dfb13935b4040b903ea724aefda02701463243770ed400e8d16cfac7e3",
+      "author_id": "show",
+      "author_words": "希望大家多多分享自己的作品！",
+      "license_label": "作者允许本应用展示、缓存与个人署名收藏；其他用途请联系作者。"
+    },
+    {
+      "id": "show-happy-single-holly",
+      "image_url": "https://cdn.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-happy-single-holly/image.png",
+      "image_fallbacks": [
+        "https://fastly.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-happy-single-holly/image.png",
+        "https://gcore.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-happy-single-holly/image.png"
+      ],
+      "source_url": "https://github.com/Show-o4210/DIY-IMG/blob/92e8763497aa48268b3806674aa6deadec7bf89a/works/show-happy-single-holly/image.png",
+      "sha256": "365fe4859be903ef4d61737bba7cc27fddf5d4c6418c2e2c34e592e0c9fcf870",
+      "author_id": "show",
+      "author_words": "希望大家多多分享自己的作品！",
+      "license_label": "作者允许本应用展示、缓存与个人署名收藏；其他用途请联系作者。"
+    },
+    {
+      "id": "show-unhappy-holly",
+      "image_url": "https://cdn.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-unhappy-holly/image.png",
+      "image_fallbacks": [
+        "https://fastly.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-unhappy-holly/image.png",
+        "https://gcore.jsdelivr.net/gh/Show-o4210/DIY-IMG@92e8763497aa48268b3806674aa6deadec7bf89a/works/show-unhappy-holly/image.png"
+      ],
+      "source_url": "https://github.com/Show-o4210/DIY-IMG/blob/92e8763497aa48268b3806674aa6deadec7bf89a/works/show-unhappy-holly/image.png",
+      "sha256": "4b4b078326706614b34282d0ea2f7cae6605e0fb7616a746c97d6ee263a993b7",
+      "author_id": "show",
+      "author_words": "希望大家多多分享自己的作品！",
+      "license_label": "作者允许本应用展示、缓存与个人署名收藏；其他用途请联系作者。"
+    }
+  ],
+  "source_repository": "Show-o4210/DIY-IMG",
+  "source_revision": "92e8763497aa48268b3806674aa6deadec7bf89a"
 }
