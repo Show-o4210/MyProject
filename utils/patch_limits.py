@@ -225,21 +225,25 @@ def _strip_json_trailing_commas(text):
     return ''.join(parts)
 
 
+def loads_json_with_trailing_commas(text):
+    """标准 JSON 快路径；仅兼容值后的尾逗号，不改动字符串正文。"""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return json.loads(_strip_json_trailing_commas(text))
+
+
 def load_patch_json(text, label):
     check_json_text(text, label)
     try:
-        parsed = json.loads(text)
+        parsed = loads_json_with_trailing_commas(text)
     except json.JSONDecodeError:
+        # 其余 JSON5 仍解析原文，避免修改单引号/注释等 JSON5 内容。
+        if len(text.encode("utf-8")) > JSON5_MAX_BYTES:
+            raise limit_error(f"{label} 需要 JSON5 解析，但超过 {JSON5_MAX_BYTES // 1024} KiB；请保存为标准 JSON")
         try:
-            # 仅尾逗号的旧 JSON 仍用标准解析器，沿用 JSON 大小/深度/节点预算。
-            parsed = json.loads(_strip_json_trailing_commas(text))
-        except json.JSONDecodeError:
-            # 其余 JSON5 仍解析原文，避免修改单引号/注释等 JSON5 内容。
-            if len(text.encode("utf-8")) > JSON5_MAX_BYTES:
-                raise limit_error(f"{label} 需要 JSON5 解析，但超过 {JSON5_MAX_BYTES // 1024} KiB；请保存为标准 JSON")
-            try:
-                parsed = json5.loads(text)
-            except RecursionError as exc:
-                raise limit_error(f"{label} JSON5 嵌套过于复杂") from exc
+            parsed = json5.loads(text)
+        except RecursionError as exc:
+            raise limit_error(f"{label} JSON5 嵌套过于复杂") from exc
     check_json_tree(parsed, label)
     return parsed

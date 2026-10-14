@@ -315,7 +315,7 @@ def dumps_embedded_json(value, process_strategy="auto", newline="\n"):
 def parse_embedded_json(text, process_strategy="auto"):
     cleaned = clean_json_string(text) if process_strategy == "auto" else text
     try:
-        return json.loads(cleaned)
+        return patch_limits.loads_json_with_trailing_commas(cleaned)
     except json.JSONDecodeError:
         try:
             return json5.loads(cleaned)
@@ -712,7 +712,7 @@ def prepare_export_tree(tree, policy, budget):
                 except ClientFacingError as exc:
                     raise export_limits.exceeded("Bundle 内嵌 JSON 结构过于复杂") from exc
                 try:
-                    value = json.loads(text)
+                    value = patch_limits.loads_json_with_trailing_commas(text)
                 except json.JSONDecodeError:
                     if len(text.encode("utf-8")) > export_limits.JSON5_MAX_BYTES:
                         raise export_limits.exceeded("非标准内嵌 JSON 超过 JSON5 解析预算")
