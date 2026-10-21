@@ -3,7 +3,7 @@
 {% block vue_script %}{% endblock %}
 
 {% block title %}PVZH Mod 工具箱 · 植物大战僵尸英雄{% endblock %}
-{% block meta_description %}植物大战僵尸：英雄在线 Mod 工具：Unity JSON/CSV 解包回填、卡牌、卡组和关卡编辑，以及工具资料下载。{% endblock %}
+{% block meta_description %}植物大战僵尸：英雄在线 Mod 工具：Unity JSON/CSV 解包回填，以及工具资料网盘下载。{% endblock %}
 
 {% macro update_row(log) %}
 <details class="update-row border-b border-slate-100 last:border-0">
@@ -48,8 +48,6 @@
             <span class="material-symbols-rounded text-[20px] text-brand-600" aria-hidden="true">arrow_forward</span>
         </a>
         {% for href, icon, title, description in [
-            ('/deck-editor', 'style', '卡组编辑器', '修改卡组，生成游戏数据。'),
-            ('/editor', 'dashboard_customize', '关卡编辑器', '修改人机配置与场景事件。'),
             ('/downloads', 'download', '下载中心', '获取工具与参考资料。')
         ] %}
         <a href="{{ href }}" class="flex items-center gap-4 rounded-xl border border-slate-200 p-4 sm:p-5 hover:border-brand-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">

@@ -49,7 +49,7 @@ gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --ma
 - 根路径 `/robots.txt` 与 `/sitemap.xml` 由 `blueprints/home.py` 提供。
 - `scripts/generate_sitemap.py` 在构建时同步生成静态版本。
 - 新增可公开索引的固定页面时，需要同步检查 `_STATIC_SITEMAP_PAGES` 和生成脚本。
-- 下载资料卡片不生成独立 URL，sitemap 只收录 `/downloads`。
+- 下载中心为单一网盘链接；sitemap 只收录 `/downloads`，不收录归档工具。
 
 ## 上线检查
 
@@ -63,8 +63,9 @@ python scripts/generate_sitemap.py
 
 - `/health` 返回 200。
 - `/robots.txt` 和 `/sitemap.xml` 使用正确公网域名。
-- 首页、下载中心和主要编辑器页面可以打开。
-- 下载卡片弹窗及夸克网盘、QQ 群入口正常。
+- 首页、Unity 文本工具和下载中心可以打开。
+- 下载中心只有一个夸克网盘超链接，无卡片、弹窗或 QQ 引流。
+- `/editor`、`/deck-editor` 及原 API 返回 410。
 - 配置 Supabase 后，安全日志写入正常。
 
 

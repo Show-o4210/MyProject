@@ -27,23 +27,6 @@ def dispatch(workdir, action, payload):
             perform_unpack(str(workdir / 'input.bundle'), str(workdir / 'output.zip'), payload['policy'], budget)
         else:
             perform_repack(str(workdir / 'original.bundle'), str(workdir / 'patch.zip'), str(workdir / 'output.bundle'), payload['mode'])
-    elif action == 'deck_export':
-        from logic_unity import unity_processor
-        unity_processor.repack_from_server_data(payload['mods'], output_path=str(workdir / 'output.zip'))
-    elif action == 'deck_init':
-        from logic_unity import unity_processor
-        return unity_processor.extract_all_to_memory()
-    elif action.startswith('level_'):
-        from logic_level_editor import LevelEditorLogic
-        logic = LevelEditorLogic()
-        if action == 'level_list':
-            return logic.get_all_level_ids()
-        if action == 'level_extract':
-            return logic.load_level_config(payload['level_id'])
-        if action == 'level_pack':
-            logic.pack_level_config(payload['level_id'], payload['config_text'], output_path=str(workdir / 'output.bundle'))
-        else:
-            raise ValueError('Unknown job')
     else:
         raise ValueError('Unknown job')
 

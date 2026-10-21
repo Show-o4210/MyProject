@@ -7,9 +7,9 @@
 主要分层如下：
 
 - `blueprints/`：HTTP 路由、请求解析和页面渲染。
-- `logic_*.py`：Unity 底包和关卡等领域逻辑。
-- `utils/`：卡牌索引、JSON 清洗和数据读取。
-- `data/`：运行时配置、下载目录、卡牌数据和 Unity 底包。
+- `archive/editors/`：已归档的关卡/卡组实现、专用数据、底包与历史测试，不参与在线运行。
+- `utils/`：Unity 任务隔离、资源预算、JSON 清洗和配置读取。
+- `data/`：公告、版本、赞助、单一下载链接和玩家精选目录。
 - `templates/` 与 `static/`：Jinja2 页面和前端资源。
 - `sql/`：Supabase 表结构、RLS 与权限脚本。
 
@@ -19,18 +19,18 @@
 | --- | --- |
 | `home.py` | 首页、鸣谢页、robots 与动态 sitemap |
 | `unity.py` | AssetBundle 文本解包和回填 |
-| `deck_editor.py` | 卡组编辑与打包 |
-| `level_editor.py` | 关卡数据读取、编辑与打包 |
+| `deck_editor.py` | 卡组旧页面和 API 的 HTTP 410 响应 |
+| `level_editor.py` | 关卡旧页面和 API 的 HTTP 410 响应 |
 | `phantom.py` | 幻影引擎归档说明及旧 API 的 HTTP 410 响应；原实现位于 `archive/phantom/` |
-| `downloads.py` | 资料卡片列表与共享获取入口 |
+| `downloads.py` | 单一夸克网盘超链接页面 |
 | `version.py` | APK 版本查询接口 |
 | `sponsors.py` | 赞助相关接口 |
 
 ## 关键数据流
 
-卡组和关卡模块通过 `utils/card_index.py` 读取 `data/index_new.json`。卡组和关卡打包直接修改各自 Unity 底包的 typetree，不经过通用 Unity 工作台的导出格式。幻影模块源码及专用资源已移入 `archive/phantom/`，不再提供在线编辑器或配置 API，首页、公共导航及 sitemap 入口已撤下。
+关卡与卡组工具于 2026-10-21 正式归档到 `archive/editors/`；幻影引擎位于 `archive/phantom/`。专用 Python 实现、模板、卡牌索引、配置、JSON Worker 和底包不再参与网站运行。生产蓝图只返回归档页面或 JSON HTTP 410，不创建 Unity 任务、不加载数据、不清除浏览器历史数据。首页、导航及动态/静态 sitemap 撤下旧入口，原“可能关闭”维护公告与 QQ 引流已移除。
 
-`base.html` 在首页、卡组、关卡、下载和 Phantom 旧页面的粘性页头显示维护公告，明确工具可能关闭，并链接现有 QQ 群以联系维护者。公告由服务端渲染，无关闭按钮、折叠或持久化隐藏状态，不依赖 Vue；Unity 页面不显示该公告。
+`app.py` 仍注册轻量退役蓝图，以兼容旧 URL；`utils/unity_worker.py` 仅分派 `unpack` / `repack`。旧任务分派、输入校验、文档和测试快照保存在归档目录。通用 Unity 回归测试继续读取归档中的三个底包作为样本。
 
 Unity 页面使用解包 / 回填双页签，JSON/CSV 直接选择，auto/manual 兼容选项默认折叠；任务处理中锁定表单与页签，错误和下载状态分别显示在所属表单。通用 Unity 工作台接收用户上传的 Bundle，支持 JSON/CSV 文本导出、受限补丁回填。Unity 重任务共用 `extensions.py` 中的并发控制，避免低内存实例同时处理多个包。
 
@@ -71,7 +71,7 @@ Unity 页面使用解包 / 回填双页签，JSON/CSV 直接选择，auto/manual
 
 JSON 和 CSV 的六次真实导出均无失败对象；CSV 最大未压缩 8137380 字节、ZIP 1807441 字节。单对象展开 JSON 最大 7095592 字节；data_assets_44 的单对象 JSON P50/P95 为 1431/5912 字节，另外两个包的 P50 为 3130/887 字节。最大源对象 1143932 字节；最大单对象结构 297329 节点、深度 10，最大请求累计 792369 节点、读取源数据 5306540 字节。对象预算约最大实例的 4.15 倍、输出文件 2.08 倍、单文本 2.36 倍、累计内容 3.67 倍、ZIP 15.9 倍；16 MiB 源对象预算约 14.7 倍，64 MiB 累计源读取约 12.6 倍；单结构节点 1.68 倍、累计节点 2.52 倍、深度 3.2 倍。普通单字符串预算为 2 Mi 字符；完整嵌入 JSON 在展开前使用独立 8 MiB UTF-8 字节预算，展开后的字符串仍按原额度检查。临时磁盘预算兼容上传暂存和副本（最多约 280 MiB）、导出 ZIP 的同时存在，并非按小样本无限缩小上传范围。
 
-应用预算之外，UnityPy.load、单次对象读取和完整序列化现在均运行在可丢弃 Linux 子进程（`utils/unity_jobs.py` / `utils/unity_worker.py`）。导出、回填、卡组初始化与导出、关卡打包使用这一边界。子进程导入 UnityPy 前设置 RLIMIT_AS=384 MiB、CPU=30 秒、FSIZE=140 MiB、NOFILE=64、NPROC=16、CORE=0；父进程每约 50ms 监测 RSS（256 MiB）、实际时间（45 秒）和任务目录（384 MiB，包括上传框架暂存预留）。超限杀死整个子进程组并 wait 回收，失败路径删除工作目录并释放锁。磁盘总量与 RSS 的监测可能有一个采样周期的延迟，地址空间、CPU 与单文件上限由内核执行；主机总磁盘配额仍不由应用提供，慢下载可能保留多个已完成目录。
+应用预算之外，UnityPy.load、单次对象读取和完整序列化现在均运行在可丢弃 Linux 子进程（`utils/unity_jobs.py` / `utils/unity_worker.py`）。当前在线导出与回填使用这一边界；卡组和关卡任务已归档。子进程导入 UnityPy 前设置 RLIMIT_AS=384 MiB、CPU=30 秒、FSIZE=140 MiB、NOFILE=64、NPROC=16、CORE=0；父进程每约 50ms 监测 RSS（256 MiB）、实际时间（45 秒）和任务目录（384 MiB，包括上传框架暂存预留）。超限杀死整个子进程组并 wait 回收，失败路径删除工作目录并释放锁。磁盘总量与 RSS 的监测可能有一个采样周期的延迟，地址空间、CPU 与单文件上限由内核执行；主机总磁盘配额仍不由应用提供，慢下载可能保留多个已完成目录。
 
 成功仅返回固定输出文件与大小受限的 JSON 状态；网页进程不接收 Unity 对象图或整份 Bundle bytes。回填通过有限对象遍历，并在写文件前检查输出长度；序列化兼容回退共用同一子进程 CPU/时间预算，内存、递归或 I/O 错误不重试。任务仍串行；锁已忙时立即返回 429。
 
@@ -83,29 +83,15 @@ JSON 和 CSV 的六次真实导出均无失败对象；CSV 最大未压缩 81373
 
 安全层负责真实访客 IP、黑名单、可疑请求处理和审计日志。
 
-小型 JSON 请求预算集中于 `utils/json_requests.py`，依赖 Flask >= 3.1 的每请求 `max_content_length`，在读取正文前设置。`POST /api/editor/ab/extract` 上限 4 KiB；`POST /api/editor/ab/pack` 上限 128 KiB，不降低全局 150 MiB 上传上限。Content-Length 仅作辅助拒绝，实际读取使用 Werkzeug 受限流。WSGI 服务器标记 `wsgi.input_terminated` 的流达到预算即返回中文 413（恰好等于预算也保守拒绝），避免把 `readall()` 返回的截断正文当作完整 JSON；未标记终止且没有 Content-Length 时遵循 Werkzeug 的安全空流行为。已封禁请求仍保留安全层的提前响应。
+`utils/json_requests.py` 仅保留 Unity 解包的 141 MiB 请求流上限，以及对应中文 413 响应；全局上传上限仍为 150 MiB。旧关卡 JSON 和卡组表单解析器随工具归档，410 路由不解析旧请求正文。
 
-关卡 config 必须是非空对象：根深度为 1，最多 32 层、20000 节点（键和值均计数）、单个键或字符串值 4096 字符、保持原四空格缩进后最多 256 KiB UTF-8；level_id 为非空字符串、最长 128 字符。遍历使用迭代器栈，序列化分段计数；超预算中文 413，参数或 JSON 格式错误中文 400。请求体解析、参数/结构预算和序列化均先于 Unity 锁；目标查找与写入共用一次 UnityPy.load。异常释放锁并清理目录，成功在下载流关闭后清理。UnityPy 加载与完整 Bundle 输出的峰值内存风险仍见上文。
-
-默认预算基线：2026-10-02 随项目提供的 `data/data_assets_44` 中含 PlayerConfig / BoardConfig 的 1065 份 TextAsset 关卡 JSON，统计无解析失败。下表分位数取排序后向下取整的位置；字符串长度包含对象键，节点包含对象键和值。
-
-| 指标 | 最小 | P50 | P95 | 最大 | 默认预算 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 原 JSON UTF-8 字节 | 2191 | 2553 | 2892 | 9600 | pack 请求 131072 字节（含参数） |
-| 四空格序列化 UTF-8 字节 | 4068 | 4767 | 5446 | 18474 | 262144 字节 |
-| 深度 | 6 | 7 | 7 | 7 | 32 |
-| 节点 | 216 | 252 | 288 | 988 | 20000 |
-| 最长字符串字符数 | 36 | 42 | 45 | 56 | 4096 |
-
-最大原/序列化 JSON 与最多节点均来自 FTUE_Node_1_Slim，现有 level_id 最长 39 字符。pack 正文约为最大原 JSON 的 13.7 倍，序列化预算约 14.2 倍、节点约 20 倍，留出 Mod 编辑余量。
-
-下载中心从 `data/downloads.json` 的 `items[]` 加载资料卡片；点击卡片打开原生 dialog，共享 `download_options[]` 中的夸克网盘和 QQ 群链接。只维护名称、文件类型与图标；详情页、独立下载 API 和分区结构已移除，sitemap 仅收录下载中心。
+下载中心保留 `/downloads`，从 `data/downloads.json` 读取唯一 `url`，直接渲染“打开夸克网盘”超链接，无资源目录、下载弹窗或 QQ 群入口，不需要 Vue 或页面脚本。配置校验见 `scripts/validate_downloads.py`。
 
 ## 运行约束
 
 - 上传上限为 150 MB。
 - Render 配置使用单 worker，避免 UnityPy 并发导致内存峰值过高。
-- `data/` 中的二进制底包和 JSON 都是运行时资产，不应当作普通文档移动。
+- `data/` 中的 JSON 为运行时配置；编辑器底包已移入 `archive/editors/data/`，当前仅被通用 Unity 测试作为样本读取。
 - `data/news.json` 是首页公告来源；`data/version.json` 是版本 API 的首选数据源。
 
 ## PVZH DIY 玩家精选
@@ -115,10 +101,8 @@ JSON 和 CSV 的六次真实导出均无失败对象；CSV 最大未压缩 81373
 
 
 
-## 卡组与浏览器输入
+## 前端依赖与历史兼容
 
-卡组导出在获取锁前限制 512 KiB 实际表单请求流，要求唯一 deck_json 字段、已知卡组 ID、已知且不重复的整数卡牌 ID、正确阵营、1–99 整数份数；最多 110 个卡组、每组 128 条目、合计 8192 条目。此为自定义 Mod 的资源与类型规则，不强加 40 张/每种 4 张的对战规则。底包无法匹配任一卡组时整次失败，不下载部分或空包。Unity 序列化和 ZIP 生成在受限子进程，ZIP 在文件写入前执行预算。
+Vue 3.5.13 生产构建与 Tailwind 3.4.17 生成 CSS 提交为本地文件，构建前校验 SHA-256 清单。CSP 的 script-src 仅允许本站，但保留 unsafe-inline/unsafe-eval 以支持既有行内事件与 Vue 模板编译器。Google 字体 CSS/字体仍为外部资源，不加载外部执行脚本。
 
-归档 Phantom 源码与现行关卡文件导入在读取前检查 256 KiB 文件大小，文本粘贴先检查 UTF-8 字节和词法嵌套深度；Web Worker 中解析并迭代校验深度 32、节点 20000、数组 2048、单字符串 4096 字符。无效结构不能进入响应式状态或 localStorage。Phantom 启动草稿同样校验，非法草稿自动清除并显示恢复提示。关卡粘贴解析使用序号避免旧异步结果覆盖新输入。
-
-Vue 3.5.13 生产构建与 Tailwind 3.4.17 生成 CSS 提交为本地文件，构建前校验 SHA-256 清单。CSP 的 script-src 仅允许本站，但保留 unsafe-inline/unsafe-eval 以支持既有行内事件与 Vue 模板编译器；不宣称已消除所有 XSS 风险。Google 字体 CSS/字体仍为外部资源，不加载外部执行脚本。
+关卡 JSON 导入和卡组表单输入逻辑已随源码归档，不再公开服务。现行 Node 测试读取 `archive/phantom/static/js/` 快照，保留对历史草稿恢复与 JSON Worker 预算的验证；生产 `static/js/` 不再提供这些文件。

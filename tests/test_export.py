@@ -309,7 +309,7 @@ class RealBundleExportTests(unittest.TestCase):
         app.testing = True
         app.register_blueprint(unity.unity_bp)
         for name in ("data_assets_44", "recipe_decks_1", "recipe_definitions_1"):
-            content = (ROOT / "data" / name).read_bytes()
+            content = (ROOT / "archive" / "editors" / "data" / name).read_bytes()
             with self.subTest(bundle=name), patch("blueprints.unity.cleanup_old_temp"):
                 for fmt in ("json", "csv"):
                     with self.subTest(format=fmt):

@@ -1,24 +1,22 @@
 """Real disposable processes and real shipped bundles, small caps for abuse tests."""
 import io
-import json
 from pathlib import Path
-import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from unittest.mock import patch
-import zipfile
 
 import pytest
 from flask import Flask
-import UnityPy
 
-from blueprints import unity, deck_editor
+from blueprints import unity
 from extensions import UNITY_TASK_LOCK
-from logic_data import data_manager
 from utils import unity_jobs as jobs
 from utils.patch_limits import ClientFacingError
+
+pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Unity resource isolation requires Linux")
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -27,64 +25,8 @@ def make_app():
     app = Flask(__name__, template_folder=str(ROOT / 'templates'))
     app.config['MAX_CONTENT_LENGTH'] = 150 * jobs.MIB
     app.register_blueprint(unity.unity_bp)
-    app.register_blueprint(deck_editor.deck_editor_bp)
     app.add_url_rule('/health', view_func=lambda: {'status': 'ok'})
     return app
-
-
-def valid_mods():
-    return {'Deck_GreenShadow_G1': [{'cardguid': 1, 'count': 2, 'faction': 0}]}
-
-
-def test_real_deck_export_preserves_modified_count_and_other_bundle():
-    app = make_app()
-    with patch('UnityPy.load', side_effect=AssertionError('web process must never parse Unity')):
-        result = app.test_client().post('/api/quick_export', data={'deck_json': json.dumps(valid_mods())})
-    assert result.status_code == 200, result.data
-    with zipfile.ZipFile(io.BytesIO(result.data)) as archive:
-        assert set(archive.namelist()) == {'recipe_decks_1', 'recipe_definitions_1'}
-        env = UnityPy.load(archive.read('recipe_decks_1'))
-        trees = [obj.read_typetree() for obj in env.objects if obj.type.name == 'MonoBehaviour']
-        deck = next(tree for tree in trees if tree.get('m_Name') == 'Deck_GreenShadow_G1')
-        entry = deck['Cards']['CardEntries'][0]
-        assert (entry['CardGuid'], entry['NumCopies'], entry['Faction']) == (1, 2, 0)
-    result.close()
-    assert not UNITY_TASK_LOCK.locked()
-    assert app.test_client().get('/health').status_code == 200
-
-
-@pytest.mark.parametrize('mods', [[], {}, {'unknown': []}, {'Deck_GreenShadow_G1': [0]},
-    {'Deck_GreenShadow_G1': [{'cardguid': True, 'count': 1, 'faction': 0}]},
-    {'Deck_GreenShadow_G1': [{'cardguid': 1, 'count': 100, 'faction': 0}]},
-    {'Deck_GreenShadow_G1': [{'cardguid': 1, 'count': 2, 'faction': 1}]},
-    {'Deck_GreenShadow_G1': [{'cardguid': 99999999, 'count': 2, 'faction': 0}]},
-    {'Deck_GreenShadow_G1': [dict(cardguid=1, count=2, faction=0)] * 129},
-])
-def test_invalid_decks_never_acquire_lock_or_start_worker(mods):
-    with patch.object(deck_editor, 'acquire_unity_lock') as lock, patch.object(deck_editor, 'run_unity_job') as runner:
-        result = make_app().test_client().post('/api/quick_export', data={'deck_json': json.dumps(mods)})
-    assert result.status_code in {400, 413}
-    lock.assert_not_called(); runner.assert_not_called()
-
-
-def test_large_deck_body_rejects_before_parsing_and_lock():
-    with patch.object(deck_editor, 'acquire_unity_lock') as lock:
-        result = make_app().test_client().post('/api/quick_export', data={'deck_json': ' ' * (512 * 1024 + 1)})
-    assert result.status_code == 413
-    lock.assert_not_called()
-
-
-def test_busy_lock_returns_immediately_and_does_not_start_worker():
-    UNITY_TASK_LOCK.acquire()
-    try:
-        start = time.monotonic()
-        with patch.object(deck_editor, 'run_unity_job') as runner:
-            result = make_app().test_client().post('/api/quick_export', data={'deck_json': json.dumps(valid_mods())})
-        assert result.status_code == 429
-        assert time.monotonic() - start < 1
-        runner.assert_not_called()
-    finally:
-        UNITY_TASK_LOCK.release()
 
 
 def harness_runner(monkeypatch, script):

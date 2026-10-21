@@ -389,7 +389,7 @@ class RepackRouteTests(unittest.TestCase):
 class RealBundleRepackTests(unittest.TestCase):
     def test_real_bundle_json_and_csv_roundtrips(self):
         # 使用项目已有的 23 KiB 底包，不修改磁盘原件；验证真实 UnityPy load/save。
-        source = (ROOT / "data" / "recipe_decks_1").read_bytes()
+        source = (ROOT / "archive" / "editors" / "data" / "recipe_decks_1").read_bytes()
         original = UnityPy.load(source)
         obj = next(obj for obj in original.objects if obj.type.name == "MonoBehaviour")
         tree = obj.read_typetree()
@@ -421,7 +421,7 @@ class RealBundleRepackTests(unittest.TestCase):
 
     def test_export_edit_repack_preserves_text_and_references(self):
         for source_name, object_type in (("recipe_decks_1", "MonoBehaviour"), ("data_assets_44", "TextAsset")):
-            source = (ROOT / "data" / source_name).read_bytes()
+            source = (ROOT / "archive" / "editors" / "data" / source_name).read_bytes()
             original = UnityPy.load(source)
             target = next(obj for obj in original.objects if obj.type.name == object_type)
             expected = target.read_typetree()
@@ -466,7 +466,7 @@ class RealBundleRepackTests(unittest.TestCase):
                             self.assertEqual(json.loads(actual["m_Script"]), json.loads(expected["m_Script"]))
                             actual["m_Script"] = expected["m_Script"]
                         self.assertEqual(actual, expected)
-                        self.assertEqual((ROOT / "data" / source_name).read_bytes(), source)
+                        self.assertEqual((ROOT / "archive" / "editors" / "data" / source_name).read_bytes(), source)
                     finally:
                         response.close()
                         response.request.environ["wsgi.input"].close()

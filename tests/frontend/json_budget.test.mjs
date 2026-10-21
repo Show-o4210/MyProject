@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseBoundedJson, validateJson, readBoundedJson, JSON_LIMITS} from '../../static/js/json_budget.js';
+import {parseBoundedJson, validateJson, readBoundedJson, JSON_LIMITS} from '../../archive/phantom/static/js/json_budget.js';
 
 test('normal Unicode JSON, escaped quotes and brackets remain valid', () => {
   const value = {name:'植物', x:'\\"[]{}', items:[1,true,null]};

@@ -22,8 +22,6 @@ _STATIC_SITEMAP_PAGES = [
     {"path": "/", "changefreq": "daily", "priority": "1.0"},
     {"path": "/downloads", "changefreq": "weekly", "priority": "0.9"},
     {"path": "/unity", "changefreq": "weekly", "priority": "0.9"},
-    {"path": "/deck-editor", "changefreq": "weekly", "priority": "0.8"},
-    {"path": "/editor", "changefreq": "weekly", "priority": "0.8"},
     {"path": "/tools", "changefreq": "monthly", "priority": "0.5"},
 ]
 
