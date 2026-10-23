@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "product": "pvzh-launcher",
+  "channel": "stable",
+  "latest": {
+    "release_code": 22001,
+    "version": "R22 RC1",
+    "title": "启动器有新版本",
+    "notes": "版本检查与公告服务已上线。需要升级时，请前往夸克网盘获取安装包，或通过官方社群获取帮助。",
+    "download_url": "https://pan.quark.cn/s/35c024ea8e02"
+  },
+  "announcements": [
+    {
+      "id": "20261023-launcher-online",
+      "title": "启动器通知服务已上线",
+      "content": "版本检查与公告现已启用。低版本每次进入启动器都会收到提醒。\n升级可查看夸克网盘；如尚未找到新包，可通过启动器的官方社群入口获取帮助。",
+      "published_at": "2026-10-23"
+    }
+  ]
+}
