@@ -10,3 +10,5 @@ Flask-Limiter
 requests
 json5
 flask-apscheduler
+# Render eMudhra advisory: Requests/HTTPX use a separate CA bundle.
+certifi>=2026.10.19
