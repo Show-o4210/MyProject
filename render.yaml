@@ -9,3 +9,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.3"
+      # Only valid for Render's public Cloudflare-protected ingress.
+      - key: TRUST_CLOUDFLARE_CLIENT_IP
+        value: "true"

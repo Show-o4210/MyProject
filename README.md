@@ -17,6 +17,10 @@
 
 旧 `/unity`、`/editor`、`/deck-editor`、`/phantom`、`/downloads`、`/tools` 返回 HTTP 410 及说明页；原工具 API 返回 JSON 410，仅读取路由，不解析上传。工具源码、归档底包和专用资源已退出当前树，仍可从 Git 历史找回。完整旧路径见 `blueprints/retired.py`。
 
+## 基础请求保护
+
+保留跨接口的单 IP 和全站总量限流，超限返回 429 与 Retry-After。默认每 IP 10 次/秒、120 次/分钟，全站 120 次/秒、1200 次/分钟，额度可通过环境变量调整。只有 GET/HEAD `/health` 豁免；不按 User-Agent 猜测恶意用户，不依赖数据库审计或假成功响应。单 worker 内存计数不适用于多实例部署，详见部署说明。
+
 ## 本地运行与验证
 
 使用 Python 3.12，无需 Node、Linux resource、UnityPy 或 Supabase。

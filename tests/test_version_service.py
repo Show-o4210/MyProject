@@ -104,7 +104,7 @@ def test_startup_needs_no_tool_database_or_scheduler_packages():
 import sys
 from app import app
 assert app.test_client().get('/health').status_code == 200
-for module in ('UnityPy', 'supabase', 'requests', 'flask_apscheduler', 'security', 'database', 'extensions'):
+for module in ('UnityPy', 'supabase', 'requests', 'flask_apscheduler', 'database', 'extensions'):
     assert module not in sys.modules, module
 '''
     result = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, timeout=10)

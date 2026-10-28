@@ -1,9 +1,10 @@
-"""Read-only PVZH version service. Importing the app starts no jobs or network I/O."""
+"""Read-only PVZH version service with lightweight request admission limits."""
 import os
 
 from flask import Flask, jsonify, send_from_directory
 
 from config import Config
+from security import init_request_protection
 from blueprints.featured import featured_bp
 from blueprints.home import home_bp
 from blueprints.launcher import launcher_bp
@@ -17,6 +18,8 @@ def create_app(test_config=None):
     app.config.from_object(Config)
     if test_config:
         app.config.update(test_config)
+
+    init_request_protection(app)
 
     for blueprint in (home_bp, version_bp, launcher_bp, featured_bp, sponsors_bp, retired_bp):
         app.register_blueprint(blueprint)
