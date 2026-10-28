@@ -177,3 +177,29 @@ PY
 最后确认本站 `/health` 返回 200、自唤醒 Requests 正常、已有业务的 Supabase
 安全日志写入正常。保存部署信息、依赖版本和测试结果。Free 套餐若不能使用 Shell，
 可在受控的一次性运维任务中执行同样检查并保存日志，不要公开诊断端点。
+
+
+### 2026-10-29 部署核查记录
+
+已通过 Render 读取「切尔's workspace」中的 `PVZ-H-tools`，服务 ID
+`srv-d7f37f1j2pic73922md0`，关联本仓库 `main`，开启按提交自动部署。
+
+- 当前 Live 部署：`dep-dbdo5c142hec739f2hfg`。
+- 部署提交：`3356bd06f2324a67befb375656d0321ba26d1e0e`。
+- 构建开始：2026-10-23 15:52:16 UTC；上线：15:53:28 UTC
+  （北京时间 2026-10-23 23:53:28）。
+- 同次构建日志明确包含 `Successfully installed ... certifi-2026.10.23 ...`，
+  已高于公告要求的 `2026.10.19`。原生运行时在新 build 时按 Render 公告刷新系统 CA；
+  本次没有读取系统 CA 文件或散列。
+- Dashboard 实际 Build Command 为 `pip install -r requirements.txt`，
+  与上方仓库声明的完整构建命令存在差异；Start Command 与仓库一致，均不调用 Node。
+  本次没有修改 Dashboard 构建命令。
+- 运行日志含 Requests 自唤醒成功记录。查询部署后日志未命中
+  `CERTIFICATE_VERIFY_FAILED` 或 `Failed to log to Supabase`；
+  未命中不等于证书拒绝测试通过，也不证明 Supabase 写入成功。
+
+因此，已有部署证据支持本服务已在公告后完成重建并安装修复版 Certifi，
+本次无需重复进行紧急重建。显式依赖下限用于保障未来构建。
+当前连接没有执行服务内 Python 命令或读取环境变量的能力；
+自定义 CA 覆盖、系统 CA 实际内容以及两个测试端点的运行时拒绝结果仍待现场验证。
+按上方步骤完成验证；如自定义 CA 仍旧或任一问题证书被接受，再更新相应 CA 并重新构建。
