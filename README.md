@@ -1,73 +1,44 @@
-# PVZH Mod 工具箱
+# PVZH 版本服务
 
-面向《植物大战僵尸：英雄》的在线 Mod 辅助工具站，基于 Flask、UnityPy 和 Supabase。
+本项目已由在线 Mod 工具站收缩为只读版本与更新信息服务。Web 工具服务停止，相关工具能力正在逐步迁往 **PVZH Mod 启动器**；迁移尚未完成。开发进度见 [B 站](https://m.bilibili.com/space/1578548705)。
 
-当前提供：
+首页 `/` 只提供调整说明与感谢，不展示工具、下载中心、玩家精选或赞助界面。
 
-- Unity AssetBundle 的 JSON/CSV 文本导出、修改 ZIP 回填与 Bundle 下载。
-- 下载中心：一个直接打开夸克网盘的超链接。
-- 首页公告、鸣谢、赞助信息、客户端版本查询和 DIY 玩家精选目录。
+## 保留的客户端接口
 
-## 工具归档 · 2026-10-21
+| 内容 | GET 路径 | 配置 |
+| --- | --- | --- |
+| DIY 版本 | `/version`、`/api/version`、`/version.txt` | `data/version.json` |
+| 启动器版本与公告 | `/api/pvzh-launcher/v1/manifest.json` | `data/launcher.json` |
+| DIY 玩家精选 | `/api/pvzh-diy/v1/featured/version.json`、`/api/pvzh-diy/v1/featured/manifest.json` | `data/featured.json` |
+| 赞助与鸣谢 | `/sponsors`、`/api/sponsors`、`/thanks`、`/api/thanks`、`/sponsors.txt`、`/thanks.txt` | `data/sponsors.json` |
 
-关卡与卡组工具已正式归档到 `archive/editors/`，幻影引擎位于 `archive/phantom/`。旧页面及原 API 返回 HTTP 410，不清除浏览器历史数据。首页、导航和 sitemap 不再提供这些工具入口，应用启动不加载编辑器实现或数据。
+接口沿用既有字段、别名、公开 CORS 与禁止缓存的响应头；DIY 和启动器的版本编号彼此独立。玩家精选和赞助仅保留客户端 API，没有网页展示。本次调整不修改四份配置中的版本、公告或作品数据。DIY 配置损坏或缺失时现返回 503，不再回退到源码里的旧版本。
 
-下载中心保留 `/downloads` 地址，只提供现有夸克网盘链接；资料卡片、下载弹窗和 QQ 引流已移除，旧维护公告已撤下。
+旧 `/unity`、`/editor`、`/deck-editor`、`/phantom`、`/downloads`、`/tools` 返回 HTTP 410 及说明页；原工具 API 返回 JSON 410，仅读取路由，不解析上传。工具源码、归档底包和专用资源已退出当前树，仍可从 Git 历史找回。完整旧路径见 `blueprints/retired.py`。
 
-## Unity 文本工具
+## 基础请求保护
 
-解包支持 JSON/CSV 与 auto/manual 文本处理，导出 MonoBehaviour / TextAsset，附带 `_index.json` 和摘要。回填流程：上传原 Bundle → 上传修改 ZIP → 直接回填 → 下载修改 Bundle。
+保留跨接口的单 IP 和全站总量限流，超限返回 429 与 Retry-After。默认每 IP 10 次/秒、120 次/分钟，全站 120 次/秒、1200 次/分钟，额度可通过环境变量调整。只有 GET/HEAD `/health` 豁免；不按 User-Agent 猜测恶意用户，不依赖数据库审计或假成功响应。单 worker 内存计数不适用于多实例部署，详见部署说明。
 
-保留 JSON5、尾逗号、嵌入 JSON、负数 path_id、索引匹配和 PPtr 兼容。只支持文本补丁，不提供图片、raw/DAT 替换、独立结构检查或深度预检。
+## 本地运行与验证
 
-Unity 重任务运行在受限 Linux 子进程，并由全局锁串行执行；非 Linux 环境返回 503。资源预算、临时文件清理、限流和安全审计保持启用，详见 [架构说明](docs/architecture.md)。
-
-## 快速开始
-
-使用 Python 3.12；完整 Unity 功能需要 Linux（Windows 开发可使用 WSL）。
+使用 Python 3.12，无需 Node、Linux resource、UnityPy 或 Supabase。
 
 ```sh
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env
+python scripts/validate_snapshots.py
+python -m pytest -q
 python app.py
 ```
 
-默认访问 `http://127.0.0.1:5001`。Windows 可以安装依赖后使用 `开始.bat` 查看页面与非 Unity 接口，但无法执行 Unity 子进程任务。
+访问 `http://127.0.0.1:5001`。Windows 激活命令为 `.venv\Scripts\activate`；不再需要 WSL。生产只安装 `requirements.txt`。
 
-安全日志需要 `SUPABASE_URL` / `SUPABASE_KEY`；未配置时其他不依赖数据库的功能仍可使用。管理员令牌、IP 名单、自唤醒及域名配置见 `.env.example` 和 [部署说明](docs/deployment.md)。不要提交真实 `.env` 或凭据。
+## 发布
 
-## 项目结构
+修改对应 `data/*.json`，运行快照校验和测试，再通过 PR 审阅、合并和部署。没有公共写入接口，不需要数据库或管理令牌。首页文字位于 `templates/index.html`，样式为本地 `static/site.css`，无前端脚本或外部字体。
 
-```text
-app.py                 Flask 入口、健康检查和定时保活
-blueprints/            当前页面/API，以及归档工具的轻量 410 路由
-templates/             Jinja2 页面；Unity 页面使用 Vue
-static/、styles/       前端资源、Vue 与 Tailwind
-utils/                 Unity 子进程、输入/输出预算和 JSON 工具
-data/                  公告、版本、赞助、下载链接与精选目录配置
-security.py            客户端 IP、访问检查与审计
-database.py、sql/      Supabase 客户端与安全日志表
-archive/editors/       关卡/卡组源码、专用数据、底包与历史测试
-archive/phantom/       幻影引擎源码与资源
-tests/、scripts/       当前回归测试及维护脚本
-docs/                  架构、部署、下载维护与变更记录
-```
-
-## 验证与部署
-
-在 Linux 环境运行：
-
-```sh
-python -m pip install pytest
-python -m pytest -q
-node --test tests/frontend/*.test.mjs
-python scripts/validate_downloads.py
-python scripts/verify_frontend.py
-python scripts/generate_sitemap.py
-```
-
-前端历史 JSON/草稿兼容测试读取归档快照；关卡/卡组专用测试已随源码归档，不属于当前 CI。通用 Unity 测试仍使用归档底包作为真实回归样本。
-
-Render 构建与启动配置见 `render.yaml`：Python 3.12.3，单 Gunicorn worker、4 个线程。依赖 Vue 3.5.13 与 Tailwind 3.4.17 已作为本地静态文件提交；改动样式时按 [部署说明](docs/deployment.md) 构建并更新校验清单。
+部署与配置清理见 [部署说明](docs/deployment.md)，组件关系见 [架构说明](docs/architecture.md)，启动器合同见 [通知说明](docs/launcher-notifications.md)。

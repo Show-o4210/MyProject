@@ -1,85 +1,28 @@
-{% extends "base.html" %}
-
-{% block vue_script %}{% endblock %}
-
-{% block title %}PVZH Mod 工具箱 · 植物大战僵尸英雄{% endblock %}
-{% block meta_description %}植物大战僵尸：英雄在线 Mod 工具：Unity JSON/CSV 解包回填，以及工具资料网盘下载。{% endblock %}
-
-{% macro update_row(log) %}
-<details class="update-row border-b border-slate-100 last:border-0">
-    <summary class="flex items-start gap-3 py-3 cursor-pointer list-none rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
-        <time class="hidden sm:block shrink-0 text-xs text-slate-400 leading-5">{{ log.date }}</time>
-        <div class="flex-1 min-w-0">
-            <span class="block sm:hidden text-xs text-slate-400 mb-1">{{ log.date }}</span>
-            <h3 class="text-sm font-medium text-slate-700 leading-5">{{ log.title }}</h3>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="PVZH Mod 工具站调整说明：Web 工具服务停止，工具能力正逐步迁往 PVZH Mod 启动器。">
+    <meta name="theme-color" content="#faf9f6">
+    <title>站点调整说明 · PVZH</title>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+    <link rel="canonical" href="{{ config.SITE_BASE_URL }}/">
+</head>
+<body>
+    <main>
+        <p class="eyebrow">PVZH · 站点调整说明</p>
+        <h1>工具的故事，<br>换个地方继续。</h1>
+        <p>最近，我正在开发 <strong>PVZH Mod 启动器</strong>。随着开发重心的调整，这个网站也正在卸下 Web 工具的职责：原有在线工具服务已停止，相关工具能力将逐步搬到启动器中。</p>
+        <p>这里今后主要负责为客户端提供版本与更新信息。工具迁移仍在进行中，具体进展和可用功能会随开发推进公布。</p>
+        <p>如果你愿意继续关注，可以到 B 站看看启动器的开发进度。</p>
+        <a class="progress-link" href="https://m.bilibili.com/space/1578548705" target="_blank" rel="noopener noreferrer">关注 B 站开发进度 <span aria-hidden="true">↗</span></a>
+        <div class="thanks">
+            <p>感谢每一位使用过这些工具、提出建议、反馈问题的朋友，也感谢所有支持和帮助过这个项目的人。</p>
+            <p>你们的耐心与支持，让它走到了今天。我们在新的地方继续见。</p>
         </div>
-        <span class="update-chevron material-symbols-rounded text-[18px] text-slate-400 shrink-0" aria-hidden="true">expand_more</span>
-    </summary>
-    <ul class="pb-4 sm:pl-[5.5rem] text-sm leading-relaxed text-slate-500 space-y-2 list-disc list-inside break-words">
-        {% for detail in log.details %}<li>{{ detail | safe }}</li>{% endfor %}
-    </ul>
-</details>
-{% endmacro %}
-
-{% block content %}
-<div class="max-w-4xl mx-auto px-4 sm:px-6 py-7 sm:py-10">
-    <header class="mb-6">
-        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950">PVZH Mod 工具箱</h1>
-        <p class="mt-2 text-sm text-slate-500">编辑游戏数据，制作你的 Mod。</p>
-    </header>
-
-    {% if announcements %}
-    {% set announcement = announcements[0] %}
-    <details class="mb-6 rounded-lg border border-slate-200 px-3.5 text-sm text-slate-600">
-        <summary class="py-3 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded">
-            <span class="text-slate-400 mr-2">公告</span>{{ announcement.title }}
-        </summary>
-        <p class="pb-3 leading-relaxed whitespace-pre-wrap text-slate-500">{{ announcement.content }}</p>
-    </details>
-    {% endif %}
-
-    <section aria-label="工具入口" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <a href="/unity" class="sm:col-span-2 flex items-center gap-4 rounded-xl border border-brand-100 bg-brand-50/50 p-4 sm:p-5 hover:border-brand-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
-            <span class="material-symbols-rounded text-[26px] text-brand-600" aria-hidden="true">inventory_2</span>
-            <div class="flex-1 min-w-0">
-                <h2 class="text-base font-bold text-slate-900">Unity 文本工具</h2>
-                <p class="mt-1 text-sm text-slate-500">导出 JSON / CSV，编辑后回填 Bundle。</p>
-            </div>
-            <span class="material-symbols-rounded text-[20px] text-brand-600" aria-hidden="true">arrow_forward</span>
-        </a>
-        {% for href, icon, title, description in [
-            ('/downloads', 'download', '下载中心', '获取工具与参考资料。')
-        ] %}
-        <a href="{{ href }}" class="flex items-center gap-4 rounded-xl border border-slate-200 p-4 sm:p-5 hover:border-brand-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
-            <span class="material-symbols-rounded text-[24px] text-slate-400" aria-hidden="true">{{ icon }}</span>
-            <div class="flex-1 min-w-0">
-                <h2 class="text-sm font-bold text-slate-900">{{ title }}</h2>
-                <p class="mt-1 text-sm text-slate-500">{{ description }}</p>
-            </div>
-            <span class="material-symbols-rounded text-[18px] text-slate-400" aria-hidden="true">arrow_forward</span>
-        </a>
-        {% endfor %}
-    </section>
-
-    {% if changelogs %}
-    <section aria-labelledby="updates-title" class="mt-8 sm:mt-10">
-        <h2 id="updates-title" class="text-sm font-bold text-slate-900 mb-2">最近更新</h2>
-        <div id="recent-updates">
-            {% for log in changelogs[:3] %}{{ update_row(log) }}{% endfor %}
-        </div>
-        {% if changelogs | length > 3 %}
-        <details id="update-history" class="mt-3">
-            <summary class="text-sm text-slate-500 cursor-pointer w-fit rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">查看历史更新</summary>
-            <div class="mt-2">
-                {% for log in changelogs[3:] %}{{ update_row(log) }}{% endfor %}
-            </div>
-        </details>
-        {% endif %}
-    </section>
-    {% endif %}
-</div>
-<style>
-    .update-row > summary::-webkit-details-marker { display: none; }
-    .update-row[open] > summary .update-chevron { transform: rotate(180deg); }
-</style>
-{% endblock %}
+        <footer>感谢一路同行。</footer>
+    </main>
+</body>
+</html>

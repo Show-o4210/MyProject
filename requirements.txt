@@ -1,12 +1,4 @@
-Flask>=3.1
-UnityPy>=1.20.26
-gunicorn
-whitenoise
-supabase
-pydantic>=2.11.0,<3
-pydantic-core>=2.27.0,<3
+Flask>=3.1,<4
+gunicorn>=26.2,<27
 python-dotenv
-Flask-Limiter
-requests
-json5
-flask-apscheduler
+limits>=5.8,<6

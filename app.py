@@ -1,143 +1,57 @@
-# app.py
-import datetime
-import logging
+"""Read-only PVZH version service with lightweight request admission limits."""
 import os
 
-import requests
-from flask import Flask, send_from_directory
-from flask_apscheduler import APScheduler
-from whitenoise import WhiteNoise
+from flask import Flask, jsonify, send_from_directory
 
 from config import Config
-from extensions import init_limiter
-from security import init_security_handlers
-from utils.json_requests import init_small_json_limits
-from blueprints.unity import unity_bp
-from blueprints.home import home_bp
-from blueprints.deck_editor import deck_editor_bp
-from blueprints.downloads import downloads_bp
-from blueprints.level_editor import level_editor_bp
-from blueprints.phantom import phantom_bp
-from blueprints.version import version_bp
+from security import init_request_protection
 from blueprints.featured import featured_bp
-from blueprints.sponsors import sponsors_bp
+from blueprints.home import home_bp
 from blueprints.launcher import launcher_bp
-
-app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config.from_object(Config)
-app.logger.setLevel(logging.INFO)
-
-# Flask send_file 默认缓存（favicon 等非 WhiteNoise 路径）
-app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 7
-
-# WhiteNoise：正确设置 Content-Length / Cache-Control，避免 Gunicorn access log
-# 把静态文件记成「200 0」（sendfile 无长度时常见假象），并提升 js/css/png 可靠性。
-# max_age=7 天：浏览器强缓存，减少重复拉 CSS/JS/图片。
-app.wsgi_app = WhiteNoise(
-    app.wsgi_app,
-    root=os.path.join(app.root_path, "static"),
-    prefix="static/",
-    max_age=60 * 60 * 24 * 7,
-)
-
-@app.after_request
-def security_response_headers(response):
-    response.headers["Content-Security-Policy"] = "script-src 'self' 'unsafe-inline' 'unsafe-eval'; worker-src 'self'; object-src 'none'; base-uri 'self'"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    return response
+from blueprints.retired import retired_bp
+from blueprints.sponsors import sponsors_bp
+from blueprints.version import version_bp
 
 
-init_small_json_limits(app)
-init_security_handlers(app)
+def create_app(test_config=None):
+    app = Flask(__name__)
+    app.config.from_object(Config)
+    if test_config:
+        app.config.update(test_config)
+
+    init_request_protection(app)
+
+    for blueprint in (home_bp, version_bp, launcher_bp, featured_bp, sponsors_bp, retired_bp):
+        app.register_blueprint(blueprint)
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    @app.get("/favicon.ico")
+    def favicon():
+        return send_from_directory(app.static_folder, "favicon.ico", max_age=86400)
+
+    @app.after_request
+    def response_headers(response):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; style-src 'self'; img-src 'self'; "
+            "base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'"
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if response.status_code >= 400:
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.errorhandler(413)
+    def too_large(_error):
+        return jsonify({"error": "本站仅提供只读版本服务，不接受文件上传。"}), 413
+
+    return app
 
 
-@app.route("/health")
-def health():
-    return {"status": "ok"}, 200
+app = create_app()
 
-
-# 限流在 health 注册之后初始化，才能正确 exempt /health
-init_limiter(app)
-
-# --- 唤醒逻辑开始 ---
-# 说明：Render free tier 会休眠；进程内定时请求公网 URL 保活。
-# 必须打 /health（已在 security 白名单），并带专用 UA/Token，
-# 否则出站 IP（如 74.220.49.7）会被当成“脚本 UA”写入安全日志。
-# 全天保活：减少 Googlebot 夜间抓取撞冷启动 → 软 404 / 索引失败。
-scheduler = APScheduler()
-
-# 与 security.py 中 SELF_PING_UA / X-Self-Ping-Token 约定一致
-SELF_PING_UA = "PVZH-KeepAlive/1.0"
-DEFAULT_SELF_PING_URL = "https://pvz-h-tools.onrender.com/health"
-
-# 成功的 self-ping 只每 N 次打一条，避免日志被健康检查刷屏
-_SELF_PING_OK_COUNTER = 0
-_SELF_PING_LOG_EVERY = 12  # 约 12 * 14min ≈ 每 3 小时一条成功摘要
-
-
-def keep_awake():
-    """自唤醒任务：全天每 14 分钟请求一次，降低 Free 休眠与 SEO 冷启动问题。"""
-    global _SELF_PING_OK_COUNTER
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-    url = os.environ.get("SELF_PING_URL", DEFAULT_SELF_PING_URL)
-    headers = {"User-Agent": SELF_PING_UA}
-    token = os.environ.get("SELF_PING_TOKEN", "").strip()
-    if token:
-        headers["X-Self-Ping-Token"] = token
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            _SELF_PING_OK_COUNTER += 1
-            if _SELF_PING_OK_COUNTER == 1 or _SELF_PING_OK_COUNTER % _SELF_PING_LOG_EVERY == 0:
-                print(
-                    f"[{now}] Self-ping ok x{_SELF_PING_OK_COUNTER} "
-                    f"(logging every {_SELF_PING_LOG_EVERY} successes) url={url}"
-                )
-        else:
-            print(f"[{now}] Self-ping status: {response.status_code} url={url}")
-    except Exception as e:
-        print(f"[{now}] Self-ping failed: {e}")
-
-
-class SchedulerConfig:
-    SCHEDULER_API_ENABLED = False
-
-
-app.config.from_object(SchedulerConfig)
-scheduler.init_app(app)
-
-
-@scheduler.task('interval', id='keep_render_alive', minutes=14)
-def scheduled_ping():
-    keep_awake()
-
-
-scheduler.start()
-# --- 唤醒逻辑结束 ---
-
-app.register_blueprint(downloads_bp)
-app.register_blueprint(deck_editor_bp)
-app.register_blueprint(home_bp)
-app.register_blueprint(unity_bp)
-app.register_blueprint(level_editor_bp)
-app.register_blueprint(phantom_bp)
-app.register_blueprint(version_bp)
-app.register_blueprint(featured_bp)
-app.register_blueprint(sponsors_bp)
-app.register_blueprint(launcher_bp)
-
-
-@app.route("/favicon.ico")
-def favicon():
-    """提供站点品牌 favicon，并为旧浏览器保留标准根路径。"""
-    return send_from_directory(
-        app.static_folder,
-        "favicon.ico",
-        mimetype="image/x-icon",
-        max_age=60 * 60 * 24 * 30,
-    )
-
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5001))
-    app.run(host='0.0.0.0', port=port, debug=False)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5001)), debug=False)
