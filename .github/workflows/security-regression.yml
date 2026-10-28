@@ -1,4 +1,4 @@
-name: Security regression
+name: Version service regression
 on: [push, pull_request]
 permissions:
   contents: read
@@ -10,10 +10,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: pip install -r requirements.txt pytest
-      - run: python scripts/verify_frontend.py
+      - run: pip install -r requirements-dev.txt
+      - run: python scripts/validate_snapshots.py
       - run: python -m pytest -q
-      - run: node --test tests/frontend/*.test.mjs

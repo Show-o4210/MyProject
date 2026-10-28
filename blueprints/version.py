@@ -1,25 +1,40 @@
+from datetime import date
+from urllib.parse import urlsplit
+
 from flask import Blueprint, jsonify, make_response
 from utils.json_data import load_json_file
 
 version_bp = Blueprint("version", __name__)
 
-DEFAULT_VERSION_DATA = {
-    'version': 'v5.0.0',
-    'version_code': 50000,
-    'update_title': 'v5.0.0 · 创作体验与角色更新',
-    'update_log': '1. 首页加入 MAIN / SEED 角色背景与转场，保留原版龙；背景可随机切换或固定。\n2. 工作台支持长按上下排序、边缘自动滚动、右滑置顶和左滑二次确认删除；套系默认三列，并加入批量整理与模板预览。\n3. 编辑器优化页签、图层卡片和叶芽滑块；文字采用专注编辑与大幅实时预览，字体、颜色和排版统一至顶部高级面板。\n4. 主角与贴纸按可见内容自动适配，换图保留视觉大小；支持缩放范围设置、高级位置调整、拖动吸附及贴纸穿插图层，背景固定最底层。\n5. 技能与小故事可开启自动换行；底色图案支持样式、间距、缩放、旋转、不透明度和自定义图片。\n6. 素材选择支持分类置顶，移除“无”占位；补齐克制英雄嵌入图标与 [amb] 快捷语法。\n7. 官方作品收录《第 0 张卡》漫画及 MAIN-01 / SEED-01 透明立绘，全部离线可看；玩家精选由 Render 提供目录、jsDelivr 按当前页下载并缓存。\n8. 工具中心重整公告、更新、战绩与设置，设置使用二级分类，字体采用列表菜单，制作等级加入徽章。\n9. 保存与导出显示真实状态和结果，失败可重试；修复新建套系写入失败闪退、高级调色盘难滚动及大图预览被压小等问题。',
-    'download_url': 'https://pan.quark.cn/s/92d058b77b5f',
-    'force_update': True,
-    'release_date': '2026-10-07',
-    'minimum_supported_version': None,
-    'minimum_supported_version_code': None,
-}
-
-
 def get_version_info():
-    data = load_json_file("version.json", default=DEFAULT_VERSION_DATA)
+    data = load_json_file("version.json")
     if not isinstance(data, dict):
-        return DEFAULT_VERSION_DATA
+        raise ValueError("Version snapshot must be an object")
+    for field, limit in (("version", 80), ("update_title", 120), ("update_log", 16000)):
+        value = data.get(field)
+        if not isinstance(value, str) or len(value) > limit or (field != "update_log" and not value.strip()):
+            raise ValueError("Invalid version text")
+    code = data.get("version_code")
+    if type(code) is not int or not 1 <= code <= 2147483647:
+        raise ValueError("Invalid version code")
+    if type(data.get("force_update")) is not bool:
+        raise ValueError("Invalid update flag")
+    released = data.get("release_date")
+    if not isinstance(released, str) or date.fromisoformat(released).isoformat() != released:
+        raise ValueError("Invalid release date")
+    url = data.get("download_url")
+    if not isinstance(url, str) or len(url) > 4096 or "\\" in url or any(c.isspace() for c in url):
+        raise ValueError("Invalid download URL")
+    parsed = urlsplit(url)
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.username is not None
+            or parsed.password is not None or parsed.port not in (None, 443)):
+        raise ValueError("Invalid download URL")
+    minimum = data.get("minimum_supported_version")
+    if minimum is not None and (not isinstance(minimum, str) or not minimum.strip() or len(minimum) > 80):
+        raise ValueError("Invalid minimum version")
+    minimum_code = data.get("minimum_supported_version_code")
+    if minimum_code is not None and (type(minimum_code) is not int or not 1 <= minimum_code <= code):
+        raise ValueError("Invalid minimum version code")
     return {**data, "minimum_supported_version": data.get("minimum_supported_version"),
             "minimum_supported_version_code": data.get("minimum_supported_version_code")}
 
@@ -37,6 +52,11 @@ def build_no_cache_response(data):
 @version_bp.route("/version", methods=["GET"])
 @version_bp.route("/version.txt", methods=["GET"])
 def get_version():
-    info = get_version_info()
-    return build_no_cache_response(info)
+    try:
+        return build_no_cache_response(get_version_info())
+    except (OSError, ValueError, TypeError, OverflowError, RecursionError):
+        response = build_no_cache_response({"error": "版本信息暂时不可用", "code": "VERSION_UNAVAILABLE"})
+        response.status_code = 503
+        return response
+
 

@@ -17,8 +17,23 @@ def load_json_file(filename: str, default: Any = None) -> Any:
     if not os.path.exists(path):
         return default
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"读取 {filename} 失败: {e}")
+        with open(path, "rb") as f:
+            raw = f.read(128 * 1024 + 1)
+        if len(raw) > 128 * 1024:
+            raise ValueError("Snapshot exceeds size limit")
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object, parse_constant=_invalid_constant)
+    except (OSError, ValueError, RecursionError):
         return default
+
+
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate property")
+        result[key] = value
+    return result
+
+
+def _invalid_constant(_value):
+    raise ValueError("Non-finite JSON number")

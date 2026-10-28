@@ -1,78 +1,46 @@
 # 部署与运维
 
-## Render
+本次 PR 仅准备代码，不合并、不部署、不修改 Render Dashboard，也不更改四份客户端配置内容。
 
-仓库的 `render.yaml` 使用 Python 3.12.3，构建命令为：
+## Render 配置
 
-```text
-pip install -r requirements.txt && python scripts/verify_frontend.py && python scripts/generate_sitemap.py
-```
-
-启动命令为：
+`render.yaml` 保留原服务名 `pvz-h-tools`、Python 3.12.3 与 free 方案，健康检查为 `/health`。
 
 ```text
-gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --max-requests 500 --max-requests-jitter 50 --access-logfile - --error-logfile -
+Build: pip install -r requirements.txt && python scripts/validate_snapshots.py
+Start: gunicorn app:app --no-control-socket --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 30 --max-requests 500 --max-requests-jitter 50 --access-logfile - --error-logfile -
 ```
 
-如果 Render Dashboard 中配置了自定义 Build Command 或 Start Command，应与仓库配置保持一致。
+原 Dashboard 曾使用独立的自定义构建命令，不能假定修改 YAML 就会同步生效。上线前确认 Dashboard 的 Build/Start Command 与此文件一致，尤其不能继续运行已删除的前端校验或 sitemap 生成脚本。单 worker 沿用现有配置以控制免费实例开销，不再受 Unity 并发锁约束。
 
-## 客户端 IP 的信任边界
+## 环境变量与依赖
 
-当前部署是 Render public Web Service。[Render 官方说明](https://render.com/docs/ddos-protection)其公网服务自动使用 Cloudflare 保护；请求经过 Cloudflare / Render 代理后，Flask 的 `remote_addr` 通常是直接连接的代理地址，不能据此区分所有公网客户端。
+只需按情况设置 `SITE_BASE_URL`（默认原 Render 域名）和平台提供的 `PORT`。自定义域名应为完整 HTTPS 站点根地址；首页 canonical、robots、sitemap 均从同一配置生成。`/health` 只检查进程，客户端快照有效性由构建检查及各数据端点确认。
 
-[Cloudflare 官方 header 文档](https://developers.cloudflare.com/fundamentals/reference/http-headers/)说明公网入口向源站发送的 `CF-Connecting-IP` 提供连接到 Cloudflare 的客户端地址；已有 `X-Forwarded-For` 会被保留并追加地址，因此不能直接信任左侧值。当前入口模型下使用 Cloudflare 写入的 CF header，不在应用中维护 Cloudflare CIDR 列表或配置 ProxyFix。
+不再读取 `SUPABASE_URL`、`SUPABASE_KEY`、`SECURITY_ADMIN_TOKEN`、`SECURITY_BLOCKED_IPS`、`SECURITY_TRUSTED_IPS`、`SELF_PING_URL` 或 `SELF_PING_TOKEN`。本次不操作线上凭据；上线后可另行清理这些旧环境变量，不要删除其他服务共用的数据库或密钥。
 
-唯一规则位于 `security.resolve_client_ip()`：校验并规范化单个 CF IPv4/IPv6；缺失、空值、非法值或逗号地址链时降级到经过同样校验的 `remote_addr`，两者都不可用时使用稳定的 `unknown`。IPv6 压缩并统一大小写，IPv4-mapped IPv6 与 IPv4 使用同一身份。`X-Forwarded-For` 不参与任何身份判定。全局/反馈限流、安全 block/trust、审计去重与记录、反馈 `ua_info.ip` 均使用此规则。`SECURITY_BLOCKED_IPS` / `SECURITY_TRUSTED_IPS` 同样规范化，忽略无效配置项。
+生产直接依赖只有 Flask、Gunicorn 和 python-dotenv；没有 Requests、HTTPX/Supabase 或应用主动出站请求。此前草稿 PR #3 的 Certifi 防护针对旧依赖链，本次已移除该链；本 PR 不合并或关闭 #3，上线时需一起评估其是否仍需保留，勿直接恢复已删除的旧检查指令。
 
-信任 CF header 的依据是当前公网代理入口，而不是 IP 字符串合法性本身。若迁移平台、开放直接访问 Gunicorn 的入口、引入私网调用或改变 Cloudflare Worker/代理链，需重新评估 header 的写入/覆盖保证。降级到代理地址会让部分请求共用限流桶，这是保守降级的预期行为。
+## 可用性变化
 
-目前单 worker 保留 `memory://` 限流与进程内审计去重；增加 worker 或实例时，需改为共享限流/去重存储。进程重启也会重置窗口。UA 不再授予信任；令牌仅识别 GET/HEAD /health，不允许绕过其他路径。
+原进程内每 14 分钟自唤醒已移除。代码精简不会消除免费服务的休眠、冷启动或平台故障；如版本查询需要常驻响应，应另行选择合适的部署方案，本次不升级套餐、不新增外部保活任务。客户端查询失败应保留已有数据并正常继续使用，不应当成“已是最新版本”。
 
-## 环境变量
+## 发布及验收
 
-以 `.env.example` 为基准在部署平台配置变量，不要上传真实 `.env`。
-
-- 安全日志需要 `SUPABASE_URL` 与 `SUPABASE_KEY`。
-- 自定义域名应设置 `SITE_BASE_URL`，避免 sitemap 继续输出默认域名。
-- 如启用进程内自唤醒，`SELF_PING_URL` 必须指向本站 `/health`；可同时设置 `SELF_PING_TOKEN`。
-
-## Supabase
-
-按功能执行：
-
-- `sql/security_logs.sql`：创建安全审计表及写入权限。
-
-后端使用 anon key 时，插入操作不能依赖插入后的 SELECT 回读。安全审计已按 `returning=minimal` 约定处理。
-
-## SEO
-
-- 根路径 `/robots.txt` 与 `/sitemap.xml` 由 `blueprints/home.py` 提供。
-- `scripts/generate_sitemap.py` 在构建时同步生成静态版本。
-- 新增可公开索引的固定页面时，需要同步检查 `_STATIC_SITEMAP_PAGES` 和生成脚本。
-- 下载中心为单一网盘链接；sitemap 只收录 `/downloads`，不收录归档工具。
-
-## 上线检查
-
-```powershell
-python -m compileall -q .
-python scripts/validate_downloads.py
-python scripts/generate_sitemap.py
+```sh
+pip install -r requirements-dev.txt
+python scripts/validate_snapshots.py
+python -m pytest -q
 ```
 
-部署后至少检查：
+修改 `data/version.json` 发布 DIY 版本；修改 `data/launcher.json` 发布启动器版本和公告。启动器 `release_code` 单独递增，不能与 DIY version_code 或游戏资源编号混用。维护精选目录和赞助配置的方式保持不变。所有修改经审阅和部署后生效，没有线上配置编辑接口。
 
-- `/health` 返回 200。
-- `/robots.txt` 和 `/sitemap.xml` 使用正确公网域名。
-- 首页、Unity 文本工具和下载中心可以打开。
-- 下载中心只有一个夸克网盘超链接，无卡片、弹窗或 QQ 引流。
-- `/editor`、`/deck-editor` 及原 API 返回 410。
-- 配置 Supabase 后，安全日志写入正常。
+正式部署后检查：
 
+- `/health` 返回 200，首页显示转型说明、感谢和正确 B 站链接。
+- DIY 三个别名及六个赞助/鸣谢别名返回原有字段；启动器、精选版本及精选清单均返回 200、公开 CORS 和 no-store。
+- `/unity`、`/downloads`、`/tools` 等旧页面返回 410；向 `/unpack`、`/repack` 提交请求返回 JSON 410。
+- robots、sitemap 和首页 canonical 使用正确站点域名，sitemap 仅收录首页。
+- 实际客户端的版本、公告、精选和鸣谢加载正常；Web 页面不再展示后两项。
 
-## 资源隔离与前端构建
-
-线上处理依赖 Linux resource 内核限制；非 Linux 环境的在线处理明确返回 503，不能悄悄退回网页进程。保持 1 个 Gunicorn worker；增加实例需要共享并发容量与限流存储。RSS/目录监测是采样保护，内核地址空间/CPU/单文件限制提供硬边界；不等同于整个主机磁盘配额。
-
-已提交本地 Vue 和生成 CSS，Render 无需安装 Node。修改 Tailwind 类名后执行 `npm ci && npm run build:css`，检查变化并更新 `static/vendor/manifest.json` 中 CSS SHA-256；构建会拒绝与清单不同的资源。Vue 使用完整生产版以支持原有模板编译器。
-
-测试：`python -m pytest -q`、`node --test tests/frontend/*.test.mjs`、`python scripts/verify_frontend.py`。真实 Unity 测试仅使用仓库底包，不访问生产站点。安全扫描应在修复合并、部署后复查；PR 完成不自动关闭旧扫描 finding。
+回退时将代码回退到部署前的 Git 提交并恢复对应依赖与启动配置；本次不迁移或删除线上数据库数据。不要用本地测试通过或 Git 推送成功代替正式 HTTPS 与客户端验收。
