@@ -10,10 +10,13 @@
 | --- | --- | --- |
 | DIY 版本 | `/version`、`/api/version`、`/version.txt` | `data/version.json` |
 | 启动器版本与公告 | `/api/pvzh-launcher/v1/manifest.json` | `data/launcher.json` |
+| 启动器项目留言与名单 | `/api/pvzh-launcher/v1/project.json` | `data/launcher-project.json` |
 | DIY 玩家精选 | `/api/pvzh-diy/v1/featured/version.json`、`/api/pvzh-diy/v1/featured/manifest.json` | `data/featured.json` |
 | 赞助与鸣谢 | `/sponsors`、`/api/sponsors`、`/thanks`、`/api/thanks`、`/sponsors.txt`、`/thanks.txt` | `data/sponsors.json` |
 
-接口沿用既有字段、别名、公开 CORS 与禁止缓存的响应头；DIY 和启动器的版本编号彼此独立。玩家精选和赞助仅保留客户端 API，没有网页展示。本次调整不修改四份配置中的版本、公告或作品数据。DIY 配置损坏或缺失时现返回 503，不再回退到源码里的旧版本。
+既有接口沿用原字段、别名、公开 CORS 与禁止缓存的响应头；DIY 和启动器的版本编号彼此独立。玩家精选和赞助仅保留客户端 API，没有网页展示。项目留言使用新增的独立快照，不修改原四份配置中的版本、公告、作品或赞助数据。DIY 配置损坏或缺失时返回 503，不回退到源码里的旧版本。
+
+项目留言、赞赏者与贡献者名单仅提供有界纯文本JSON，由部署快照维护，没有留言提交、编辑、上传或管理接口。新名单默认为空，不从旧赞助接口自动复制。GitHub按钮地址由客户端固定，项目快照不提供可替换URL；合同见[项目留言说明](docs/launcher-project.md)。
 
 旧 `/unity`、`/editor`、`/deck-editor`、`/phantom`、`/downloads`、`/tools` 返回 HTTP 410 及说明页；原工具 API 返回 JSON 410，仅读取路由，不解析上传。工具源码、归档底包和专用资源已退出当前树，仍可从 Git 历史找回。完整旧路径见 `blueprints/retired.py`。
 
@@ -41,4 +44,4 @@ python app.py
 
 修改对应 `data/*.json`，运行快照校验和测试，再通过 PR 审阅、合并和部署。没有公共写入接口，不需要数据库或管理令牌。首页文字位于 `templates/index.html`，样式为本地 `static/site.css`，无前端脚本或外部字体。
 
-部署与配置清理见 [部署说明](docs/deployment.md)，组件关系见 [架构说明](docs/architecture.md)，启动器合同见 [通知说明](docs/launcher-notifications.md)。
+部署与配置清理见 [部署说明](docs/deployment.md)，组件关系见 [架构说明](docs/architecture.md)，启动器合同见 [通知说明](docs/launcher-notifications.md)和[项目留言说明](docs/launcher-project.md)。

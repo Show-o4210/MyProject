@@ -1,6 +1,6 @@
 # 部署与运维
 
-本次 PR 仅准备代码，不合并、不部署、不修改 Render Dashboard，也不更改四份客户端配置内容。
+当前树保留只读服务与原四份客户端配置；项目留言另使用新增的独立快照。代码、审阅、合并、平台部署与线上验收分别记录，不能由本文或本地测试推定线上已经采用。
 
 ## Render 配置
 
@@ -45,13 +45,14 @@ python scripts/validate_snapshots.py
 python -m pytest -q
 ```
 
-修改 `data/version.json` 发布 DIY 版本；修改 `data/launcher.json` 发布启动器版本和公告。启动器 `release_code` 单独递增，不能与 DIY version_code 或游戏资源编号混用。维护精选目录和赞助配置的方式保持不变。所有修改经审阅和部署后生效，没有线上配置编辑接口。
+修改 `data/version.json` 发布 DIY 版本；修改 `data/launcher.json` 发布启动器版本和公告。启动器 `release_code` 单独递增，不能与 DIY version_code 或游戏资源编号混用。项目留言和纯名称名单使用`data/launcher-project.json`，不递增版本公告或从旧赞助表自动复制名单；合同见[项目留言说明](launcher-project.md)。维护精选目录和旧赞助配置的方式保持不变。所有修改经审阅和部署后生效，没有线上配置编辑接口。
 
 正式部署后检查：
 
 - `/health` 返回 200，首页显示转型说明、感谢和正确 B 站链接。
 - 在受控测试中确认单 IP 跨接口超限为 429、Retry-After 有效，其他 IP 可继续访问，等待窗口后恢复；核对真实代理 IP 解析，不对生产站点发起压力测试。
 - DIY 三个别名及六个赞助/鸣谢别名返回原有字段；启动器、精选版本及精选清单均返回 200、公开 CORS 和 no-store。
+- 项目留言`/api/pvzh-launcher/v1/project.json`返回独立的八字段合同、正确留言及空的初始赞赏／贡献者名单，公开CORS和no-store；HEAD／OPTIONS正常，写入405。快照异常为503，不影响旧API。
 - `/unity`、`/downloads`、`/tools` 等旧页面返回 410；向 `/unpack`、`/repack` 提交请求返回 JSON 410。
 - robots、sitemap 和首页 canonical 使用正确站点域名，sitemap 仅收录首页。
 - 实际客户端的版本、公告、精选和鸣谢加载正常；Web 页面不再展示后两项。
