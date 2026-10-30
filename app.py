@@ -9,6 +9,7 @@ from blueprints.featured import featured_bp
 from blueprints.home import home_bp
 from blueprints.launcher import launcher_bp
 from blueprints.launcher_project import launcher_project_bp
+from blueprints.launcher_release import launcher_release_bp
 from blueprints.retired import retired_bp
 from blueprints.sponsors import sponsors_bp
 from blueprints.version import version_bp
@@ -22,7 +23,7 @@ def create_app(test_config=None):
 
     init_request_protection(app)
 
-    for blueprint in (home_bp, version_bp, launcher_bp, launcher_project_bp, featured_bp, sponsors_bp, retired_bp):
+    for blueprint in (home_bp, version_bp, launcher_bp, launcher_project_bp, launcher_release_bp, featured_bp, sponsors_bp, retired_bp):
         app.register_blueprint(blueprint)
 
     @app.get("/health")
