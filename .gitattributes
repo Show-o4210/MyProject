@@ -1,0 +1,2 @@
+# Preserve the canonical release bytes, including intentional CRLF, for APK parity.
+data/launcher-release.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

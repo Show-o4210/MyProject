@@ -9,12 +9,15 @@
 | 内容 | GET 路径 | 配置 |
 | --- | --- | --- |
 | DIY 版本 | `/version`、`/api/version`、`/version.txt` | `data/version.json` |
-| 启动器版本与公告 | `/api/pvzh-launcher/v1/manifest.json` | `data/launcher.json` |
+| 历史 R 构建版本与公告 | `/api/pvzh-launcher/v1/manifest.json` | `data/launcher.json` |
+| 正式启动器版本与公告 | `/api/pvzh-launcher/v2/manifest.json` | `data/launcher-release.json`（身份）＋`data/launcher.json`（公告） |
 | 启动器项目留言与名单 | `/api/pvzh-launcher/v1/project.json` | `data/launcher-project.json` |
 | DIY 玩家精选 | `/api/pvzh-diy/v1/featured/version.json`、`/api/pvzh-diy/v1/featured/manifest.json` | `data/featured.json` |
 | 赞助与鸣谢 | `/sponsors`、`/api/sponsors`、`/thanks`、`/api/thanks`、`/sponsors.txt`、`/thanks.txt` | `data/sponsors.json` |
 
 既有接口沿用原字段、别名、公开 CORS 与禁止缓存的响应头；DIY 和启动器的版本编号彼此独立。玩家精选和赞助仅保留客户端 API，没有网页展示。项目留言使用新增的独立快照，不修改原四份配置中的版本、公告、作品或赞助数据。DIY 配置损坏或缺失时返回 503，不回退到源码里的旧版本。
+
+正式版 v2 接口从独立十字段发行文件生成原五字段 `latest`，普通公告复用原文件。旧 v1 的版本与正文保留，防止历史 R 构建收到正式版升级。发行副本来自客户端唯一 `release.json`，当前对外 v1、内部 R51、独立发布编号 100001；构建默认 development，正式包显式 stable，策略由客户端执行。维护规则见[正式版合同](docs/launcher-release.md)。
 
 项目留言、赞赏者与贡献者名单仅提供有界纯文本JSON，由部署快照维护，没有留言提交、编辑、上传或管理接口。新名单默认为空，不从旧赞助接口自动复制。GitHub按钮地址由客户端固定，项目快照不提供可替换URL；合同见[项目留言说明](docs/launcher-project.md)。
 
