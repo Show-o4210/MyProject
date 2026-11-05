@@ -1,11 +1,11 @@
 {
-  "version": "v5.1.0",
-  "version_code": 50100,
-  "update_title": "v5.1.0 · 公共资源",
-  "update_log": "新增公共资源下载。",
+  "version": "v5.2.0",
+  "version_code": 50200,
+  "update_title": "v5.2.0 · 体验优化",
+  "update_log": "删掉了过场动画，增加了素材文件夹功能",
   "download_url": "https://pan.quark.cn/s/92d058b77b5f",
   "force_update": true,
-  "release_date": "2026-10-16",
+  "release_date": "2026-11-06",
   "minimum_supported_version": null,
   "minimum_supported_version_code": null
 }
