@@ -9,13 +9,13 @@
 | schema_version／product | 精确整数1／pvzh-launcher |
 | public_version | `v1`、`v1.1`、`v1.0.1`等最多三段正主版本，子版本允许0，无前导0，最多80码点；映射为latest.version |
 | release_code | 1～2147483647整数，不接受布尔／小数；映射为latest.release_code |
-| internal_revision | R加正整数，无前导0，最多80码点；内部校验，不额外输出 |
+| internal_revision | 接受历史 `R51` 形式与 `r-2-17` 形式，最多80码点；内部校验，不额外输出 |
 | channel | 精确stable |
 | release_date | 有效规范YYYY-MM-DD；内部校验，不额外输出 |
 | title／notes | 标题非空白且最多120码点；说明允许空或换行，最多8000码点；对应latest字段 |
 | download_url | 最多4096码点，仅HTTPS的pan.quark.cn或pvz-h-tools.onrender.com；无凭据、片段、反斜杠、空白，端口缺省或443 |
 
-当前身份是对外 `v1`、内部 `R51`、`release_code=100001`、stable、`2026-10-30`。发布编号独立单调递增，不与游戏Android versionCode、DIY编号、资源版本或R编号换算。服务仅验证范围，不保存历史最大值；维护者在发布审阅中检查递增。开发／R构建默认development，正式包须显式stable。关闭正式升级提示、标签、按钮及缓存绕过的策略在客户端执行，服务器不根据UA或参数猜测客户端模式。
+当前身份是对外 `v3`、内部 `r-2-17`、`release_code=100002`、stable、`2026-11-08`。发布编号独立单调递增，不与游戏Android versionCode、DIY编号、资源版本或R编号换算。服务仅验证范围，不保存历史最大值；维护者在发布审阅中检查递增。开发／R构建默认development，正式包须显式stable。关闭正式升级提示、标签、按钮及缓存绕过的策略在客户端执行，服务器不根据UA或参数猜测客户端模式。
 
 普通公告唯一来源仍是 `data/launcher.json` 的 `announcements`；更新公告只改这一处。新接口不采用旧文件的 `latest`。公告沿用唯一ID、最多30条、标题120码点、正文8000码点及有效日期的校验；未知字段不透传。历史 `/api/pvzh-launcher/v1/manifest.json` 的旧latest和正文、DIY `/version`、项目名单、精选与赞助配置均保持，防止历史R客户端收到正式版升级。
 

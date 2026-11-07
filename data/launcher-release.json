@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "product": "pvzh-launcher",
-  "public_version": "v1",
-  "release_code": 100001,
-  "internal_revision": "R51",
+  "public_version": "v3",
+  "release_code": 100002,
+  "internal_revision": "r-2-17",
   "channel": "stable",
-  "release_date": "2026-10-30",
-  "title": "PVZH 启动器 v1 正式版",
-  "notes": "首个正式发行版本，功能以 R51 为基础。包含 Mod 管理、手动卡牌编辑、AI 工作台、独立关于页面及在线公告。复杂能力和各项验收边界以版本说明为准。",
+  "release_date": "2026-11-08",
+  "title": "PVZH 启动器 v3 正式版",
+  "notes": "新版游玩页与 Mod 工作台，支持卡牌编辑、贴图与独立外观、AI 协助创作，并在「关于」中提供 v3 功能总览。",
   "download_url": "https://pan.quark.cn/s/35c024ea8e02"
 }

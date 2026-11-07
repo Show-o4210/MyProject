@@ -27,7 +27,7 @@ FIELDS = {
     "download_url",
 }
 PUBLIC_VERSION = re.compile(r"v[1-9][0-9]*(?:\.(?:0|[1-9][0-9]*)){0,2}")
-INTERNAL_REVISION = re.compile(r"R[1-9][0-9]*")
+INTERNAL_REVISION = re.compile(r"R[1-9][0-9]*|r-2-(?:0[1-9]|[1-9][0-9]+)")
 
 
 def _finite_number(value):
