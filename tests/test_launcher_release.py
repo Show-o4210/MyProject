@@ -92,6 +92,18 @@ def test_committed_identity_maps_to_five_public_fields():
     assert "release_date" not in response.json["latest"]
 
 
+def test_legacy_migration_is_isolated_from_stable_feed():
+    client = application().test_client()
+    headers = {"User-Agent": "PVZH-Launcher/36001"}
+    stable = client.get(URL).json
+    assert client.get(URL, headers=headers).json == stable
+    legacy = client.get("/api/pvzh-launcher/v1/manifest.json", headers=headers).json
+    assert legacy["latest"]["release_code"] == 36002
+    assert legacy["latest"]["version"] == stable["latest"]["version"] == "v3.1"
+    assert legacy["latest"]["download_url"] == stable["latest"]["download_url"]
+    assert legacy["announcements"] == stable["announcements"]
+
+
 def test_snapshot_is_read_on_each_request_and_normal_announcements_share_source(client, snapshots):
     first = client.get(URL).json
     identity = valid_release(); identity["release_code"] = 100002

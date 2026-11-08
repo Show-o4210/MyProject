@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from flask import Blueprint
+from flask import Blueprint, request
 
 from blueprints.version import build_no_cache_response
 from utils.json_data import data_file_path
@@ -17,6 +17,8 @@ from utils.json_data import data_file_path
 launcher_bp = Blueprint("launcher", __name__)
 MAX_BYTES = 64 * 1024
 MAX_ANNOUNCEMENTS = 30
+LEGACY_R_CLIENT_CODE = 36001
+LEGACY_R_USER_AGENT = f"PVZH-Launcher/{LEGACY_R_CLIENT_CODE}"
 DOWNLOAD_HOSTS = {"pvz-h-tools.onrender.com", "pan.quark.cn"}
 IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
 
@@ -58,7 +60,22 @@ def _download_url(value):
     return value
 
 
-def launcher_manifest():
+def _latest(latest):
+    if not isinstance(latest, dict):
+        raise ValueError("Missing latest release")
+    code = latest.get("release_code")
+    if type(code) is not int or not 1 <= code <= 2147483647:
+        raise ValueError("Invalid release code")
+    return {
+        "release_code": code,
+        "version": _text(latest.get("version"), 80),
+        "title": _text(latest.get("title"), 120),
+        "notes": _text(latest.get("notes"), 8000, empty=True, multiline=True),
+        "download_url": _download_url(latest.get("download_url")),
+    }
+
+
+def launcher_manifest(*, user_agent=None):
     with Path(data_file_path("launcher.json")).open("rb") as source:
         raw = source.read(MAX_BYTES + 1)
     if len(raw) > MAX_BYTES:
@@ -68,19 +85,12 @@ def launcher_manifest():
             or data["schema_version"] != 1 or data.get("product") != "pvzh-launcher"
             or data.get("channel") != "stable"):
         raise ValueError("Invalid launcher contract")
-    latest = data.get("latest")
-    if not isinstance(latest, dict):
-        raise ValueError("Missing latest release")
-    code = latest.get("release_code")
-    if type(code) is not int or not 1 <= code <= 2147483647:
-        raise ValueError("Invalid release code")
-    clean_latest = {
-        "release_code": code,
-        "version": _text(latest.get("version"), 80),
-        "title": _text(latest.get("title"), 120),
-        "notes": _text(latest.get("notes"), 8000, empty=True, multiline=True),
-        "download_url": _download_url(latest.get("download_url")),
-    }
+    clean_latest = _latest(data.get("latest"))
+    if user_agent == LEGACY_R_USER_AGENT and "legacy_r_migration" in data:
+        migration = _latest(data["legacy_r_migration"])
+        if migration["release_code"] <= LEGACY_R_CLIENT_CODE:
+            raise ValueError("Legacy migration code must exceed the target client code")
+        clean_latest = migration
     announcements = data.get("announcements")
     if not isinstance(announcements, list) or len(announcements) > MAX_ANNOUNCEMENTS:
         raise ValueError("Invalid announcement list")
@@ -117,16 +127,17 @@ def manifest():
         # Flask's default ASCII escaping can double a Chinese snapshot's wire
         # size. Keep this route's UTF-8 body within the client's same 64 KiB cap
         # without changing the global JSON provider used by existing clients.
-        payload = json.dumps(launcher_manifest(), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        manifest_data = launcher_manifest(user_agent=request.headers.get("User-Agent"))
+        payload = json.dumps(manifest_data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         if len(payload) > MAX_BYTES:
             raise ValueError("Launcher response too large")
         response = build_no_cache_response({})
         response.set_data(payload)
-        return response
     except (OSError, ValueError, KeyError, TypeError, OverflowError, RecursionError):
         response = build_no_cache_response({
             "error": "启动器通知暂时不可用",
             "code": "LAUNCHER_MANIFEST_UNAVAILABLE",
         })
         response.status_code = 503
-        return response
+    response.vary.add("User-Agent")
+    return response

@@ -11,10 +11,23 @@
   },
   "announcements": [
     {
+      "id": "20261109-legacy-r-migration",
+      "title": "旧版启动器升级说明",
+      "content": "此前发布 v1 时误发了 R 版安装包，给大家带来困扰，抱歉。仍在使用旧 R 版的朋友，请先导出自制 Mod，再从原夸克目录下载 v3.1 正式版。",
+      "published_at": "2026-11-09"
+    },
+    {
       "id": "20261023-launcher-online",
       "title": "启动器通知服务已上线",
       "content": "版本检查与公告现已启用。低版本每次进入启动器都会收到提醒。\n升级可查看夸克网盘；如尚未找到新包，可通过启动器的官方社群入口获取帮助。",
       "published_at": "2026-10-23"
     }
-  ]
+  ],
+  "legacy_r_migration": {
+    "release_code": 36002,
+    "version": "v3.1",
+    "title": "旧版启动器升级提醒",
+    "notes": "请先导出自制 Mod，再下载 v3.1 正式版。",
+    "download_url": "https://pan.quark.cn/s/35c024ea8e02"
+  }
 }

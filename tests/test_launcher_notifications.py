@@ -83,6 +83,36 @@ class LauncherNotificationsTest(unittest.TestCase):
         self.assertEqual("0", response.headers["Expires"])
         self.assertEqual("*", response.headers["Access-Control-Allow-Origin"])
 
+    def test_migration_changes_only_exact_legacy_user_agent(self):
+        value = valid_manifest()
+        migration = {**value["latest"], "release_code": 36002, "version": "v3.1"}
+        self.write({**value, "legacy_r_migration": migration})
+        for agent in (None, "PVZH-Launcher/22001", "PVZH-Launcher/36002", "PVZH-Launcher/360010",
+                      "PVZH-Launcher/36001 extra", "PVZH-Launcher/100003"):
+            with self.subTest(agent=agent):
+                response = self.client.get(URL, headers={"User-Agent": agent} if agent else {})
+                self.assertEqual(200, response.status_code)
+                self.assertEqual(value, response.json)
+                self.assertIn("User-Agent", response.vary)
+        headers = {"User-Agent": "PVZH-Launcher/36001"}
+        response = self.client.get(URL, headers=headers)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({**value, "latest": migration}, response.json)
+        self.assertIn("User-Agent", response.vary)
+        self.assertIn("no-store", response.headers["Cache-Control"])
+        self.assertEqual(b"", self.client.head(URL, headers=headers).data)
+        self.write(value)
+        self.assertEqual(value, self.client.get(URL, headers=headers).json)
+
+    def test_invalid_migration_is_rejected_for_the_target_only(self):
+        value = valid_manifest()
+        self.write({**value, "legacy_r_migration": {**value["latest"], "release_code": 36001}})
+        response = self.client.get(URL, headers={"User-Agent": "PVZH-Launcher/36001"})
+        self.assertEqual(503, response.status_code)
+        self.assertEqual("LAUNCHER_MANIFEST_UNAVAILABLE", response.json["code"])
+        self.assertIn("User-Agent", response.vary)
+        self.assertEqual(value, self.client.get(URL).json)
+
     def test_snapshot_is_read_each_time_without_version_announcement_tearing(self):
         first = self.client.get(URL).json
         value = valid_manifest()
