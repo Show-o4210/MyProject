@@ -73,10 +73,10 @@ def unavailable(client, method="GET"):
 def test_committed_identity_maps_to_five_public_fields():
     data = json.loads((ROOT / "data/launcher-release.json").read_text(encoding="utf-8"))
     assert len(data) == 10
-    assert data["public_version"] == "v3"
-    assert data["release_code"] == 100002
-    assert data["internal_revision"] == "r-2-17"
-    assert data["release_date"] == "2026-11-08"
+    assert data["public_version"] == "v3.1"
+    assert data["release_code"] == 100003
+    assert data["internal_revision"] == "r-2-22"
+    assert data["release_date"] == "2026-11-09"
     response = application().test_client().get(URL)
     assert response.status_code == 200
     assert response.json == {
