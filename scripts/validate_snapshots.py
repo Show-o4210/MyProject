@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from blueprints.featured import catalog
-from blueprints.launcher import launcher_manifest
+from blueprints.launcher import LEGACY_R_USER_AGENT, launcher_manifest
 from blueprints.launcher_project import launcher_project_snapshot
 from blueprints.launcher_release import launcher_release_manifest
 from blueprints.version import get_version_info
@@ -15,6 +15,7 @@ from utils.json_data import load_json_file
 def main():
     get_version_info()
     launcher_manifest()
+    launcher_manifest(user_agent=LEGACY_R_USER_AGENT)
     launcher_project_snapshot()
     launcher_release_manifest()
     catalog()
