@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "product": "pvzh-launcher",
-  "public_version": "v3.1",
-  "release_code": 100003,
-  "internal_revision": "r-2-22",
+  "public_version": "v4",
+  "release_code": 100004,
+  "internal_revision": "r-2-60",
   "channel": "stable",
-  "release_date": "2026-11-09",
-  "title": "PVZH 启动器 v3.1 补丁",
-  "notes": "改善大 Mod 的手动卡牌编辑与保存，修复中间积木的删除入口，支持长按拖动和按序号跨页移动。内置招笑版更新部分卡牌和普通超尸外观。",
+  "release_date": "2026-11-14",
+  "title": "PVZH 启动器 v4 正式版",
+  "notes": "新增手机关卡编辑器和卡牌属性、稀有度编辑，改善贴图兼容与原版资源恢复，统一启动器样式并支持首页左右滑动切换。",
   "download_url": "https://pan.quark.cn/s/35c024ea8e02"
 }
