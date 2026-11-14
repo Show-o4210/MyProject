@@ -15,6 +15,11 @@ from utils.json_data import data_file_path
 launcher_project_bp = Blueprint("launcher_project", __name__)
 MAX_BYTES = 64 * 1024
 PROJECT_PATH = "/api/pvzh-launcher/v1/project.json"
+LOCALIZED_PROJECT_PATH = "/api/pvzh-launcher/v2/project.json"
+PROJECT_LOCALES = {
+    "zh-CN": "launcher-project-zh.json",
+    "en-US": "launcher-project-en.json",
+}
 FIELDS = {
     "schema_version", "product", "updated_at", "title", "paragraphs",
     "repository_note", "supporters", "contributors",
@@ -82,8 +87,8 @@ def validate_launcher_project(data):
     return clean
 
 
-def launcher_project_snapshot():
-    with Path(data_file_path("launcher-project.json")).open("rb") as source:
+def launcher_project_snapshot(filename="launcher-project.json"):
+    with Path(data_file_path(filename)).open("rb") as source:
         raw = source.read(MAX_BYTES + 1)
     if len(raw) > MAX_BYTES:
         raise ValueError("Project snapshot too large")
@@ -95,7 +100,7 @@ def launcher_project_snapshot():
 def project_headers(response):
     # Routing rejects write methods before a blueprint is selected. Apply this
     # endpoint's headers to those 405s and request-budget errors as well.
-    if request.path == PROJECT_PATH:
+    if request.path in (PROJECT_PATH, LOCALIZED_PROJECT_PATH):
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
@@ -104,20 +109,36 @@ def project_headers(response):
 
 
 @launcher_project_bp.route(PROJECT_PATH, methods=["GET", "HEAD", "OPTIONS"])
+@launcher_project_bp.route(LOCALIZED_PROJECT_PATH, methods=["GET", "HEAD", "OPTIONS"])
 def project():
     if request.method == "OPTIONS":
         response = build_no_cache_response({})
         response.headers["Allow"] = "GET, HEAD, OPTIONS"
         response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
         return response
+    language = None
+    if request.path == LOCALIZED_PROJECT_PATH:
+        languages = request.args.getlist("lang")
+        language = languages[0] if len(languages) == 1 else "zh-CN"
+        if len(languages) > 1 or language not in PROJECT_LOCALES:
+            response = build_no_cache_response({
+                "error": "Use lang=zh-CN or lang=en-US",
+                "code": "LAUNCHER_PROJECT_LANGUAGE_INVALID",
+            })
+            response.status_code = 400
+            return response
     try:
-        payload = _wire(launcher_project_snapshot())
+        snapshot = (launcher_project_snapshot(PROJECT_LOCALES[language])
+                    if language else launcher_project_snapshot())
+        payload = _wire(snapshot)
         response = build_no_cache_response({})
         response.set_data(payload)
+        if language:
+            response.headers["Content-Language"] = language
         return response
     except (OSError, ValueError, KeyError, TypeError, OverflowError, RecursionError):
         response = build_no_cache_response({
-            "error": "项目留言暂时不可用",
+            "error": "Project information is temporarily unavailable" if language == "en-US" else "项目留言暂时不可用",
             "code": "LAUNCHER_PROJECT_UNAVAILABLE",
         })
         response.status_code = 503

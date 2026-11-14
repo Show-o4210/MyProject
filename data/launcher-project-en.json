@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "product": "pvzh-launcher",
+  "updated_at": "2026-11-14",
+  "title": "To every player with an idea",
+  "paragraphs": [
+    "I started this project so players could make their own mods on a phone.",
+    "Start with a card’s stats, keywords, or text. Then try templates, skill blocks, and AI assistance to turn an idea into something you can share. I hope more players will feel comfortable giving modding a try.",
+    "This project grew out of knowledge shared by the community, and I want to give that knowledge back. PVZH-Library is public. You can read, learn from, verify, and contribute to it. The original credits and licenses stay with the tools and materials.",
+    "The project is still growing. Some features are ready to use, while others are still being explored. AI can misunderstand requests, and complex skills have limits. I’ll explain what’s supported and keep improving how the tools work.",
+    "You’re welcome to share your mods, report problems, or tell us what you’d like to create. Specific feedback helps us improve the workbench.",
+    "Thank you to everyone who has shared tools, tutorials, or advice with the PVZH community, and to everyone trying this project. I hope it helps you get started."
+  ],
+  "repository_note": "PVZH-Library is public on GitHub and collects the tools and reference material I’ve built up while modding the game.",
+  "supporters": [
+    "托五的面包",
+    "铁锅炖秋山",
+    "梦魇。",
+    "神光朝子"
+  ],
+  "contributors": [
+    "1.休切尔",
+    "2.张雪峰老师",
+    "3.托五想不起的面包",
+    "4.鼠-_-",
+    "5.小张",
+    "6.蠢龙一只",
+    "And everyone who quietly uses and supports the project."
+  ]
+}

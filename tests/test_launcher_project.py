@@ -99,6 +99,50 @@ def test_valid_snapshot_uses_bounded_utf8_json_and_no_cache(client):
     assert client.application.json.ensure_ascii is True
 
 
+def test_localized_projects_and_legacy_are_separate():
+    client = application().test_client()
+    legacy = client.get(URL)
+    expected_legacy = project._wire(project.launcher_project_snapshot())
+    assert legacy.data == expected_legacy
+    assert "Content-Language" not in legacy.headers
+    assert client.get(URL + "?lang=en-US").data == expected_legacy
+
+    localized = project.LOCALIZED_PROJECT_PATH
+    for language, filename in project.PROJECT_LOCALES.items():
+        url = localized + "?lang=" + language
+        response = client.get(url)
+        assert response.status_code == 200
+        assert_headers(response)
+        assert response.headers["Content-Language"] == language
+        assert response.data == project._wire(project.launcher_project_snapshot(filename))
+        head = client.head(url)
+        assert head.data == b""
+        assert head.headers["Content-Language"] == language
+    assert client.get(localized).data == client.get(localized + "?lang=zh-CN").data
+    assert client.get(localized + "?lang=en-US").json["title"] == "To every player with an idea"
+    for query in ("?lang=fr", "?lang=", "?lang=en-US&lang=zh-CN"):
+        response = client.get(localized + query)
+        assert response.status_code == 400
+        assert_headers(response)
+    assert client.post(localized).status_code == 405
+    assert client.options(localized).headers["Allow"] == "GET, HEAD, OPTIONS"
+
+
+def test_missing_localized_snapshot_does_not_return_other_language(monkeypatch):
+    original = project.data_file_path
+    def data_path(name):
+        if name == project.PROJECT_LOCALES["en-US"]:
+            raise FileNotFoundError
+        return original(name)
+    monkeypatch.setattr(project, "data_file_path", data_path)
+    client = application().test_client()
+    response = client.get(project.LOCALIZED_PROJECT_PATH + "?lang=en-US")
+    assert response.status_code == 503
+    assert response.json["code"] == "LAUNCHER_PROJECT_UNAVAILABLE"
+    assert "title" not in response.json
+    assert client.get(URL).status_code == 200
+
+
 def test_snapshot_changes_are_read_without_restarting(client, snapshot):
     first = client.get(URL).json
     changed = valid_project()
