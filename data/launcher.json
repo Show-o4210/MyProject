@@ -11,6 +11,12 @@
   },
   "announcements": [
     {
+      "id": "20261114-v41-upgrade",
+      "title": "v4.1 已发布，请尽快更新 / Please update to v4.1",
+      "content": "旧版在卡牌换阵营、调色和收藏图显示上有多处问题，给大家带来不便，抱歉。请尽快从原夸克分享下载并安装 v4.1。升级前请先导出自制 Mod，暂时避免用旧版继续编辑或保存，以免已有内容受影响。\n\nWe’re sorry for the issues in earlier versions, including faction changes, tinting, and collection artwork. Please download and install v4.1 from the existing Quark share as soon as possible. Export your custom Mods before updating and avoid editing or saving them in the older version to protect your work.",
+      "published_at": "2026-11-14"
+    },
+    {
       "id": "20261109-legacy-r-migration",
       "title": "旧版启动器升级说明",
       "content": "此前发布 v1 时误发了 R 版安装包，给大家带来困扰，抱歉。仍在使用旧 R 版的朋友，请先导出自制 Mod，再从原夸克目录下载 v3.1 正式版。",
