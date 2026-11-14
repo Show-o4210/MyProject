@@ -73,9 +73,9 @@ def unavailable(client, method="GET"):
 def test_committed_identity_maps_to_five_public_fields():
     data = json.loads((ROOT / "data/launcher-release.json").read_text(encoding="utf-8"))
     assert len(data) == 10
-    assert data["public_version"] == "v4"
-    assert data["release_code"] == 100004
-    assert data["internal_revision"] == "r-2-60"
+    assert data["public_version"] == "v4.1"
+    assert data["release_code"] == 100005
+    assert data["internal_revision"] == "r-2-62"
     assert data["release_date"] == "2026-11-14"
     response = application().test_client().get(URL)
     assert response.status_code == 200
@@ -100,7 +100,7 @@ def test_legacy_migration_is_isolated_from_stable_feed():
     legacy = client.get("/api/pvzh-launcher/v1/manifest.json", headers=headers).json
     assert legacy["latest"]["release_code"] == 36002
     assert legacy["latest"]["version"] == "v3.1"
-    assert stable["latest"]["version"] == "v4"
+    assert stable["latest"]["version"] == "v4.1"
     assert legacy["latest"]["download_url"] == notifications()["legacy_r_migration"]["download_url"]
     assert legacy["announcements"] == stable["announcements"]
 
