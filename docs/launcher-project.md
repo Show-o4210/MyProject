@@ -2,6 +2,8 @@
 
 `GET /api/pvzh-launcher/v1/project.json`读取部署内`data/launcher-project.json`，独立于启动器版本／公告、DIY版本、玩家精选和旧赞助接口。它只提供项目介绍、仓库说明与公开名称，不接受用户留言、表单、上传或配置编辑。
 
+`GET /api/pvzh-launcher/v2/project.json?lang=zh-CN` 和 `?lang=en-US` 分别读取 `data/launcher-project-zh.json` 和 `data/launcher-project-en.json`。省略 `lang` 时返回简体中文。无效或重复的 `lang` 返回 400，成功响应标记 `Content-Language`。v2 使用下文相同的八字段 JSON，启动器按用户选中的界面语言选择中文或英文。v1 继续读取原快照。
+
 ```json
 {
   "schema_version": 1,

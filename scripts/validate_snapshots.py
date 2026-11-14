@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from blueprints.featured import catalog
 from blueprints.launcher import LEGACY_R_USER_AGENT, launcher_manifest
-from blueprints.launcher_project import launcher_project_snapshot
+from blueprints.launcher_project import PROJECT_LOCALES, launcher_project_snapshot
 from blueprints.launcher_release import launcher_release_manifest
 from blueprints.version import get_version_info
 from utils.json_data import load_json_file
@@ -17,6 +17,8 @@ def main():
     launcher_manifest()
     launcher_manifest(user_agent=LEGACY_R_USER_AGENT)
     launcher_project_snapshot()
+    for filename in PROJECT_LOCALES.values():
+        launcher_project_snapshot(filename)
     launcher_release_manifest()
     catalog()
     sponsors = load_json_file("sponsors.json")

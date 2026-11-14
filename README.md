@@ -12,6 +12,7 @@
 | 历史 R 构建版本与公告 | `/api/pvzh-launcher/v1/manifest.json` | `data/launcher.json` |
 | 正式启动器版本与公告 | `/api/pvzh-launcher/v2/manifest.json` | `data/launcher-release.json`（身份）＋`data/launcher.json`（公告） |
 | 启动器项目留言与名单 | `/api/pvzh-launcher/v1/project.json` | `data/launcher-project.json` |
+| 启动器中英文项目介绍与名单 | `/api/pvzh-launcher/v2/project.json?lang=zh-CN` 或 `?lang=en-US` | `data/launcher-project-zh.json`、`data/launcher-project-en.json` |
 | DIY 玩家精选 | `/api/pvzh-diy/v1/featured/version.json`、`/api/pvzh-diy/v1/featured/manifest.json` | `data/featured.json` |
 | 赞助与鸣谢 | `/sponsors`、`/api/sponsors`、`/thanks`、`/api/thanks`、`/sponsors.txt`、`/thanks.txt` | `data/sponsors.json` |
 
