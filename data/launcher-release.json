@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "product": "pvzh-launcher",
-  "public_version": "v4",
-  "release_code": 100004,
-  "internal_revision": "r-2-60",
+  "public_version": "v4.1",
+  "release_code": 100005,
+  "internal_revision": "r-2-62",
   "channel": "stable",
   "release_date": "2026-11-14",
-  "title": "PVZH 启动器 v4 正式版",
-  "notes": "新增手机关卡编辑器和卡牌属性、稀有度编辑，改善贴图兼容与原版资源恢复，统一启动器样式并支持首页左右滑动切换。",
+  "title": "PVZH 启动器 v4.1 正式版",
+  "notes": "修复植物与僵尸锦囊和环境卡换阵营时的卡牌基类与出牌阶段标记。包含烟囱工僵尸独立新卡调色修复和跨阵营收藏图回退。",
   "download_url": "https://pan.quark.cn/s/35c024ea8e02"
 }
