@@ -310,7 +310,8 @@ def test_new_config_failure_cannot_change_any_old_client_response(client, snapsh
     unavailable(client)
     for url, expected in before.items():
         response = client.get(url)
-        assert response.status_code == 200
+        expected_status = 503 if "/featured/" in url else 200
+        assert response.status_code == expected_status
         assert response.json == expected
     assert before["/api/pvzh-launcher/v1/manifest.json"]["latest"]["release_code"] == 22001
 

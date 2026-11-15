@@ -4,7 +4,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from blueprints.featured import catalog
 from blueprints.launcher import LEGACY_R_USER_AGENT, launcher_manifest
 from blueprints.launcher_project import PROJECT_LOCALES, launcher_project_snapshot
 from blueprints.launcher_release import launcher_release_manifest
@@ -20,12 +19,13 @@ def main():
     for filename in PROJECT_LOCALES.values():
         launcher_project_snapshot(filename)
     launcher_release_manifest()
-    catalog()
+    # The featured catalog was intentionally removed; it is not a required
+    # deployment snapshot. Its legacy endpoints retain their fail-closed behavior.
     sponsors = load_json_file("sponsors.json")
     names = sponsors.get("sponsors") if isinstance(sponsors, dict) else sponsors
     if not isinstance(names, list) or any(not isinstance(name, str) for name in names):
         raise ValueError("Invalid sponsors snapshot")
-    print("Validated DIY version, launcher notifications, launcher project, stable launcher release, featured catalog and sponsors snapshots.")
+    print("Validated DIY version, launcher notifications, launcher project, stable launcher release and sponsors snapshots.")
 
 
 if __name__ == "__main__":

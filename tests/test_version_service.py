@@ -33,9 +33,8 @@ def test_legacy_aliases_keep_committed_payloads_and_headers(client, url, filenam
     assert client.post(url).status_code == 405
 
 
-def test_launcher_and_featured_are_still_available_in_real_app(client):
-    urls = ("/api/pvzh-launcher/v1/manifest.json", "/api/pvzh-diy/v1/featured/manifest.json",
-            "/api/pvzh-diy/v1/featured/version.json")
+def test_launcher_is_still_available_in_real_app(client):
+    urls = ("/api/pvzh-launcher/v1/manifest.json",)
     for url in urls:
         response = client.get(url, headers={"User-Agent": "PVZH-Launcher/1.0"})
         assert response.status_code == 200
@@ -44,6 +43,25 @@ def test_launcher_and_featured_are_still_available_in_real_app(client):
         assert response.headers["Access-Control-Allow-Origin"] == "*"
         assert client.head(url).status_code == 200
         assert client.post(url).status_code == 405
+
+
+@pytest.mark.parametrize("name", ("version", "manifest"))
+def test_removed_featured_snapshot_remains_unavailable_in_real_app(client, name):
+    url = f"/api/pvzh-diy/v1/featured/{name}.json"
+    response = client.get(url)
+    assert response.status_code == 503
+    assert response.json == {"error": "精选目录暂时不可用"}
+    assert "no-store" in response.headers["Cache-Control"]
+    assert response.headers["Access-Control-Allow-Origin"] == "*"
+    assert client.head(url).status_code == 503
+    assert client.post(url).status_code == 405
+
+
+def test_committed_snapshots_validate_without_featured_catalog():
+    assert not (ROOT / "data" / "featured.json").exists()
+    result = subprocess.run([sys.executable, "scripts/validate_snapshots.py"],
+                            cwd=ROOT, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
 
 
 def test_index_is_only_a_transition_notice(client):
