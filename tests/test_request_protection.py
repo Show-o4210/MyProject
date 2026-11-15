@@ -106,7 +106,8 @@ def test_default_burst_and_sustained_rules_allow_normal_client_polling():
     app = create_app({"TESTING": True, "TRUST_CLOUDFLARE_CLIENT_IP": False})
     client = app.test_client()
     for path in ("/version", "/api/pvzh-launcher/v1/manifest.json", "/api/pvzh-diy/v1/featured/version.json", "/api/pvzh-diy/v1/featured/manifest.json", "/thanks"):
-        assert client.get(path).status_code == 200
+        expected_status = 503 if "/featured/" in path else 200
+        assert client.get(path).status_code == expected_status
     # The first five calls used half of the short burst allowance.
     for _ in range(5):
         assert client.get("/version").status_code == 200

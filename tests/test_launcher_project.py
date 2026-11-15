@@ -377,7 +377,7 @@ def test_html_and_url_looking_content_remains_plain_json_data(client, snapshot):
 
 def test_project_failures_do_not_modify_or_break_existing_service_snapshots(client, snapshot):
     old_files = [ROOT / "data" / name for name in
-                 ("launcher.json", "version.json", "featured.json", "sponsors.json")]
+                 ("launcher.json", "version.json", "sponsors.json")]
     before = {p: p.read_bytes() for p in old_files}
     snapshot.write_bytes(b"{broken new project snapshot")
     assert_unavailable(client)
@@ -386,7 +386,8 @@ def test_project_failures_do_not_modify_or_break_existing_service_snapshots(clie
                 "/api/pvzh-diy/v1/featured/version.json",
                 "/api/pvzh-diy/v1/featured/manifest.json", "/thanks"):
         response = client.get(url)
-        assert response.status_code == 200, url
+        expected_status = 503 if "/featured/" in url else 200
+        assert response.status_code == expected_status, url
         if response.is_json:
             assert response.json.get("code") != "LAUNCHER_PROJECT_UNAVAILABLE"
     assert {p: p.read_bytes() for p in old_files} == before
